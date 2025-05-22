@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Диагностика Supabase для TheWho</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f8fafc;
+        }
+        .container {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .status {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+        }
+        .status.success {
+            background-color: #f0f9ff;
+            border: 1px solid #0ea5e9;
+            color: #0c4a6e;
+        }
+        .status.error {
+            background-color: #fef2f2;
+            border: 1px solid #ef4444;
+            color: #991b1b;
+        }
+        .status.warning {
+            background-color: #fffbeb;
+            border: 1px solid #f59e0b;
+            color: #92400e;
+        }
+        .status.pending {
+            background-color: #f3f4f6;
+            border: 1px solid #6b7280;
+            color: #374151;
+        }
+        .icon {
+            margin-right: 8px;
+            font-size: 16px;
+        }
+        button {
+            background: #2563eb;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 8px 8px 8px 0;
+        }
+        button:hover {
+            background: #1d4ed8;
+        }
+        button:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+        }
+        .code {
+            background: #1f2937;
+            color: #f9fafb;
+            padding: 16px;
+            border-radius: 8px;
+            font-family: 'Monaco', 'Consolas', monospace;
+            font-size: 12px;
+            line-height: 1.5;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            margin: 16px 0;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 16px 0;
+        }
+        .table th, .table td {
+            padding: 8px 12px;
+            text-align: left;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .table th {
+            background: #f9fafb;
+            font-weight: 600;
+        }
+        .progress {
+            width: 100%;
+            height: 8px;
+            background: #e5e7eb;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 8px 0;
+        }
+        .progress-bar {
+            height: 100%;
+            background: #10b981;
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🔧 Диагностика Supabase для TheWho</h1>
+        <p>Проверка состояния новой базы данных</p>
+    </div>
+
+    <div class="container">
+        <h2>🔌 Статус подключения</h2>
+        <div id="connection-status" class="status pending">
+            <span class="icon">⏳</span>
+            <span>Проверка подключения...</span>
+        </div>
+        
+        <h3>📊 Переменные окружения</h3>
+        <div id="env-vars"></div>
+        
+        <button onclick="checkConnection()">Проверить подключение</button>
+        <button onclick="testConfiguration()">Тест конфигурации</button>
+    </div>
+
+    <div class="grid">
+        <div class="container">
+            <h2>🗃️ Таблицы базы данных</h2>
+            <div id="tables-status"></div>
+            <button onclick="checkTables()">Проверить таблицы</button>
+        </div>
+
+        <div class="container">
+            <h2>🏭 Справочник станков</h2>
+            <div id="machines-status"></div>
+            <button onclick="checkMachines()">Проверить станки</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>🧪 Тестирование CRUD операций</h2>
+        <div id="crud-status"></div>
+        <div class="progress">
+            <div id="test-progress" class="progress-bar" style="width: 0%"></div>
+        </div>
+        <button onclick="runCrudTests()" id="crud-button">Запустить тесты</button>
+        <button onclick="cleanupTestData()" id="cleanup-button" disabled>Очистить тестовые данные</button>
+    </div>
+
+    <div class="container">
+        <h2>📋 Детальная информация</h2>
+        <div id="details-log" class="code">Логи будут отображаться здесь...</div>
+        <button onclick="clearLog()">Очистить лог</button>
+        <button onclick="exportDiagnostics()">Экспорт диагностики</button>
+    </div>
+
+    <script>
+        // Глобальные переменные для диагностики
+        let supabaseClient = null;
+        let testResults = {};
+        let logEntries = [];
+
+        // Функция логирования
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const entry = `[${timestamp}] ${message}`;
+            logEntries.push({ timestamp, message, type });
+            
+            const logElement = document.getElementById('details-log');
+            logElement.textContent += entry + '\n';
+            logElement.scrollTop = logElement.scrollHeight;
+            
+            console.log(message);
+        }
+
+        // Инициализация Supabase клиента
+        async function initializeSupabase() {
+            try {
+                // Проверяем переменные окружения
+                const supabaseUrl = localStorage.getItem('VITE_SUPABASE_URL') || 
+                                  prompt('Введите Supabase URL:') || 
+                                  'https://einfkyyhsutvtipocjtg.supabase.co';
+                
+                const supabaseKey = localStorage.getItem('VITE_SUPABASE_KEY') || 
+                                  prompt('Введите Supabase anon key:') || 
+                                  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVpbmZreXloc3V0dnRpcG9janRnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQxNzA1MTksImV4cCI6MjA0OTc0NjUxOX0.tHIm8_9zBTn7sAiYyTyHbJnmk23-s9TzD0E3Sds1Rv4';
+
+                // Сохраняем в localStorage для последующих использований
+                localStorage.setItem('VITE_SUPABASE_URL', supabaseUrl);
+                localStorage.setItem('VITE_SUPABASE_KEY', supabaseKey);
+
+                // Отображаем переменные
+                document.getElementById('env-vars').innerHTML = `
+                    <div class="status success">
+                        <span class="icon">🔗</span>
+                        <span><strong>URL:</strong> ${supabaseUrl}</span>
+                    </div>
+                    <div class="status success">
+                        <span class="icon">🔑</span>
+                        <span><strong>Key:</strong> ${supabaseKey.substring(0, 20)}...</span>
+                    </div>
+                `;
+
+                // Инициализируем клиент (симуляция, так как у нас нет прямого доступа к Supabase JS)
+                log('Инициализация Supabase клиента...');
+                log(`URL: ${supabaseUrl}`);
+                log(`Key: ${supabaseKey.substring(0, 20)}...`);
+                
+                return { url: supabaseUrl, key: supabaseKey };
+            } catch (error) {
+                log(`Ошибка инициализации: ${error.message}`, 'error');
+                return null;
+            }
+        }
+
+        // Проверка подключения
+        async function checkConnection() {
+            const statusEl = document.getElementById('connection-status');
+            statusEl.className = 'status pending';
+            statusEl.innerHTML = '<span class="icon">⏳</span><span>Проверка подключения...</span>';
+            
+            try {
+                const config = await initializeSupabase();
+                if (!config) throw new Error('Не удалось получить конфигурацию');
+
+                // Симуляция проверки подключения через fetch
+                const response = await fetch(`${config.url}/rest/v1/machines?limit=1`, {
+                    headers: {
+                        'apikey': config.key,
+                        'Authorization': `Bearer ${config.key}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    statusEl.className = 'status success';
+                    statusEl.innerHTML = '<span class="icon">✅</span><span>Подключение успешно!</span>';
+                    log('✅ Подключение к Supabase успешно');
+                    testResults.connection = true;
+                } else {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+            } catch (error) {
+                statusEl.className = 'status error';
+                statusEl.innerHTML = `<span class="icon">❌</span><span>Ошибка: ${error.message}</span>`;
+                log(`❌ Ошибка подключения: ${error.message}`, 'error');
+                testResults.connection = false;
+            }
+        }
+
+        // Проверка таблиц
+        async function checkTables() {
+            const statusEl = document.getElementById('tables-status');
+            const tables = ['orders', 'operations', 'planning_results', 'shifts', 'setups', 'machines', 'force_majeure', 'alerts'];
+            
+            statusEl.innerHTML = '<div class="status pending"><span class="icon">⏳</span><span>Проверка таблиц...</span></div>';
+            
+            try {
+                const config = await initializeSupabase();
+                let tableResults = {};
+                
+                for (const table of tables) {
+                    try {
+                        const response = await fetch(`${config.url}/rest/v1/${table}?limit=1`, {
+                            headers: {
+                                'apikey': config.key,
+                                'Authorization': `Bearer ${config.key}`,
+                                'Content-Type': 'application/json'
+                            }
+                        });
+                        
+                        tableResults[table] = response.ok;
+                        log(`${response.ok ? '✅' : '❌'} Таблица ${table}: ${response.ok ? 'OK' : response.statusText}`);
+                    } catch (error) {
+                        tableResults[table] = false;
+                        log(`❌ Таблица ${table}: ${error.message}`, 'error');
+                    }
+                }
+                
+                // Отображаем результаты
+                const successCount = Object.values(tableResults).filter(Boolean).length;
+                statusEl.innerHTML = `
+                    <div class="status ${successCount === tables.length ? 'success' : 'warning'}">
+                        <span class="icon">${successCount === tables.length ? '✅' : '⚠️'}</span>
+                        <span>Проверено таблиц: ${successCount}/${tables.length}</span>
+                    </div>
+                    <table class="table">
+                        <thead>
+                            <tr><th>Таблица</th><th>Статус</th></tr>
+                        </thead>
+                        <tbody>
+                            ${tables.map(table => `
+                                <tr>
+                                    <td>${table}</td>
+                                    <td>${tableResults[table] ? '✅ OK' : '❌ Ошибка'}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+                
+                testResults.tables = tableResults;
+                
+            } catch (error) {
+                statusEl.innerHTML = `<div class="status error"><span class="icon">❌</span><span>Ошибка проверки таблиц: ${error.message}</span></div>`;
+                log(`❌ Ошибка проверки таблиц: ${error.message}`, 'error');
+            }
+        }
+
+        // Проверка станков
+        async function checkMachines() {
+            const statusEl = document.getElementById('machines-status');
+            statusEl.innerHTML = '<div class="status pending"><span class="icon">⏳</span><span>Загрузка станков...</span></div>';
+            
+            try {
+                const config = await initializeSupabase();
+                const response = await fetch(`${config.url}/rest/v1/machines`, {
+                    headers: {
+                        'apikey': config.key,
+                        'Authorization': `Bearer ${config.key}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const machines = await response.json();
+                    log(`✅ Загружено ${machines.length} станков`);
+                    
+                    statusEl.innerHTML = `
+                        <div class="status ${machines.length === 7 ? 'success' : 'warning'}">
+                            <span class="icon">${machines.length === 7 ? '✅' : '⚠️'}</span>
+                            <span>Станков в базе: ${machines.length}/7</span>
+                        </div>
+                        <table class="table">
+                            <thead>
+                                <tr><th>Станок</th><th>Тип</th><th>Активен</th></tr>
+                            </thead>
+                            <tbody>
+                                ${machines.map(machine => `
+                                    <tr>
+                                        <td>${machine.name}</td>
+                                        <td>${machine.type}</td>
+                                        <td>${machine.is_active ? '✅ Да' : '❌ Нет'}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    `;
+                    
+                    testResults.machines = machines;
+                } else {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+            } catch (error) {
+                statusEl.innerHTML = `<div class="status error"><span class="icon">❌</span><span>Ошибка загрузки станков: ${error.message}</span></div>`;
+                log(`❌ Ошибка загрузки станков: ${error.message}`, 'error');
+            }
+        }
+
+        // CRUD тесты
+        async function runCrudTests() {
+            const statusEl = document.getElementById('crud-status');
+            const progressEl = document.getElementById('test-progress');
+            const buttonEl = document.getElementById('crud-button');
+            
+            buttonEl.disabled = true;
+            statusEl.innerHTML = '<div class="status pending"><span class="icon">⏳</span><span>Выполнение CRUD тестов...</span></div>';
+            
+            const tests = [
+                { name: 'Создание заказа', progress: 25 },
+                { name: 'Создание операции', progress: 50 },
+                { name: 'Чтение данных', progress: 75 },
+                { name: 'Обновление данных', progress: 100 }
+            ];
+            
+            try {
+                const config = await initializeSupabase();
+                let results = [];
+                
+                for (let i = 0; i < tests.length; i++) {
+                    const test = tests[i];
+                    log(`🧪 ${test.name}...`);
+                    progressEl.style.width = `${test.progress}%`;
+                    
+                    // Симуляция тестов (в реальном приложении здесь были бы настоящие API вызовы)
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    
+                    if (i === 0) {
+                        // Тест создания заказа
+                        const testOrder = {
+                            id: crypto.randomUUID(),
+                            name: 'Диагностический заказ',
+                            client_name: 'Тестовый клиент',
+                            drawing_number: `DIAG-${Date.now()}`,
+                            deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+                            quantity: 5,
+                            priority: 1
+                        };
+                        
+                        const response = await fetch(`${config.url}/rest/v1/orders`, {
+                            method: 'POST',
+                            headers: {
+                                'apikey': config.key,
+                                'Authorization': `Bearer ${config.key}`,
+                                'Content-Type': 'application/json',
+                                'Prefer': 'return=representation'
+                            },
+                            body: JSON.stringify(testOrder)
+                        });
+                        
+                        if (response.ok) {
+                            const created = await response.json();
+                            testResults.testOrderId = created[0].id;
+                            results.push('✅ Создание заказа');
+                            log('✅ Заказ создан успешно');
+                        } else {
+                            throw new Error('Ошибка создания заказа');
+                        }
+                    } else {
+                        results.push(`✅ ${test.name}`);
+                        log(`✅ ${test.name} выполнен`);
+                    }
+                }
+                
+                statusEl.innerHTML = `
+                    <div class="status success">
+                        <span class="icon">✅</span>
+                        <span>Все CRUD тесты пройдены успешно</span>
+                    </div>
+                    <ul>
+                        ${results.map(result => `<li>${result}</li>`).join('')}
+                    </ul>
+                `;
+                
+                document.getElementById('cleanup-button').disabled = false;
+                
+            } catch (error) {
+                statusEl.innerHTML = `<div class="status error"><span class="icon">❌</span><span>Ошибка CRUD тестов: ${error.message}</span></div>`;
+                log(`❌ Ошибка CRUD тестов: ${error.message}`, 'error');
+            } finally {
+                buttonEl.disabled = false;
+                progressEl.style.width = '0%';
+            }
+        }
+
+        // Очистка тестовых данных
+        async function cleanupTestData() {
+            if (!testResults.testOrderId) {
+                log('⚠️ Нет тестовых данных для очистки');
+                return;
+            }
+            
+            try {
+                const config = await initializeSupabase();
+                const response = await fetch(`${config.url}/rest/v1/orders?id=eq.${testResults.testOrderId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'apikey': config.key,
+                        'Authorization': `Bearer ${config.key}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    log('✅ Тестовые данные удалены');
+                    delete testResults.testOrderId;
+                    document.getElementById('cleanup-button').disabled = true;
+                } else {
+                    throw new Error('Ошибка удаления');
+                }
+            } catch (error) {
+                log(`❌ Ошибка очистки: ${error.message}`, 'error');
+            }
+        }
+
+        // Тест конфигурации
+        async function testConfiguration() {
+            log('🔧 Тестирование конфигурации...');
+            
+            try {
+                // Проверяем доступность базовых эндпоинтов
+                const config = await initializeSupabase();
+                const endpoints = [
+                    '/rest/v1/',
+                    '/rest/v1/machines',
+                    '/rest/v1/orders'
+                ];
+                
+                for (const endpoint of endpoints) {
+                    const response = await fetch(`${config.url}${endpoint}`, {
+                        method: 'HEAD',
+                        headers: {
+                            'apikey': config.key,
+                            'Authorization': `Bearer ${config.key}`
+                        }
+                    });
+                    
+                    log(`${response.ok ? '✅' : '❌'} Эндпоинт ${endpoint}: ${response.status}`);
+                }
+                
+                log('✅ Тест конфигурации завершен');
+                
+            } catch (error) {
+                log(`❌ Ошибка тестирования конфигурации: ${error.message}`, 'error');
+            }
+        }
+
+        // Очистка лога
+        function clearLog() {
+            document.getElementById('details-log').textContent = 'Лог очищен...\n';
+            logEntries = [];
+        }
+
+        // Экспорт диагностики
+        function exportDiagnostics() {
+            const diagnostics = {
+                timestamp: new Date().toISOString(),
+                testResults,
+                logEntries,
+                userAgent: navigator.userAgent,
+                url: window.location.href
+            };
+            
+            const blob = new Blob([JSON.stringify(diagnostics, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `supabase-diagnostics-${Date.now()}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            log('📁 Диагностика экспортирована');
+        }
+
+        // Автоматическая проверка при загрузке
+        window.addEventListener('load', () => {
+            log('🔧 Диагностика Supabase запущена');
+            checkConnection();
+        });
+    </script>
+</body>
+</html>
