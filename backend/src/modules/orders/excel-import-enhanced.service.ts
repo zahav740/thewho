@@ -1,0 +1,378 @@
+/**
+ * @file: excel-import-enhanced.service.ts
+ * @description: Улучшенный сервис для импорта заказов из Excel (адаптированный под существующую БД)
+ * @dependencies: exceljs, entities
+ * @created: 2025-05-28
+ */
+import { Injectable, BadRequestException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import * as ExcelJS from 'exceljs';
+import { Order } from '../../database/entities/order.entity';
+import { Operation } from '../../database/entities/operation.entity';
+import { PdfFile } from '../../database/entities/pdf-file.entity';
+import type { Express } from 'express';
+
+export interface ImportResult {
+  created: number;
+  updated: number;
+  skipped: number; // Зеленые строки
+  errors: Array<{ row: number; drawingNumber: string; error: string }>;
+}
+
+export interface ColumnMapping {
+  drawingNumber: string; // C
+  revision: string; // D
+  quantity: string; // E
+  deadline: string; // H
+  priority: string; // K
+}
+
+interface ParsedOrder {
+  drawingNumber: string;
+  revision?: string;
+  quantity: number;
+  deadline: Date;
+  priority: number;
+  clientName?: string;
+  name?: string;
+}
+
+@Injectable()
+export class ExcelImportEnhancedService {
+  constructor(
+    @InjectRepository(Order)
+    private readonly orderRepository: Repository<Order>,
+    @InjectRepository(Operation)
+    private readonly operationRepository: Repository<Operation>,
+    @InjectRepository(PdfFile)
+    private readonly pdfFileRepository: Repository<PdfFile>,
+  ) {}
+
+  /**
+   * Импорт заказов из Excel с настраиваемым маппингом колонок
+   */
+  async importOrdersWithMapping(
+    file: Express.Multer.File,
+    columnMapping: ColumnMapping,
+  ): Promise<ImportResult> {
+    if (!file) {
+      throw new BadRequestException('Файл не предоставлен');
+    }
+
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(file.buffer);
+
+    const worksheet = workbook.getWorksheet(1);
+    if (!worksheet) {
+      throw new BadRequestException('Рабочий лист не найден');
+    }
+
+    const orders: ParsedOrder[] = [];
+    const errors: Array<{ row: number; drawingNumber: string; error: string }> = [];
+    let skippedRows = 0;
+
+    console.log('ExcelImport: Начинаем обработку файла');
+
+    // Обрабатываем каждую строку
+    worksheet.eachRow((row, rowNumber) => {
+      if (rowNumber === 1) return; // Пропускаем заголовок
+
+      try {
+        // Проверяем, не выкрашена ли строка в зеленый
+        if (this.isRowGreen(row)) {
+          console.log(`ExcelImport: Пропускаем зеленую строку ${rowNumber}`);
+          skippedRows++;
+          return;
+        }
+
+        const order = this.parseRowToOrder(row, columnMapping, rowNumber);
+        if (order) {
+          orders.push(order);
+          console.log(`ExcelImport: Обработана строка ${rowNumber}: ${order.drawingNumber}`);
+        }
+      } catch (error) {
+        console.error(`ExcelImport: Ошибка в строке ${rowNumber}:`, error);
+        errors.push({
+          row: rowNumber,
+          drawingNumber: row.getCell(this.getColumnIndex(columnMapping.drawingNumber)).value?.toString() || 'Неизвестно',
+          error: error.message,
+        });
+      }
+    });
+
+    console.log(`ExcelImport: Обработано ${orders.length} заказов, пропущено ${skippedRows} строк`);
+
+    return this.processImportedOrders(orders, errors, skippedRows);
+  }
+
+  /**
+   * Проверка, выкрашена ли строка в зеленый цвет
+   */
+  private isRowGreen(row: ExcelJS.Row): boolean {
+    try {
+      // Проверяем несколько ячеек в строке на зеленый фон
+      for (let i = 1; i <= 10; i++) {
+        const cell = row.getCell(i);
+        const fill = cell.style?.fill;
+        
+        if (fill && fill.type === 'pattern') {
+          const patternFill = fill as any; // Используем any чтобы избежать ошибку типов
+          const fgColor = patternFill.fgColor;
+          
+          if (fgColor && typeof fgColor === 'object') {
+            const color = (fgColor as any).argb;
+            // Проверяем различные оттенки зеленого
+            if (color && (
+              color.toLowerCase().includes('00ff00') || // Ярко-зеленый
+              color.toLowerCase().includes('008000') || // Темно-зеленый
+              color.toLowerCase().includes('90ee90') || // Светло-зеленый
+              color.toLowerCase().includes('00ff00') || // Лайм
+              color.toLowerCase().startsWith('ff00') // Другие варианты зеленого
+            )) {
+              return true;
+            }
+          }
+        }
+      }
+      return false;
+    } catch (error) {
+      console.error('Ошибка проверки цвета строки:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Парсинг строки в заказ
+   */
+  private parseRowToOrder(row: ExcelJS.Row, mapping: ColumnMapping, rowNumber: number): ParsedOrder | null {
+    const drawingNumber = this.getCellValue(row, mapping.drawingNumber);
+    if (!drawingNumber) {
+      console.log(`ExcelImport: Пустой номер чертежа в строке ${rowNumber}`);
+      return null;
+    }
+
+    try {
+      const revision = this.getCellValue(row, mapping.revision) || 'A';
+      const quantity = this.parseNumber(this.getCellValue(row, mapping.quantity), 'количество');
+      const deadline = this.parseDate(this.getCellValue(row, mapping.deadline));
+      const priority = this.parseNumber(this.getCellValue(row, mapping.priority), 'приоритет') || 3;
+
+      // Дополнительные поля
+      const clientName = this.getCellValue(row, 'B'); // Предполагаем, что клиент в колонке B
+      const name = this.getCellValue(row, 'A'); // Предполагаем, что название в колонке A
+
+      return {
+        drawingNumber,
+        revision,
+        quantity,
+        deadline,
+        priority: Math.max(1, Math.min(4, priority)), // Ограничиваем 1-4
+        clientName,
+        name,
+      };
+    } catch (error) {
+      throw new Error(`Ошибка парсинга данных: ${error.message}`);
+    }
+  }
+
+  /**
+   * Получение значения ячейки по колонке
+   */
+  private getCellValue(row: ExcelJS.Row, column: string): string {
+    const cell = row.getCell(this.getColumnIndex(column));
+    return cell.value?.toString()?.trim() || '';
+  }
+
+  /**
+   * Преобразование буквы колонки в индекс
+   */
+  private getColumnIndex(column: string): number {
+    return column.charCodeAt(0) - 'A'.charCodeAt(0) + 1;
+  }
+
+  /**
+   * Парсинг числа с проверкой
+   */
+  private parseNumber(value: string, fieldName: string): number {
+    if (!value) {
+      throw new Error(`Не указано ${fieldName}`);
+    }
+
+    const num = parseInt(value, 10);
+    if (isNaN(num) || num <= 0) {
+      throw new Error(`Неверное значение ${fieldName}: ${value}`);
+    }
+
+    return num;
+  }
+
+  /**
+   * Парсинг даты
+   */
+  private parseDate(value: string): Date {
+    if (!value) {
+      throw new Error('Не указана дата');
+    }
+
+    // Пробуем различные форматы даты
+    let date: Date;
+
+    // Если это число (Excel serial date)
+    const numValue = parseFloat(value);
+    if (!isNaN(numValue) && numValue > 25569) { // Excel epoch
+      date = new Date((numValue - 25569) * 86400 * 1000);
+    } else {
+      // Пробуем парсить как строку
+      date = new Date(value);
+    }
+
+    if (isNaN(date.getTime())) {
+      throw new Error(`Неверный формат даты: ${value}`);
+    }
+
+    return date;
+  }
+
+  /**
+   * Обработка импортированных заказов
+   */
+  private async processImportedOrders(
+    orders: ParsedOrder[],
+    existingErrors: Array<{ row: number; drawingNumber: string; error: string }>,
+    skippedRows: number,
+  ): Promise<ImportResult> {
+    const result: ImportResult = {
+      created: 0,
+      updated: 0,
+      skipped: skippedRows,
+      errors: existingErrors,
+    };
+
+    for (const orderData of orders) {
+      try {
+        const existingOrder = await this.orderRepository.findOne({
+          where: { drawingNumber: orderData.drawingNumber }
+        });
+
+        if (existingOrder) {
+          await this.updateExistingOrder(existingOrder, orderData);
+          result.updated++;
+          console.log(`ExcelImport: Обновлен заказ ${orderData.drawingNumber}`);
+        } else {
+          await this.createNewOrder(orderData);
+          result.created++;
+          console.log(`ExcelImport: Создан заказ ${orderData.drawingNumber}`);
+        }
+      } catch (error) {
+        console.error(`ExcelImport: Ошибка обработки заказа ${orderData.drawingNumber}:`, error);
+        result.errors.push({
+          row: 0,
+          drawingNumber: orderData.drawingNumber,
+          error: error.message,
+        });
+      }
+    }
+
+    console.log(`ExcelImport: Завершено. Создано: ${result.created}, Обновлено: ${result.updated}, Ошибок: ${result.errors.length}`);
+    return result;
+  }
+
+  /**
+   * Создание нового заказа
+   */
+  private async createNewOrder(orderData: ParsedOrder): Promise<void> {
+    const order = this.orderRepository.create({
+      drawingNumber: orderData.drawingNumber,
+      name: orderData.name,
+      clientName: orderData.clientName,
+      quantity: orderData.quantity,
+      remainingQuantity: orderData.quantity,
+      deadline: orderData.deadline,
+      priority: orderData.priority,
+      status: 'planned',
+      completionPercentage: 0,
+      isOnSchedule: true,
+    });
+
+    const savedOrder = await this.orderRepository.save(order);
+
+    // Создаем базовые операции (можно настроить)
+    await this.createDefaultOperations(savedOrder);
+
+    // Создаем запись для PDF (пока пустую)
+    await this.createPdfRecord(savedOrder);
+  }
+
+  /**
+   * Обновление существующего заказа
+   */
+  private async updateExistingOrder(existingOrder: Order, orderData: ParsedOrder): Promise<void> {
+    // Обновляем только основные поля, не затрагивая прогресс
+    existingOrder.quantity = orderData.quantity;
+    existingOrder.remainingQuantity = orderData.quantity; // Сбрасываем остаток
+    existingOrder.deadline = orderData.deadline;
+    existingOrder.priority = orderData.priority;
+    existingOrder.name = orderData.name || existingOrder.name;
+    existingOrder.clientName = orderData.clientName || existingOrder.clientName;
+    existingOrder.lastRecalculationAt = new Date();
+
+    await this.orderRepository.save(existingOrder);
+  }
+
+  /**
+   * Создание операций по умолчанию для нового заказа
+   */
+  private async createDefaultOperations(order: Order): Promise<void> {
+    // Создаем базовую операцию (можно настроить логику)
+    const operation = this.operationRepository.create({
+      order: { id: order.id } as Order,
+      sequenceNumber: 1,
+      operationType: '3-axis', // По умолчанию
+      estimatedTime: 60, // 1 час по умолчанию
+      status: 'pending',
+      completedUnits: 0,
+      operators: [],
+    });
+
+    await this.operationRepository.save(operation);
+  }
+
+  /**
+   * Создание записи PDF для заказа
+   */
+  private async createPdfRecord(order: Order): Promise<void> {
+    const pdfFile = this.pdfFileRepository.create({
+      orderId: order.id,
+      fileName: `${order.drawingNumber}.pdf`,
+      fileUrl: `/uploads/pdf/${order.drawingNumber}.pdf`,
+      previewUrl: `/uploads/preview/${order.drawingNumber}.jpg`,
+    });
+
+    await this.pdfFileRepository.save(pdfFile);
+  }
+
+  /**
+   * Валидация файла перед обработкой
+   */
+  validateFile(file: Express.Multer.File): void {
+    if (!file) {
+      throw new BadRequestException('Файл не предоставлен');
+    }
+
+    const allowedMimeTypes = [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+      'application/vnd.ms-excel', // .xls
+    ];
+
+    if (!allowedMimeTypes.includes(file.mimetype)) {
+      throw new BadRequestException('Неподдерживаемый формат файла. Разрешены только .xlsx и .xls');
+    }
+
+    // Проверяем размер файла (например, не более 10MB)
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+      throw new BadRequestException('Размер файла превышает 10MB');
+    }
+  }
+}

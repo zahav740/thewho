@@ -1,0 +1,106 @@
+/**
+ * @file: calendar.controller.ts
+ * @description: Контроллер для производственного календаря
+ * @dependencies: calendar.service, working-days.service
+ * @created: 2025-01-28
+ */
+import { Controller, Get, Post, Query, Body, Param } from '@nestjs/common';
+import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { CalendarService } from './calendar.service';
+import { WorkingDaysService } from './working-days.service';
+import { CalendarFilterDto } from './dto/calendar-filter.dto';
+import { ScheduleOperationDto } from './dto/schedule-operation.dto';
+import { CalendarViewDto } from './dto/calendar-view.dto';
+
+@ApiTags('calendar')
+@Controller('calendar')
+export class CalendarController {
+  constructor(
+    private readonly calendarService: CalendarService,
+    private readonly workingDaysService: WorkingDaysService,
+  ) {}
+
+  @Get()
+  @ApiOperation({ summary: 'Получить календарное представление' })
+  async getCalendarView(@Query() filterDto: CalendarFilterDto): Promise<CalendarViewDto> {
+    try {
+      const startDate = new Date(filterDto.startDate);
+      const endDate = new Date(filterDto.endDate);
+      
+      if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+        throw new Error('Invalid date format');
+      }
+      
+      return await this.calendarService.getCalendarView(startDate, endDate);
+    } catch (error) {
+      console.error('Calendar view error:', error);
+      throw error;
+    }
+  }
+
+  @Get('working-days')
+  @ApiOperation({ summary: 'Получить рабочие дни в периоде' })
+  async getWorkingDays(@Query() filterDto: CalendarFilterDto): Promise<{
+    workingDays: Date[];
+    totalDays: number;
+    workingDaysCount: number;
+  }> {
+    const startDate = new Date(filterDto.startDate);
+    const endDate = new Date(filterDto.endDate);
+    const workingDays = this.workingDaysService.getWorkingDaysInPeriod(startDate, endDate);
+    
+    const totalDays = Math.ceil(
+      (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24) + 1,
+    );
+
+    return {
+      workingDays,
+      totalDays,
+      workingDaysCount: workingDays.length,
+    };
+  }
+
+  @Post('schedule-operation')
+  @ApiOperation({ summary: 'Запланировать операцию' })
+  async scheduleOperation(@Body() scheduleDto: ScheduleOperationDto) {
+    return this.calendarService.scheduleOperation(scheduleDto);
+  }
+
+  @Get('machine-utilization')
+  @ApiOperation({ summary: 'Получить загруженность станков' })
+  async getMachineUtilization(@Query() filterDto: CalendarFilterDto) {
+    const startDate = new Date(filterDto.startDate);
+    const endDate = new Date(filterDto.endDate);
+    return this.calendarService.getMachineUtilization(startDate, endDate);
+  }
+
+  @Get('upcoming-deadlines')
+  @ApiOperation({ summary: 'Получить предстоящие дедлайны' })
+  async getUpcomingDeadlines(@Query('days') days: number = 7) {
+    return this.calendarService.getUpcomingDeadlines(days);
+  }
+
+  @Get('is-working-day/:date')
+  @ApiOperation({ summary: 'Проверить, является ли день рабочим' })
+  async isWorkingDay(@Param('date') date: string): Promise<{ isWorkingDay: boolean }> {
+    const checkDate = new Date(date);
+    return {
+      isWorkingDay: this.workingDaysService.isWorkingDay(checkDate),
+    };
+  }
+
+  @Get('next-working-day/:date')
+  @ApiOperation({ summary: 'Получить следующий рабочий день' })
+  async getNextWorkingDay(@Param('date') date: string): Promise<{ nextWorkingDay: Date }> {
+    const checkDate = new Date(date);
+    return {
+      nextWorkingDay: this.workingDaysService.getNextWorkingDay(checkDate),
+    };
+  }
+
+  @Get('calculate-duration/:minutes')
+  @ApiOperation({ summary: 'Рассчитать продолжительность в рабочих днях' })
+  async calculateDuration(@Param('minutes') minutes: number) {
+    return this.workingDaysService.calculateWorkingHours(minutes);
+  }
+}

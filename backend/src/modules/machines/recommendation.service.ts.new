@@ -1,0 +1,102 @@
+/**
+ * @file: recommendation.service.ts
+ * @description: Сервис для подбора рекомендуемых заказов
+ * @dependencies: typeorm, entities
+ * @created: 2025-01-28
+ */
+import { Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Machine } from '../../database/entities/machine.entity';
+import { Operation, OperationStatus } from '../../database/entities/operation.entity';
+import { Order } from '../../database/entities/order.entity';
+import { RecommendedOrderDto } from './dto/recommended-order.dto';
+import { MachinesService } from './machines.service';
+
+@Injectable()
+export class RecommendationService {
+  constructor(
+    @InjectRepository(Operation)
+    private readonly operationRepository: Repository<Operation>,
+    @InjectRepository(Machine)
+    private readonly machineRepository: Repository<Machine>,
+    private readonly machinesService: MachinesService,
+  ) {}
+
+  async getRecommendedOrders(machineId: number): Promise<RecommendedOrderDto[]> {
+    try {
+      console.log(`RecommendationService.getRecommendedOrders: Запрос для станка ${machineId}`);
+      const machine = await this.machinesService.findOne(machineId);
+      console.log(`RecommendationService: Найден станок типа ${machine.type} с ${machine.axes} осями`);
+
+      const availableOperations = await this.operationRepository
+        .createQueryBuilder('operation')
+        .leftJoinAndSelect('operation.order', 'order')
+        .where('operation.status = :status', { status: OperationStatus.PENDING })
+        .andWhere('operation.machineId IS NULL OR operation.machineId = :machineId', { machineId })
+        .andWhere(
+          `NOT EXISTS (
+            SELECT 1 FROM operations prev 
+            WHERE prev.order_id = operation.order_id 
+            AND prev.operation_number < operation.operation_number 
+            AND prev.status != :completedStatus
+          )`,
+          { completedStatus: OperationStatus.COMPLETED },
+        )
+        .orderBy('order.priority', 'ASC')
+        .addOrderBy('order.deadline', 'ASC')
+        .limit(3)
+        .getMany();
+
+      console.log(`RecommendationService: Найдено ${availableOperations.length} операций`);
+      return this.mapToRecommendedOrders(availableOperations);
+    } catch (error) {
+      console.error('RecommendationService.getRecommendedOrders Ошибка:', error);
+      // Возвращаем пустой массив вместо ошибки
+      return [];
+    }
+  }
+
+  private mapToRecommendedOrders(operations: Operation[]): RecommendedOrderDto[] {
+    return operations.map((operation) => ({
+      // Проверка на наличие order
+      if (!operation.order) {
+        console.error('RecommendationService: Операция без заказа:', operation);
+        return {
+          orderId: '0',
+          operationId: operation.id,
+          drawingNumber: 'Неизвестный заказ',
+          revision: 'A',
+          quantity: 0,
+          operationNumber: operation.sequenceNumber || 0,
+          operationType: operation.operationType || 'unknown',
+          estimatedTime: operation.estimatedTime || 0,
+          priority: 4,
+          deadline: new Date(),
+          pdfUrl: null,
+          previewUrl: null,
+        };
+      }
+      
+      // Обработка возможного отсутствия drawingNumber
+      const drawingNumber = operation.order?.drawingNumber || 
+                          (operation.order as any)?.drawing_number || 
+                          `ORDER-${operation.order?.id || 'UNKNOWN'}`;
+      
+      return {
+        orderId: operation.order.id,
+        operationId: operation.id,
+        drawingNumber: drawingNumber,
+        revision: 'A', // По умолчанию
+        quantity: operation.order.quantity || 0,
+        operationNumber: operation.sequenceNumber || 0,
+        operationType: operation.operationType || 'unknown',
+        estimatedTime: operation.estimatedTime || 0,
+        priority: operation.order.priority || 4,
+        deadline: operation.order.deadline || new Date(),
+        pdfUrl: operation.order.pdfUrl || null,
+        previewUrl: null,
+      };
+    }));
+  }
+}
