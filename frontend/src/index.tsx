@@ -1,3 +1,5 @@
+// Import browser mode 
+import './utils/browserMode'; 
 /**
  * @file: index.tsx
  * @description: Точка входа React приложения

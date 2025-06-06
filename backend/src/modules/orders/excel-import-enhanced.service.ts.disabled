@@ -1,8 +1,9 @@
 /**
  * @file: excel-import-enhanced.service.ts
- * @description: Улучшенный сервис для импорта заказов из Excel (адаптированный под существующую БД)
+ * @description: Упрощенный сервис для импорта заказов из Excel (без зависимости от PdfFile)
  * @dependencies: exceljs, entities
  * @created: 2025-05-28
+ * @fixed: 2025-06-01 // Удалена зависимость от PdfFile
  */
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -10,7 +11,6 @@ import { Repository } from 'typeorm';
 import * as ExcelJS from 'exceljs';
 import { Order } from '../../database/entities/order.entity';
 import { Operation } from '../../database/entities/operation.entity';
-import { PdfFile } from '../../database/entities/pdf-file.entity';
 import type { Express } from 'express';
 
 export interface ImportResult {
@@ -45,8 +45,6 @@ export class ExcelImportEnhancedService {
     private readonly orderRepository: Repository<Order>,
     @InjectRepository(Operation)
     private readonly operationRepository: Repository<Operation>,
-    @InjectRepository(PdfFile)
-    private readonly pdfFileRepository: Repository<PdfFile>,
   ) {}
 
   /**
@@ -299,9 +297,6 @@ export class ExcelImportEnhancedService {
 
     // Создаем базовые операции (можно настроить)
     await this.createDefaultOperations(savedOrder);
-
-    // Создаем запись для PDF (пока пустую)
-    await this.createPdfRecord(savedOrder);
   }
 
   /**
@@ -336,20 +331,6 @@ export class ExcelImportEnhancedService {
     });
 
     await this.operationRepository.save(operation);
-  }
-
-  /**
-   * Создание записи PDF для заказа
-   */
-  private async createPdfRecord(order: Order): Promise<void> {
-    const pdfFile = this.pdfFileRepository.create({
-      orderId: order.id,
-      fileName: `${order.drawingNumber}.pdf`,
-      fileUrl: `/uploads/pdf/${order.drawingNumber}.pdf`,
-      previewUrl: `/uploads/preview/${order.drawingNumber}.jpg`,
-    });
-
-    await this.pdfFileRepository.save(pdfFile);
   }
 
   /**

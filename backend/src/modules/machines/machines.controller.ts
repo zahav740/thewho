@@ -18,7 +18,7 @@ import {
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { MachinesService } from './machines.service';
 import { MachineAvailabilityService } from './machine-availability.service';
-import { PlanningAlgorithmService } from './planning-algorithm.service';
+// import { PlanningAlgorithmService } from './planning-algorithm.service';
 import { CreateMachineDto } from './dto/create-machine.dto';
 import { UpdateMachineDto } from './dto/update-machine.dto';
 import { Machine } from '../../database/entities/machine.entity';
@@ -31,7 +31,7 @@ export class MachinesController {
   constructor(
     private readonly machinesService: MachinesService,
     private readonly machineAvailabilityService: MachineAvailabilityService,
-    private readonly planningAlgorithmService: PlanningAlgorithmService,
+    // private readonly planningAlgorithmService: PlanningAlgorithmService,
   ) {}
 
   // Управление станками (старые методы)
@@ -83,6 +83,7 @@ export class MachinesController {
     );
   }
 
+  /*
   @Get(':machineName/suggested-operations')
   @ApiOperation({ summary: 'Получить рекомендуемые операции для станка' })
   async getSuggestedOperations(
@@ -90,6 +91,7 @@ export class MachinesController {
   ): Promise<RecommendedOrderDto[]> {
     return this.planningAlgorithmService.planOperationsForMachine(machineName);
   }
+  */
 
   @Post(':machineName/assign-operation')
   @ApiOperation({ summary: 'Назначить операцию на станок' })

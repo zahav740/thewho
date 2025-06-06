@@ -1,9 +1,9 @@
 /**
  * @file: operation.entity.ts
- * @description: Entity для операций производства (исправлено для существующей БД)
- * @dependencies: typeorm, order.entity, machine.entity
+ * @description: Entity РАБОТАЮЩИЙ с текущей БД (без изменений структуры)
+ * @dependencies: typeorm, order.entity
  * @created: 2025-01-28
- * @fixed: 2025-05-28
+ * @fixed: 2025-06-07 // Соответствует существующей БД БЕЗ переименований
  */
 import {
   Entity,
@@ -12,12 +12,9 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   ManyToOne,
-  OneToMany,
   JoinColumn,
 } from 'typeorm';
 import { Order } from './order.entity';
-import { Machine } from './machine.entity';
-import { ShiftRecord } from './shift-record.entity';
 
 export enum OperationStatus {
   PENDING = 'PENDING',
@@ -35,55 +32,40 @@ export enum OperationType {
 
 @Entity('operations')
 export class Operation {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
+  @PrimaryGeneratedColumn()
+  id: number;
 
-  @Column({ name: 'sequence_number' })
-  sequenceNumber: number;
+  // ИСПОЛЬЗУЕМ ТОЧНЫЕ ИМЕНА ИЗ СУЩЕСТВУЮЩЕЙ БД
+  @Column({ name: 'operationNumber' }) // Точно как в БД
+  operationNumber: number;
 
-  // Для обратной совместимости с старым кодом
-  get operationNumber(): number {
-    return this.sequenceNumber;
+  // Алиас для совместимости
+  get sequenceNumber(): number {
+    return this.operationNumber;
   }
 
-  @Column({ nullable: true })
-  machine: string;
-
-  // Отдельное поле для связи с Machine entity
-  @ManyToOne(() => Machine, { nullable: true })
-  @JoinColumn({ name: 'machine_id' })
-  machineEntity: Machine;
-
-  @Column({ name: 'operation_type', type: 'varchar', nullable: true })
+  @Column({ name: 'operationtype', nullable: true }) // Точно как в БД
   operationType: string;
 
-  @Column({ name: 'estimated_time' })
-  estimatedTime: number; // в минутах
+  @Column({ name: 'estimatedTime' }) // Точно как в БД
+  estimatedTime: number;
 
-  @Column({ name: 'completed_units', default: 0 })
-  completedUnits: number;
+  @Column({ name: 'machineaxes', nullable: true }) // Точно как в БД
+  machineAxes: number;
 
-  @Column({ name: 'actual_time', nullable: true })
-  actualTime: number;
-
-  @Column({ default: 'pending' })
+  @Column({ default: 'PENDING' })
   status: string;
 
-  @Column({ type: 'jsonb', default: '[]' })
-  operators: any[];
-
+  // СВЯЗЬ С ЗАКАЗОМ - используем существующее поле orderId
   @ManyToOne(() => Order, (order) => order.operations, {
     onDelete: 'CASCADE', 
   })
-  @JoinColumn({ name: 'order_id' })
+  @JoinColumn({ name: 'orderId' }) // Используем существующее поле
   order: Order;
 
-  @OneToMany(() => ShiftRecord, (shiftRecord) => shiftRecord.operation)
-  shiftRecords: ShiftRecord[];
-
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn({ name: 'createdAt' }) // Точно как в БД
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
+  @UpdateDateColumn({ name: 'updatedAt' }) // Точно как в БД  
   updatedAt: Date;
 }

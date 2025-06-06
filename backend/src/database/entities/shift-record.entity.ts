@@ -53,7 +53,7 @@ export class ShiftRecord {
   @Column({ name: 'nightShiftTimePerUnit', type: 'decimal', precision: 10, scale: 2, nullable: true })
   nightShiftTimePerUnit: number;
 
-  @ManyToOne(() => Operation, (operation) => operation.shiftRecords)
+  @ManyToOne(() => Operation)
   @JoinColumn({ name: 'operationId' })
   operation: Operation;
 

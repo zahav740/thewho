@@ -7,12 +7,14 @@
  */
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { Machine } from '../../database/entities/machine.entity';
+import { Operation } from '../../database/entities/operation.entity';
 import { MachinesSimpleController } from './machines-simple.controller';
 import { MachineAvailabilitySimpleService } from './machine-availability-simple.service';
 
 @Module({
   imports: [
-    // Оставляем пустым, так как используем DataSource
+    TypeOrmModule.forFeature([Machine, Operation]),
   ],
   controllers: [MachinesSimpleController],
   providers: [MachineAvailabilitySimpleService],

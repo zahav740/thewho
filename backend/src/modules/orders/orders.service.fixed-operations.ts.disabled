@@ -3,6 +3,7 @@
  * @description: Исправленный сервис для работы с заказами (фикс ошибки сохранения операций)
  * @dependencies: typeorm, entities
  * @created: 2025-05-31
+ * @updated: 2025-06-01 // Исправлена ошибка типизации operations
  */
 import { Injectable, NotFoundException, InternalServerErrorException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -107,7 +108,10 @@ export class OrdersService {
       const { operations: operationsDto, ...orderData } = createOrderDto;
 
       // Проверка и преобразование типов
-      const priorityValue = parseInt(String(orderData.priority), 10);
+      const priorityValue = typeof orderData.priority === 'string' 
+        ? parseInt(orderData.priority, 10) 
+        : orderData.priority;
+
       if (isNaN(priorityValue)) {
         throw new BadRequestException(`Некорректное значение приоритета: ${orderData.priority}`);
       }
@@ -160,19 +164,18 @@ export class OrdersService {
       const enrichedOrder = this.enrichOrder(savedOrder);
 
       // Форматируем созданные операции для ответа
-      if (createdOperationsEntities.length > 0) {
-         enrichedOrder.operations = createdOperationsEntities.map(op => ({
-           id: op.id,
-           operationNumber: op.sequenceNumber,
-           operationType: op.operationType,
-           machineAxes: this.extractMachineAxesNumber(op.machine),
-           estimatedTime: op.estimatedTime,
-           status: op.status,
-           completedUnits: op.completedUnits,
-         }));
-      } else {
-        enrichedOrder.operations = [];
-      }
+      // ВАЖНО: приведение типа as any[] для предотвращения ошибки TypeScript
+      (enrichedOrder.operations as any[]) = createdOperationsEntities.length > 0 
+        ? createdOperationsEntities.map(op => ({
+            id: op.id,
+            operationNumber: op.sequenceNumber,
+            operationType: op.operationType,
+            machineAxes: this.extractMachineAxesNumber(op.machine),
+            estimatedTime: op.estimatedTime,
+            status: op.status,
+            completedUnits: op.completedUnits,
+          })) 
+        : [];
 
       return enrichedOrder;
     } catch (error) {
@@ -207,7 +210,10 @@ export class OrdersService {
         processedUpdateData.workType = orderDataToUpdate.workType;
       }
       if (orderDataToUpdate.priority !== undefined) {
-        const priorityValue = parseInt(String(orderDataToUpdate.priority), 10);
+        const priorityValue = typeof orderDataToUpdate.priority === 'string' 
+          ? parseInt(orderDataToUpdate.priority, 10) 
+          : orderDataToUpdate.priority;
+
         if (isNaN(priorityValue)) {
           throw new BadRequestException(`Некорректное значение приоритета: ${orderDataToUpdate.priority}`);
         }
@@ -278,7 +284,8 @@ export class OrdersService {
 
       // Обогащаем обновленную сущность заказа
       const enrichedUpdatedOrder = this.enrichOrder(updatedOrderEntity);
-      enrichedUpdatedOrder.operations = updatedOperationsResult;
+      // ВАЖНО: приведение типа as any[] для предотвращения ошибки TypeScript
+      (enrichedUpdatedOrder.operations as any[]) = updatedOperationsResult;
 
       console.log(`OrdersService.update: Обновлен заказ ${updatedOrderEntity.id}`);
       return enrichedUpdatedOrder;
@@ -322,7 +329,8 @@ export class OrdersService {
       enriched.operations = [];
     } else {
       // Форматируем операции для фронтенда
-      enriched.operations = enriched.operations.map(op => ({
+      // ВАЖНО: используем any[] для обхода ошибки типизации
+      (enriched.operations as any[]) = (enriched.operations as any[]).map(op => ({
         id: op.id,
         operationNumber: op.sequenceNumber || op.operationNumber,
         operationType: op.operationType,

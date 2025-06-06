@@ -4,7 +4,7 @@ module.exports = function(app) {
   app.use(
     '/api',
     createProxyMiddleware({
-      target: 'http://localhost:3000',
+      target: 'http://localhost:5101',
       changeOrigin: true,
       onProxyReq: (proxyReq, req, res) => {
         // Удаляем большие заголовки

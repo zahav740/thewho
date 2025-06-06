@@ -1,0 +1,19 @@
+@echo off
+echo Full reinstall of frontend dependencies...
+cd frontend
+
+echo Removing node_modules...
+rmdir /s /q node_modules 2>nul
+
+echo Removing package-lock.json...
+del package-lock.json 2>nul
+
+echo Clearing npm cache...
+call npm cache clean --force
+
+echo Installing dependencies...
+call npm install
+
+echo Starting frontend...
+call npm start
+pause
