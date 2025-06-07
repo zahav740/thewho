@@ -1,8 +1,9 @@
 /**
  * @file: production-planning.service.ts
- * @description: Сервис для планирования производства согласно алгоритму выбора операций
+ * @description: Сервис для планирования производства (ИСПРАВЛЕН - учет статуса операций)
  * @dependencies: typeorm, operations, orders, machines
  * @created: 2025-05-28
+ * @fixed: 2025-06-07 - Исправлена логика выбора операций с учетом их статуса
  */
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
@@ -24,6 +25,7 @@ export interface OperationData {
   operationType: string; // 3-axis, 4-axis, turning
   estimatedTime: number;
   machineAxes: number;
+  status?: string; // Добавляем статус операции
 }
 
 export interface MachineAvailability {
@@ -75,11 +77,11 @@ export class ProductionPlanningService {
       const orders = await this.getOrdersWithPriorities();
       const machines = await this.getAvailableMachines(request.selectedMachines);
       
-      // 2. Выбор 3 заказов с разными приоритетами
+      // 2. Выбор заказов с разными приоритетами (до 3)
       const selectedOrders = await this.selectOrdersWithDifferentPriorities(orders);
       
-      // 3. Получение первых операций для каждого заказа
-      const operations = await this.getFirstOperationsForOrders(selectedOrders);
+      // 3. ИСПРАВЛЕНО: Получение доступных операций для каждого заказа (с учетом статуса)
+      const operations = await this.getAvailableOperationsForOrders(selectedOrders);
       
       // 4. Сопоставление операций со станками
       const machineMatching = this.matchOperationsWithMachines(operations, machines);
@@ -126,14 +128,14 @@ export class ProductionPlanningService {
   }
 
   /**
-   * Выбрать 3 заказа с разными приоритетами (1, 2, 3)
+   * Выбрать заказы с разными приоритетами (до 3, но если меньше - то сколько есть)
    */
   private async selectOrdersWithDifferentPriorities(orders: OrderWithPriority[]): Promise<OrderWithPriority[]> {
-    this.logger.log('Выбор 3 заказов с разными приоритетами');
+    this.logger.log('Выбор заказов с разными приоритетами');
     
     const selectedOrders: OrderWithPriority[] = [];
     
-    // Выбираем по одному заказу для каждого приоритета
+    // Выбираем по одному заказу для каждого приоритета (1, 2, 3)
     for (let priority = 1; priority <= 3; priority++) {
       const orderWithPriority = orders.find(order => order.priority === priority);
       if (orderWithPriority) {
@@ -141,25 +143,29 @@ export class ProductionPlanningService {
       }
     }
     
-    if (selectedOrders.length < 3) {
-      throw new NotFoundException(`Не найдено заказов для всех приоритетов (1,2,3). Найдено: ${selectedOrders.length}`);
+    // ИСПРАВЛЕНО: Если нет 3 заказов, то работаем с тем количеством, которое есть
+    if (selectedOrders.length === 0) {
+      throw new NotFoundException('Не найдено ни одного заказа с приоритетами 1, 2 или 3');
     }
     
-    this.logger.log(`Выбрано 3 заказа с приоритетами: ${selectedOrders.map(o => o.priority).join(', ')}`);
+    this.logger.log(`Выбрано ${selectedOrders.length} заказов с приоритетами: ${selectedOrders.map(o => o.priority).join(', ')}`);
     return selectedOrders;
   }
 
   /**
-   * Получить первые операции для выбранных заказов
+   * ИСПРАВЛЕНО: Получить доступные операции для выбранных заказов с учетом статуса
    */
-  private async getFirstOperationsForOrders(orders: OrderWithPriority[]): Promise<OperationData[]> {
-    this.logger.log('Получение первых операций для заказов');
+  private async getAvailableOperationsForOrders(orders: OrderWithPriority[]): Promise<OperationData[]> {
+    this.logger.log('=== ИСПРАВЛЕННАЯ ЛОГИКА: Получение доступных операций для заказов ===');
     
     const orderIds = orders.map(o => o.id);
+    const availableOperations: OperationData[] = [];
     
-    // Получаем первую операцию (с минимальным operationNumber) для каждого заказа
-    const operations = await this.dataSource.query(`
-      WITH first_operations AS (
+    for (const order of orders) {
+      this.logger.log(`\n--- Анализируем заказ ID:${order.id} (${order.drawingNumber}) ---`);
+      
+      // Получаем все операции заказа, отсортированные по номеру
+      const allOperations = await this.dataSource.query(`
         SELECT 
           id,
           "orderId",
@@ -167,30 +173,97 @@ export class ProductionPlanningService {
           operationtype as "operationType",
           "estimatedTime",
           machineaxes as "machineAxes",
-          ROW_NUMBER() OVER (PARTITION BY "orderId" ORDER BY "operationNumber" ASC) as rn
+          status,
+          "assignedMachine",
+          "assignedAt"
         FROM operations 
-        WHERE "orderId" = ANY($1)
-      )
-      SELECT 
-        id,
-        "orderId",
-        "operationNumber",
-        "operationType",
-        "estimatedTime",
-        "machineAxes"
-      FROM first_operations 
-      WHERE rn = 1
-      ORDER BY "orderId"
-    `, [orderIds]);
+        WHERE "orderId" = $1
+        ORDER BY "operationNumber" ASC
+      `, [order.id]);
 
-    this.logger.log(`Найдено ${operations.length} первых операций`);
-    
-    // Логируем найденные операции
-    operations.forEach(op => {
-      this.logger.log(`Операция ID:${op.id}, Заказ:${op.orderId}, Номер:${op.operationNumber}, Тип:${op.operationType}`);
+      this.logger.log(`Найдено ${allOperations.length} операций для заказа`);
+
+      // Проверяем статус операций и находим следующую доступную
+      let nextOperation = null;
+      
+      for (const operation of allOperations) {
+        this.logger.log(`Операция ${operation.operationNumber}: статус="${operation.status}", назначена=${operation.assignedMachine}`);
+        
+        // Проверяем, выполняется ли операция на каком-то станке
+        const isInProgress = await this.isOperationInProgress(operation.id);
+        
+        if (isInProgress) {
+          this.logger.log(`  ❌ Операция ${operation.operationNumber} уже выполняется на станке`);
+          continue; // Пропускаем, операция занята
+        }
+        
+        // Проверяем статус операции
+        if (operation.status === 'COMPLETED') {
+          this.logger.log(`  ✅ Операция ${operation.operationNumber} завершена, переходим к следующей`);
+          continue; // Операция завершена, ищем следующую
+        }
+        
+        if (operation.status === 'IN_PROGRESS') {
+          this.logger.log(`  ⏳ Операция ${operation.operationNumber} в процессе выполнения, пропускаем`);
+          continue; // Операция уже выполняется
+        }
+        
+        // Если операция в статусе PENDING или null, то это кандидат
+        if (!operation.status || operation.status === 'PENDING') {
+          // Проверяем, завершена ли предыдущая операция (если это не первая)
+          if (operation.operationNumber === 1) {
+            this.logger.log(`  🎯 Первая операция ${operation.operationNumber} доступна для назначения`);
+            nextOperation = operation;
+            break;
+          } else {
+            // Проверяем, завершена ли предыдущая операция
+            const prevOperation = allOperations.find(op => op.operationNumber === operation.operationNumber - 1);
+            if (prevOperation && prevOperation.status === 'COMPLETED') {
+              this.logger.log(`  🎯 Операция ${operation.operationNumber} доступна (предыдущая завершена)`);
+              nextOperation = operation;
+              break;
+            } else {
+              this.logger.log(`  ⏸️ Операция ${operation.operationNumber} ожидает завершения предыдущей`);
+            }
+          }
+        }
+      }
+      
+      if (nextOperation) {
+        this.logger.log(`✅ Для заказа ${order.drawingNumber} выбрана операция ${nextOperation.operationNumber}`);
+        availableOperations.push({
+          id: nextOperation.id,
+          orderId: nextOperation.orderId,
+          operationNumber: nextOperation.operationNumber,
+          operationType: nextOperation.operationType,
+          estimatedTime: nextOperation.estimatedTime,
+          machineAxes: nextOperation.machineAxes,
+          status: nextOperation.status
+        });
+      } else {
+        this.logger.warn(`❌ Для заказа ${order.drawingNumber} нет доступных операций`);
+      }
+    }
+
+    this.logger.log(`\n=== ИТОГО: Найдено ${availableOperations.length} доступных операций ===`);
+    availableOperations.forEach(op => {
+      this.logger.log(`- Заказ ${op.orderId}, Операция ${op.operationNumber} (${op.operationType})`);
     });
     
-    return operations;
+    return availableOperations;
+  }
+
+  /**
+   * Проверить, выполняется ли операция на каком-то станке
+   */
+  private async isOperationInProgress(operationId: number): Promise<boolean> {
+    const result = await this.dataSource.query(`
+      SELECT COUNT(*) as count 
+      FROM machines 
+      WHERE "currentOperation" = $1 AND "isOccupied" = true
+    `, [operationId]);
+    
+    return parseInt(result[0].count) > 0;
   }
 
   /**
