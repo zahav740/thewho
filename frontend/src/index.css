@@ -93,9 +93,46 @@ code {
 /* Machine cards grid */
 .machines-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 16px;
-  margin-bottom: 24px;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 20px;
+  margin-bottom: 32px;
+  padding: 8px 0;
+}
+
+/* Улучшения для карточек */
+.ant-card {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.ant-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12) !important;
+}
+
+/* Стили для тегов */
+.ant-tag {
+  border-radius: 12px;
+  padding: 4px 12px;
+  font-weight: 500;
+  border: none;
+}
+
+/* Стили для кнопок */
+.ant-btn {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.ant-btn:hover {
+  transform: translateY(-1px);
+}
+
+/* Анимации для статистики */
+.ant-statistic {
+  transition: all 0.3s ease;
+}
+
+.ant-statistic:hover {
+  transform: scale(1.02);
 }
 
 /* Utility classes */
