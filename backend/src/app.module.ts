@@ -47,7 +47,7 @@ import { OrdersDataMiddleware } from './modules/orders/orders.middleware';
     ShiftsModule,
     CalendarModule,
     FilesModule,
-    // PlanningModule,
+    PlanningModule,
     HealthModule,
     TestModule,
     PetsModule, // FindThePuppy модуль

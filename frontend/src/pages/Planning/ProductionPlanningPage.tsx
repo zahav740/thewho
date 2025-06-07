@@ -3,7 +3,7 @@
  * @description: Страница планирования производства с выбором станков (ИСПРАВЛЕНО)
  * @dependencies: machinesApi, planningApi
  * @created: 2025-05-28
- * @fixed: 2025-05-28
+ * @fixed: 2025-12-07 - JSX исправлен
  */
 import React, { useState } from 'react';
 import {
@@ -20,7 +20,6 @@ import {
   Tag,
   Divider,
   Steps,
-  Table,
   Modal,
   List,
   Statistic,
@@ -31,7 +30,6 @@ import {
   ToolOutlined,
   ClockCircleOutlined,
   InfoCircleOutlined,
-  ExclamationCircleOutlined,
 } from '@ant-design/icons';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { machinesApi } from '../../services/machinesApi';
@@ -39,7 +37,6 @@ import { planningApi } from '../../services/planningApi';
 import { MachineAvailability } from '../../types/machine.types';
 
 const { Title, Text, Paragraph } = Typography;
-const { Step } = Steps;
 
 interface PlanningResult {
   selectedOrders: any[];
@@ -488,7 +485,7 @@ const ProductionPlanningPage: React.FC = () => {
                 prefix={<ClockCircleOutlined />}
               />
             </div>
-          </Result>
+            </Result>
         )}
       </Card>
 

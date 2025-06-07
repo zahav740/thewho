@@ -43,7 +43,18 @@ curl -s http://localhost:5100/api/operations
 echo.
 echo.
 
-echo 6. Shifts endpoints...
+echo 6. Planning endpoints...
+echo Testing /api/planning/demo:
+curl -s -X POST http://localhost:5100/api/planning/demo
+echo.
+echo.
+
+echo Testing /api/planning/results/latest:
+curl -s http://localhost:5100/api/planning/results/latest
+echo.
+echo.
+
+echo 7. Shifts endpoints...
 echo Testing /api/shifts:
 curl -s http://localhost:5100/api/shifts
 echo.

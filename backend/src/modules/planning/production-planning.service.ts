@@ -150,27 +150,46 @@ export class ProductionPlanningService {
   }
 
   /**
-   * Получить первые операции (op1) для выбранных заказов
+   * Получить первые операции для выбранных заказов
    */
   private async getFirstOperationsForOrders(orders: OrderWithPriority[]): Promise<OperationData[]> {
     this.logger.log('Получение первых операций для заказов');
     
     const orderIds = orders.map(o => o.id);
     
+    // Получаем первую операцию (с минимальным operationNumber) для каждого заказа
     const operations = await this.dataSource.query(`
+      WITH first_operations AS (
+        SELECT 
+          id,
+          "orderId",
+          "operationNumber",
+          operationtype as "operationType",
+          "estimatedTime",
+          machineaxes as "machineAxes",
+          ROW_NUMBER() OVER (PARTITION BY "orderId" ORDER BY "operationNumber" ASC) as rn
+        FROM operations 
+        WHERE "orderId" = ANY($1)
+      )
       SELECT 
         id,
         "orderId",
         "operationNumber",
-        operationtype as "operationType",
+        "operationType",
         "estimatedTime",
-        machineaxes as "machineAxes"
-      FROM operations 
-      WHERE "orderId" = ANY($1) AND "operationNumber" = 1
+        "machineAxes"
+      FROM first_operations 
+      WHERE rn = 1
       ORDER BY "orderId"
     `, [orderIds]);
 
     this.logger.log(`Найдено ${operations.length} первых операций`);
+    
+    // Логируем найденные операции
+    operations.forEach(op => {
+      this.logger.log(`Операция ID:${op.id}, Заказ:${op.orderId}, Номер:${op.operationNumber}, Тип:${op.operationType}`);
+    });
+    
     return operations;
   }
 
@@ -180,7 +199,7 @@ export class ProductionPlanningService {
   private async getAvailableMachines(selectedMachineIds: number[]): Promise<MachineAvailability[]> {
     this.logger.log('Получение доступных станков');
     
-    const machines = await this.dataSource.query(`
+    let query = `
       SELECT 
         id,
         code,
@@ -189,10 +208,26 @@ export class ProductionPlanningService {
         "isActive",
         "isOccupied"
       FROM machines 
-      WHERE id = ANY($1) AND "isActive" = true AND "isOccupied" = false
-    `, [selectedMachineIds]);
+      WHERE "isActive" = true AND "isOccupied" = false
+    `;
+    
+    let params = [];
+    
+    // Если указаны конкретные станки, фильтруем по ним
+    if (selectedMachineIds && selectedMachineIds.length > 0) {
+      query += ' AND id = ANY($1)';
+      params = [selectedMachineIds];
+    }
+    
+    const machines = await this.dataSource.query(query, params);
 
     this.logger.log(`Найдено ${machines.length} доступных станков`);
+    
+    // Логируем найденные станки
+    machines.forEach(machine => {
+      this.logger.log(`Станок ID:${machine.id}, Код:${machine.code}, Тип:${machine.type}, Оси:${machine.axes}`);
+    });
+    
     return machines;
   }
 
@@ -200,38 +235,79 @@ export class ProductionPlanningService {
    * Сопоставить операции со станками по типу
    */
   private matchOperationsWithMachines(operations: OperationData[], machines: MachineAvailability[]) {
-    this.logger.log('Сопоставление операций со станками');
+    this.logger.log('=== НАЧАЛО СОПОСТАВЛЕНИЯ ОПЕРАЦИЙ СО СТАНКАМИ ===');
+    this.logger.log(`Всего операций: ${operations.length}`);
+    this.logger.log(`Всего доступных станков: ${machines.length}`);
     
     const matching = [];
     
     for (const operation of operations) {
+      this.logger.log(`\n--- Обрабатываем операцию ID:${operation.id} ---`);
+      this.logger.log(`Тип: ${operation.operationType}, Оси: ${operation.machineAxes}, Заказ: ${operation.orderId}`);
+      
       const compatibleMachines = machines.filter(machine => {
+        this.logger.log(`Проверяем станок ${machine.code} (${machine.type}, ${machine.axes} осей)`);
+        
+        let isCompatible = false;
+        
         // Логика сопоставления согласно обновленному алгоритму
         if (operation.operationType === 'TURNING') {
-          return machine.type === 'TURNING'; // Okuma, JohnFord
+          isCompatible = machine.type === 'TURNING'; // Okuma, JohnFord
+          this.logger.log(`TURNING операция: совместим = ${isCompatible}`);
         } else if (operation.operationType === 'MILLING') {
           // Для фрезерных операций:
           if (operation.machineAxes === 4) {
             // 4-осевые операции могут выполнять только 4-осевые станки
-            return machine.type === 'MILLING' && machine.axes >= 4;
+            isCompatible = machine.type === 'MILLING' && machine.axes >= 4;
+            this.logger.log(`MILLING 4-осевая операция: совместим = ${isCompatible}`);
           } else {
             // 3-осевые операции могут выполнять все фрезерные станки (и 3-осевые и 4-осевые)
-            return machine.type === 'MILLING';
+            isCompatible = machine.type === 'MILLING';
+            this.logger.log(`MILLING 3-осевая операция: совместим = ${isCompatible}`);
           }
+        } else if (operation.operationType === 'DRILLING') {
+          // Сверление может выполняться на фрезерных станках
+          isCompatible = machine.type === 'MILLING';
+          this.logger.log(`DRILLING операция: совместим = ${isCompatible}`);
+        } else if (operation.operationType === 'GRINDING') {
+          // Шлифовка - специальная операция, может выполняться на любых станках
+          isCompatible = true; // Любой доступный станок
+          this.logger.log(`GRINDING операция: совместим = ${isCompatible}`);
+        } else {
+          this.logger.warn(`Неизвестный тип операции: ${operation.operationType}`);
         }
-        return false;
+        
+        return isCompatible;
       });
 
+      this.logger.log(`Найдено ${compatibleMachines.length} совместимых станков для операции ${operation.operationType}`);
+      
       if (compatibleMachines.length > 0) {
+        const selectedMachine = compatibleMachines[0]; // Выбираем первый подходящий
+        this.logger.log(`✅ Выбран станок: ${selectedMachine.code} (ID:${selectedMachine.id}, тип: ${selectedMachine.type}, оси: ${selectedMachine.axes})`);
+        
         matching.push({
           operation,
           machines: compatibleMachines,
-          selectedMachine: compatibleMachines[0] // Выбираем первый подходящий
+          selectedMachine
+        });
+      } else {
+        this.logger.error(`❌ НЕ НАЙДЕНО совместимых станков для операции ${operation.operationType}!`);
+        this.logger.error(`Операция требует: ${operation.operationType}, оси: ${operation.machineAxes}`);
+        this.logger.error(`Доступные станки:`);
+        machines.forEach(m => {
+          this.logger.error(`- ${m.code}: ${m.type}, ${m.axes} осей`);
         });
       }
     }
     
-    this.logger.log(`Сопоставлено ${matching.length} операций со станками`);
+    this.logger.log(`\n=== ИТОГ СОПОСТАВЛЕНИЯ ===`);
+    this.logger.log(`Сопоставлено ${matching.length} операций из ${operations.length}`);
+    
+    if (matching.length === 0) {
+      this.logger.error('🚨 КРИТИЧЕСКАЯ ОШИБКА: НЕ СОПОСТАВЛЕНО НИ ОДНОЙ ОПЕРАЦИИ!');
+    }
+    
     return matching;
   }
 

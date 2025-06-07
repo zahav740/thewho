@@ -130,7 +130,7 @@ export class ProductionPlanningController {
       this.logger.log('Запуск демонстрационного планирования');
       
       // Получаем все доступные станки для демо
-      const availableMachines = await this.planningService['getAvailableMachines']([1, 2, 3, 4, 5, 6, 7]);
+      const availableMachines = await this.planningService['getAvailableMachines']([]);
       const machineIds = availableMachines.map(m => m.id);
       
       if (machineIds.length === 0) {
