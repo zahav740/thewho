@@ -1,9 +1,9 @@
 /**
  * @file: orders.service.ts
- * @description: ПРОИЗВОДСТВЕННЫЙ сервис для работы с заказами (БЕЗ ТЕСТОВЫХ ДАННЫХ)
- * @dependencies: typeorm, entities
+ * @description: ПРОИЗВОДСТВЕННЫЙ сервис для работы с заказами + файловая система
+ * @dependencies: typeorm, entities, OrderFileSystemService
  * @created: 2025-01-28
- * @updated: 2025-06-07 // УБРАНЫ ВСЕ ЗАГЛУШКИ - ТОЛЬКО РЕАЛЬНЫЕ ДАННЫЕ
+ * @updated: 2025-06-07 // Добавлена интеграция с файловой системой заказов
  */
 import { Injectable, NotFoundException, InternalServerErrorException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -59,8 +59,11 @@ export class OrdersService {
 
     console.log(`OrdersService.findAll: Найдено ${orders.length} заказов из ${total}`);
 
-    // Обогащаем заказы с информацией об операциях
-    const enrichedOrders = orders.map(order => {
+    // Обогащаем заказы с информацией об операциях и файловой системе
+    const enrichedOrders = await Promise.all(orders.map(async order => {
+      // Пытаемся получить дополнительные данные из файловой системы
+      const fileSystemData = await this.orderFileSystemService.getLatestOrderVersion(order.drawingNumber);
+      
       return {
         ...order,
         name: order.drawingNumber || 'Без имени',
@@ -71,9 +74,12 @@ export class OrdersService {
         forecastedCompletionDate: order.deadline,
         isOnSchedule: this.isOrderOnSchedule(order),
         lastRecalculationAt: order.updatedAt || order.createdAt || new Date(),
-        operations: order.operations || []
+        operations: order.operations || [],
+        // Данные из файловой системы
+        hasFileSystemData: !!fileSystemData,
+        fileSystemMetadata: fileSystemData?.metadata || null
       };
-    });
+    }));
 
     return {
       data: enrichedOrders,
@@ -104,8 +110,8 @@ export class OrdersService {
 
     console.log(`OrdersService.findOne: Найден заказ ${order.drawingNumber} с ${order.operations?.length || 0} операциями`);
 
-    // Обогащаем заказ
-    const enrichedOrder = this.enrichOrder(order);
+    // Обогащаем заказ данными из файловой системы
+    const enrichedOrder = await this.enrichOrderWithFileSystem(order);
     return enrichedOrder;
   }
 
@@ -115,7 +121,11 @@ export class OrdersService {
       relations: ['operations']
     });
 
-    return order ? this.enrichOrder(order) : null;
+    if (!order) {
+      return null;
+    }
+
+    return await this.enrichOrderWithFileSystem(order);
   }
 
   async create(createOrderDto: CreateOrderDto): Promise<Order> {
@@ -139,6 +149,7 @@ export class OrdersService {
     console.log(`OrdersService.create: Заказ создан с ID ${savedOrder.id}`);
 
     // Создаем операции если они переданы
+    let savedOperations = [];
     if (operationsDto && operationsDto.length > 0) {
       console.log(`OrdersService.create: Создание ${operationsDto.length} операций`);
       
@@ -153,7 +164,7 @@ export class OrdersService {
         });
       });
       
-      const savedOperations = await this.operationRepository.save(operationEntities);
+      savedOperations = await this.operationRepository.save(operationEntities);
       console.log(`OrdersService.create: Создано ${savedOperations.length} операций`);
     }
 
@@ -170,7 +181,13 @@ export class OrdersService {
     console.log(`OrdersService.create: Заказ создан с ${orderWithOperations.operations?.length || 0} операциями`);
 
     // 🆕 Сохраняем в файловую систему
-    await this.saveOrderToFileSystem(orderWithOperations, orderWithOperations.operations || []);
+    try {
+      await this.saveOrderToFileSystem(orderWithOperations, orderWithOperations.operations || []);
+      console.log(`OrdersService.create: Заказ сохранен в файловую систему`);
+    } catch (error) {
+      console.error('Ошибка сохранения в файловую систему:', error);
+      // Не прерываем выполнение, так как заказ уже создан в БД
+    }
 
     return this.enrichOrder(orderWithOperations);
   }
@@ -239,8 +256,13 @@ export class OrdersService {
       relations: ['operations']
     });
 
-    // 🆕 Создаем новую версию в файловой системе
-    await this.updateOrderInFileSystem(updatedOrder, updatedOrder.operations || []);
+    // 🆕 Создаем новую версию в файловой системе при обновлении
+    try {
+      await this.updateOrderInFileSystem(updatedOrder, updatedOrder.operations || []);
+      console.log(`OrdersService.update: Создана новая версия заказа в файловой системе`);
+    } catch (error) {
+      console.error('Ошибка обновления в файловой системе:', error);
+    }
 
     return this.enrichOrder(updatedOrder);
   }
@@ -260,6 +282,7 @@ export class OrdersService {
     }
     
     console.log(`OrdersService.remove: Заказ ${id} удален`);
+    // Примечание: файловая система не удаляется для сохранения истории
   }
 
   async removeBatch(ids: string[]): Promise<number> {
@@ -295,7 +318,128 @@ export class OrdersService {
     const numericId = parseInt(id, 10);
     await this.orderRepository.update(numericId, { pdfPath: filename });
     
+    // 🆕 Обновляем файловую систему при загрузке PDF
+    try {
+      const orderWithOperations = await this.orderRepository.findOne({
+        where: { id: numericId },
+        relations: ['operations']
+      });
+      
+      if (orderWithOperations) {
+        await this.updateOrderInFileSystem(orderWithOperations, orderWithOperations.operations || []);
+      }
+    } catch (error) {
+      console.error('Ошибка обновления PDF в файловой системе:', error);
+    }
+    
     return order;
+  }
+
+  // 🆕 Новые методы для работы с файловой системой
+
+  /**
+   * Получить версии заказа из файловой системы
+   */
+  async getOrderVersions(drawingNumber: string): Promise<string[]> {
+    return await this.orderFileSystemService.getOrderVersions(drawingNumber);
+  }
+
+  /**
+   * Получить конкретную версию заказа
+   */
+  async getOrderVersion(drawingNumber: string, version: string): Promise<OrderFileSystemData | null> {
+    return await this.orderFileSystemService.getOrderVersion(drawingNumber, version);
+  }
+
+  /**
+   * Экспортировать все заказы в файловую систему
+   */
+  async exportAllOrdersToFileSystem(): Promise<{ success: number; errors: number }> {
+    console.log('OrdersService.exportAllOrdersToFileSystem: Начало экспорта всех заказов');
+    
+    const orders = await this.orderRepository.find({ relations: ['operations'] });
+    let success = 0;
+    let errors = 0;
+
+    for (const order of orders) {
+      try {
+        await this.orderFileSystemService.exportOrderFromDatabase(order, order.operations || []);
+        success++;
+        console.log(`Экспортирован заказ ${order.drawingNumber}`);
+      } catch (error) {
+        errors++;
+        console.error(`Ошибка экспорта заказа ${order.drawingNumber}:`, error);
+      }
+    }
+
+    console.log(`OrdersService.exportAllOrdersToFileSystem: Завершен экспорт. Успешно: ${success}, Ошибок: ${errors}`);
+    return { success, errors };
+  }
+
+  // Приватные методы
+
+  private async enrichOrderWithFileSystem(order: Order): Promise<Order> {
+    const enriched = this.enrichOrder(order);
+    
+    try {
+      const fileSystemData = await this.orderFileSystemService.getLatestOrderVersion(order.drawingNumber);
+      if (fileSystemData) {
+        (enriched as any).hasFileSystemData = true;
+        (enriched as any).fileSystemMetadata = fileSystemData.metadata;
+        (enriched as any).fileSystemVersions = await this.orderFileSystemService.getOrderVersions(order.drawingNumber);
+      }
+    } catch (error) {
+      console.error(`Ошибка получения данных файловой системы для ${order.drawingNumber}:`, error);
+    }
+
+    return enriched;
+  }
+
+  private async saveOrderToFileSystem(order: Order, operations: Operation[]): Promise<void> {
+    const fileSystemData: OrderFileSystemData = {
+      order: {
+        ...order,
+        // Удаляем циклические ссылки
+        operations: undefined
+      },
+      operations: operations.map(op => ({
+        ...op,
+        order: undefined // Удаляем циклическую ссылку
+      })),
+      metadata: {
+        version: '1.0',
+        created_at: order.createdAt?.toISOString() || new Date().toISOString(),
+        updated_at: order.updatedAt?.toISOString() || new Date().toISOString(),
+        changes_summary: 'Создание заказа',
+        data_source: 'orders_service',
+        export_date: new Date().toISOString()
+      }
+    };
+
+    await this.orderFileSystemService.createOrderVersion(order.drawingNumber, fileSystemData);
+  }
+
+  private async updateOrderInFileSystem(order: Order, operations: Operation[]): Promise<void> {
+    const fileSystemData: OrderFileSystemData = {
+      order: {
+        ...order,
+        operations: undefined
+      },
+      operations: operations.map(op => ({
+        ...op,
+        order: undefined
+      })),
+      metadata: {
+        version: '1.1',
+        created_at: order.createdAt?.toISOString() || new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        changes_summary: 'Обновление заказа',
+        data_source: 'orders_service',
+        export_date: new Date().toISOString()
+      }
+    };
+
+    await this.orderFileSystemService.updateOrderVersion(order.drawingNumber, fileSystemData);
   }
 
   private enrichOrder(order: Order): Order {
@@ -345,95 +489,5 @@ export class OrdersService {
     
     // Простая логика: если до дедлайна больше 3 дней - на графике
     return daysUntilDeadline > 3;
-  }
-
-  // 🆕 Новые методы для работы с файловой системой
-
-  /**
-   * Сохранить заказ в файловую систему
-   */
-  private async saveOrderToFileSystem(order: Order, operations: Operation[]): Promise<void> {
-    try {
-      const fileSystemData: OrderFileSystemData = {
-        order: {
-          ...order,
-          operations: undefined // Удаляем циклические ссылки
-        },
-        operations: operations.map(op => ({
-          ...op,
-          order: undefined // Удаляем циклическую ссылку
-        })),
-        metadata: {
-          version: '1.0',
-          created_at: order.createdAt?.toISOString() || new Date().toISOString(),
-          updated_at: order.updatedAt?.toISOString() || new Date().toISOString(),
-          changes_summary: 'Создание заказа',
-          data_source: 'orders_service',
-          export_date: new Date().toISOString()
-        }
-      };
-
-      await this.orderFileSystemService.createOrderVersion(order.drawingNumber, fileSystemData);
-      console.log(`OrdersService: Заказ ${order.drawingNumber} сохранен в файловую систему`);
-    } catch (error) {
-      console.error(`Ошибка сохранения заказа ${order.drawingNumber} в файловую систему:`, error);
-      // Не прерываем выполнение - файловая система опциональна
-    }
-  }
-
-  /**
-   * Обновить заказ в файловой системе
-   */
-  private async updateOrderInFileSystem(order: Order, operations: Operation[]): Promise<void> {
-    try {
-      const fileSystemData: OrderFileSystemData = {
-        order: {
-          ...order,
-          operations: undefined
-        },
-        operations: operations.map(op => ({
-          ...op,
-          order: undefined
-        })),
-        metadata: {
-          version: '1.1',
-          created_at: order.createdAt?.toISOString() || new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          changes_summary: 'Обновление заказа',
-          data_source: 'orders_service',
-          export_date: new Date().toISOString()
-        }
-      };
-
-      await this.orderFileSystemService.updateOrderVersion(order.drawingNumber, fileSystemData);
-      console.log(`OrdersService: Создана новая версия заказа ${order.drawingNumber} в файловой системе`);
-    } catch (error) {
-      console.error(`Ошибка обновления заказа ${order.drawingNumber} в файловой системе:`, error);
-    }
-  }
-
-  /**
-   * Экспортировать все заказы в файловую систему
-   */
-  async exportAllOrdersToFileSystem(): Promise<{ success: number; errors: number }> {
-    console.log('OrdersService: Начинаем экспорт всех заказов в файловую систему');
-    
-    const orders = await this.orderRepository.find({ relations: ['operations'] });
-    let success = 0;
-    let errors = 0;
-
-    for (const order of orders) {
-      try {
-        await this.orderFileSystemService.exportOrderFromDatabase(order, order.operations || []);
-        success++;
-        console.log(`Экспортирован заказ ${order.drawingNumber}`);
-      } catch (error) {
-        errors++;
-        console.error(`Ошибка экспорта заказа ${order.drawingNumber}:`, error);
-      }
-    }
-
-    console.log(`OrdersService: Экспорт завершен. Успешно: ${success}, Ошибок: ${errors}`);
-    return { success, errors };
   }
 }

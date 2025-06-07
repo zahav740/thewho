@@ -5,7 +5,7 @@
  * @created: 2025-06-07
  * @updated: 2025-06-07 - Добавлено модальное окно аналитики
  */
-import React, { useState } from 'react';
+import React from 'react';
 import { 
   Card, 
   Row, 
@@ -33,16 +33,11 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { machinesApi } from '../../services/machinesApi';
 import { shiftsApi } from '../../services/shiftsApi';
 import { formatEstimatedTime } from '../../types/machine.types';
-import { OperationDetailsModal } from '../../components/OperationDetailsModal';
 
 const { Title, Text } = Typography;
 
 export const ActiveOperationsPage: React.FC = () => {
   const queryClient = useQueryClient();
-  
-  // State для модального окна
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedOperationData, setSelectedOperationData] = useState<any>(null);
   
   const { data: machines, isLoading, error, refetch } = useQuery({
     queryKey: ['machines'],
@@ -50,85 +45,22 @@ export const ActiveOperationsPage: React.FC = () => {
     refetchInterval: 5000, // Обновляем каждые 5 секунд
   });
 
-  // Функция генерации тестовых данных для модального окна
-  const generateOperationAnalytics = (machine: any) => {
-    const drawingNumber = machine.currentOperationDetails?.orderDrawingNumber || `DWG${machine.id}${Math.floor(Math.random() * 1000)}`;
-    const operationNumber = machine.currentOperationDetails?.operationNumber || Math.floor(Math.random() * 5) + 1;
-    
-    return {
-      operationNumber,
-      drawingNumber,
-      operationType: machine.currentOperationDetails?.operationType || 'Токарная обработка',
-      totalQuantityPlanned: Math.floor(Math.random() * 200) + 100,
-      totalQuantityProduced: Math.floor(Math.random() * 150) + 50,
-      startDate: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000),
-      estimatedCompletion: new Date(Date.now() + Math.random() * 5 * 24 * 60 * 60 * 1000),
-      machines: [
-        {
-          machineId: machine.id,
-          machineName: machine.machineName,
-          quantityProduced: Math.floor(Math.random() * 80) + 40,
-          workingTime: Math.floor(Math.random() * 400) + 200,
-          efficiency: Math.floor(Math.random() * 30) + 70,
-          status: ['working', 'setup', 'idle'][Math.floor(Math.random() * 3)] as any
-        },
-        // Добавляем еще один-два станка для сравнения
-        ...(Math.random() > 0.5 ? [{
-          machineId: machine.id + 100,
-          machineName: 'Mitsubishi',
-          quantityProduced: Math.floor(Math.random() * 60) + 30,
-          workingTime: Math.floor(Math.random() * 300) + 150,
-          efficiency: Math.floor(Math.random() * 25) + 65,
-          status: ['working', 'setup'][Math.floor(Math.random() * 2)] as any
-        }] : [])
-      ],
-      operators: [
-        {
-          operatorName: 'Кирилл',
-          shift: 'DAY' as const,
-          quantityProduced: Math.floor(Math.random() * 50) + 30,
-          partsPerHour: Math.random() * 3 + 4,
-          timePerPart: Math.random() * 5 + 10,
-          efficiency: Math.random() * 20 + 80,
-          rating: ['A', 'B'][Math.floor(Math.random() * 2)] as any
-        },
-        {
-          operatorName: 'Аркадий',
-          shift: 'NIGHT' as const,
-          quantityProduced: Math.floor(Math.random() * 45) + 25,
-          partsPerHour: Math.random() * 2.5 + 3.5,
-          timePerPart: Math.random() * 6 + 11,
-          efficiency: Math.random() * 25 + 70,
-          rating: ['B', 'C'][Math.floor(Math.random() * 2)] as any
-        },
-        {
-          operatorName: 'Андрей',
-          shift: 'DAY' as const,
-          quantityProduced: Math.floor(Math.random() * 40) + 20,
-          partsPerHour: Math.random() * 2 + 3,
-          timePerPart: Math.random() * 7 + 12,
-          efficiency: Math.random() * 20 + 60,
-          rating: ['C', 'D'][Math.floor(Math.random() * 2)] as any
-        }
-      ]
-    };
-  };
+  // Функция обработки клика по операции (продакшен)
   const handleOperationClick = async (machine: any) => {
     try {
-      console.log(`🔍 Открываем аналитику операции на станке ${machine.machineName}`);
+      console.log(`🔍 Попытка получения аналитики операции на станке ${machine.machineName}`);
       
-      // Генерируем данные для модального окна
-      const operationData = generateOperationAnalytics(machine);
+      // В продакшен версии показываем информационное сообщение
+      message.info({
+        content: 'Детальная аналитика операций будет доступна после накопления данных производства',
+        duration: 4
+      });
       
-      // Открываем модальное окно с аналитикой
-      setSelectedOperationData(operationData);
-      setIsModalOpen(true);
-      
-      console.log('✅ Модальное окно с аналитикой открыто');
+      console.log('ℹ️ Аналитика операций недоступна - нет исторических данных');
       
     } catch (error) {
-      console.error('❌ Ошибка при открытии аналитики операции:', error);
-      message.error('Ошибка при открытии деталей операции');
+      console.error('❌ Ошибка при попытке получения аналитики операции:', error);
+      message.error('Ошибка при обращении к системе аналитики');
     }
   };
 
@@ -446,13 +378,6 @@ export const ActiveOperationsPage: React.FC = () => {
           </Row>
         </Card>
       )}
-      
-      {/* Модальное окно с детальной аналитикой операции */}
-      <OperationDetailsModal
-        open={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        operationData={selectedOperationData}
-      />
     </div>
   );
 };
