@@ -13,6 +13,7 @@ import {
   ScheduleOutlined,
   CalendarOutlined,
   SettingOutlined,
+  PlayCircleOutlined,
 } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
 
@@ -30,6 +31,12 @@ export const Layout: React.FC = () => {
       icon: <AppstoreOutlined />,
       label: 'Производство',
       onClick: () => navigate('/production'),
+    },
+    {
+      key: '/operations',
+      icon: <PlayCircleOutlined />,
+      label: 'Активные операции',
+      onClick: () => navigate('/operations'),
     },
     {
       key: '/database',
@@ -107,6 +114,8 @@ function getPageTitle(pathname: string): string {
   switch (pathname) {
     case '/production':
       return 'Производство';
+    case '/operations':
+      return 'Мониторинг активных операций';
     case '/database':
       return 'База данных заказов';
     case '/shifts':

@@ -49,13 +49,55 @@ export class MachinesController {
       const machines = await this.machinesService.findAll();
       
       // Преобразуем данные из таблицы machines в формат MachineAvailability
-      const result = machines.map(machine => ({
-        id: machine.id.toString(),
-        machineName: machine.code, // используем code как имя станка
-        machineType: machine.type,
-        isAvailable: !machine.isOccupied, // инвертируем логику
-        currentOperationId: machine.currentOperation?.toString(),
-        lastFreedAt: machine.assignedAt,
+      const result = await Promise.all(machines.map(async machine => {
+        let currentOperationDetails = null;
+        
+        // Если у станка есть текущая операция, получаем её детали
+        if (machine.currentOperation) {
+          try {
+            const operationQuery = `
+              SELECT 
+                o.id,
+                o."operationNumber",
+                o."operationtype" as "operationType",
+                o."estimatedTime",
+                o."orderId",
+                ord."drawingNumber" as "orderDrawingNumber"
+              FROM operations o
+              LEFT JOIN orders ord ON o."orderId" = ord.id
+              WHERE o.id = $1
+            `;
+            
+            const operationResult = await this.machinesService['machineRepository'].query(
+              operationQuery, 
+              [machine.currentOperation]
+            );
+            
+            if (operationResult && operationResult.length > 0) {
+              const op = operationResult[0];
+              currentOperationDetails = {
+                id: op.id,
+                operationNumber: op.operationNumber,
+                operationType: op.operationType,
+                estimatedTime: op.estimatedTime,
+                orderId: op.orderId,
+                orderDrawingNumber: op.orderDrawingNumber || `Заказ #${op.orderId}`
+              };
+            }
+          } catch (error) {
+            this.logger.error(`Ошибка при получении деталей операции ${machine.currentOperation}:`, error);
+          }
+        }
+        
+        return {
+          id: machine.id.toString(),
+          machineName: machine.code, // используем code как имя станка
+          machineType: machine.type,
+          isAvailable: !machine.isOccupied, // инвертируем логику
+          currentOperationId: machine.currentOperation?.toString(),
+          currentOperationDetails,
+          lastFreedAt: machine.assignedAt,
+        };
       }));
       
       this.logger.log(`Возвращено ${result.length} станков`);

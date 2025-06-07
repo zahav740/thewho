@@ -1,9 +1,3 @@
-/**
- * @file: App.tsx
- * @description: Главный компонент приложения
- * @dependencies: React Router, Layout
- * @created: 2025-01-28
- */
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Layout } from './components/Layout/Layout';
@@ -12,6 +6,7 @@ import { DatabasePage } from './pages/Database/DatabasePage';
 import { ShiftsPage } from './pages/Shifts/ShiftsPage';
 import { CalendarPage } from './pages/Calendar/CalendarPage';
 import { ProductionPlanningPage } from './pages/Planning';
+import { ActiveOperationsPage } from './pages/ActiveOperations';
 
 const App: React.FC = () => {
   return (
@@ -28,6 +23,7 @@ const App: React.FC = () => {
           <Route path="database" element={<DatabasePage />} />
           <Route path="shifts" element={<ShiftsPage />} />
           <Route path="planning" element={<ProductionPlanningPage />} />
+          <Route path="operations" element={<ActiveOperationsPage />} />
           <Route path="calendar" element={<CalendarPage />} />
         </Route>
       </Routes>

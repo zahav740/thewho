@@ -18,7 +18,8 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   MachineAvailability, 
   getMachineTypeLabel, 
-  getPriorityColor 
+  getPriorityColor,
+  formatEstimatedTime 
 } from '../../../types/machine.types';
 import { machinesApi } from '../../../services/machinesApi';
 
@@ -173,7 +174,41 @@ export const MachineCard: React.FC<MachineCardProps> = ({
           </Card>
         </Col>
 
-        {machine.currentOperationId && (
+        {machine.currentOperationDetails && (
+          <Col span={24}>
+            <Card 
+              size="small" 
+              style={{ 
+                borderRadius: '8px', 
+                borderColor: '#faad14',
+                backgroundColor: '#fff7e6'
+              }}
+            >
+              <div style={{ marginBottom: '8px' }}>
+                <Space>
+                  <Tag color="orange" style={{ borderRadius: '12px', marginBottom: '4px' }}>
+                    📋 Операция #{machine.currentOperationDetails.operationNumber}
+                  </Tag>
+                  <Tag color="blue" style={{ borderRadius: '12px', marginBottom: '4px' }}>
+                    {machine.currentOperationDetails.operationType}
+                  </Tag>
+                </Space>
+              </div>
+              <div style={{ marginBottom: '8px' }}>
+                <Text strong style={{ fontSize: '13px', color: '#d46b08' }}>
+                  📄 {machine.currentOperationDetails.orderDrawingNumber}
+                </Text>
+              </div>
+              <div>
+                <Text type="secondary" style={{ fontSize: '12px' }}>
+                  ⏱️ Время: {formatEstimatedTime(machine.currentOperationDetails.estimatedTime)}
+                </Text>
+              </div>
+            </Card>
+          </Col>
+        )}
+
+        {machine.currentOperationId && !machine.currentOperationDetails && (
           <Col span={24}>
             <Card size="small" style={{ borderRadius: '8px', borderColor: '#faad14' }}>
               <Space>

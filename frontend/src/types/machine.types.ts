@@ -19,6 +19,14 @@ export interface MachineAvailability {
   machineType: string;
   isAvailable: boolean;
   currentOperationId?: string;
+  currentOperationDetails?: {
+    id: number;
+    operationNumber: number;
+    operationType: string;
+    estimatedTime: number;
+    orderId: number;
+    orderDrawingNumber: string;
+  };
   lastFreedAt?: string;
   createdAt: string;
   updatedAt: string;
