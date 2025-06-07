@@ -1,8 +1,9 @@
 /**
  * @file: ShiftForm.tsx
- * @description: Форма создания/редактирования записи смены
+ * @description: Форма создания/редактирования записи смены (ОБНОВЛЕНА - добавлен setupOperator)
  * @dependencies: antd, react-hook-form, shiftsApi
  * @created: 2025-01-28
+ * @fixed: 2025-06-07 - Добавлено поле setupOperator
  */
 import React, { useEffect, useState } from 'react';
 import {
@@ -58,8 +59,6 @@ export const ShiftForm: React.FC<ShiftFormProps> = ({
   const currentMachineId = watch('machineId');
   const [assignedOperation, setAssignedOperation] = useState<any>(null);
   const [operationLoading, setOperationLoading] = useState(false);
-
-  // const shiftType = watch('shiftType'); // unused
 
   // Загрузка данных
   const { data: machines } = useQuery({
@@ -166,10 +165,8 @@ export const ShiftForm: React.FC<ShiftFormProps> = ({
       reset({
         date: shiftData.date,
         shiftType: shiftData.shiftType,
-        setupStartDate: shiftData.setupStartDate,
-        setupOperator: shiftData.setupOperator,
-        setupType: shiftData.setupType,
         setupTime: shiftData.setupTime,
+        setupOperator: shiftData.setupOperator,
         dayShiftQuantity: shiftData.dayShiftQuantity,
         dayShiftOperator: shiftData.dayShiftOperator,
         dayShiftTimePerUnit: shiftData.dayShiftTimePerUnit,
@@ -237,17 +234,14 @@ export const ShiftForm: React.FC<ShiftFormProps> = ({
       return;
     }
 
-    // Исключаем поля, которых нет в базе данных
-    const { setupStartDate, setupOperator, setupType, operationId, drawingNumber, ...cleanData } = data;
-    
-    console.log('📝 Отправляем данные:', cleanData);
+    console.log('📝 Отправляем данные:', data);
     
     setLoading(true);
     try {
       if (isEdit) {
-        await updateMutation.mutateAsync({ id: shiftId, data: cleanData });
+        await updateMutation.mutateAsync({ id: shiftId, data: data });
       } else {
-        await createMutation.mutateAsync(cleanData);
+        await createMutation.mutateAsync(data);
       }
     } finally {
       setLoading(false);
@@ -423,17 +417,12 @@ export const ShiftForm: React.FC<ShiftFormProps> = ({
           <Divider orientation="left">Наладка</Divider>
 
           <Space size="large" style={{ width: '100%' }}>
-            <Form.Item label="Дата начала наладки">
+            <Form.Item label="Время наладки (мин)">
               <Controller
-                name="setupStartDate"
+                name="setupTime"
                 control={control}
                 render={({ field }) => (
-                  <DatePicker
-                    {...field}
-                    format="DD.MM.YYYY"
-                    value={field.value ? dayjs(field.value) : null}
-                    onChange={(date) => field.onChange(date?.format('YYYY-MM-DD'))}
-                  />
+                  <InputNumber {...field} min={0} placeholder="0" />
                 )}
               />
             </Form.Item>
@@ -443,32 +432,6 @@ export const ShiftForm: React.FC<ShiftFormProps> = ({
                 name="setupOperator"
                 control={control}
                 render={({ field }) => <Input {...field} placeholder="Имя оператора" />}
-              />
-            </Form.Item>
-          </Space>
-
-          <Space size="large" style={{ width: '100%' }}>
-            <Form.Item label="Тип наладки">
-              <Controller
-                name="setupType"
-                control={control}
-                render={({ field }) => (
-                  <Select {...field} placeholder="Выберите тип" style={{ width: 200 }}>
-                    <Option value="Первичная">Первичная</Option>
-                    <Option value="Повторная">Повторная</Option>
-                    <Option value="Корректировка">Корректировка</Option>
-                  </Select>
-                )}
-              />
-            </Form.Item>
-
-            <Form.Item label="Время наладки (мин)">
-              <Controller
-                name="setupTime"
-                control={control}
-                render={({ field }) => (
-                  <InputNumber {...field} min={0} placeholder="0" />
-                )}
               />
             </Form.Item>
           </Space>

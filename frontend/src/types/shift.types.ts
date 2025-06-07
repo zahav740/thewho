@@ -1,8 +1,9 @@
 /**
  * @file: shift.types.ts
- * @description: Типы для смен
+ * @description: Типы для смен (ОБНОВЛЕНЫ - добавлен оператор наладки)
  * @dependencies: -
  * @created: 2025-01-28
+ * @fixed: 2025-06-07 - Добавлено поле setupOperator
  */
 
 export enum ShiftType {
@@ -14,37 +15,59 @@ export interface ShiftRecord {
   id: number;
   date: string;
   shiftType: ShiftType;
-  setupStartDate?: string;
-  setupOperator?: string;
-  setupType?: string;
   setupTime?: number;
+  setupOperator?: string; // Добавлено поле оператора наладки
   dayShiftQuantity?: number;
   dayShiftOperator?: string;
   dayShiftTimePerUnit?: number;
   nightShiftQuantity?: number;
   nightShiftOperator?: string;
   nightShiftTimePerUnit?: number;
-  operationId: number;
-  machineId: number;
+  operationId?: number;
+  machineId?: number;
   drawingNumber?: string;
   createdAt: string;
+  
+  // Обогащенные данные от связанных таблиц
+  machineCode?: string;
+  machineType?: string;
+  operationNumber?: number;
+  operationType?: string;
+  orderDrawingNumber?: string;
+  orderId?: number;
+  
+  // Связанные объекты (если нужны)
+  machine?: {
+    id: number;
+    code: string;
+    type: string;
+    axes: number;
+  };
+  operation?: {
+    id: number;
+    operationNumber: number;
+    operationType: string;
+    estimatedTime: number;
+    order?: {
+      id: number;
+      drawingNumber: string;
+    };
+  };
 }
 
 export interface CreateShiftRecordDto {
   date: string;
   shiftType: ShiftType;
-  setupStartDate?: string;
-  setupOperator?: string;
-  setupType?: string;
   setupTime?: number;
+  setupOperator?: string; // Добавлено поле оператора наладки
   dayShiftQuantity?: number;
   dayShiftOperator?: string;
   dayShiftTimePerUnit?: number;
   nightShiftQuantity?: number;
   nightShiftOperator?: string;
   nightShiftTimePerUnit?: number;
-  operationId?: number; // Сделаем опциональным
-  machineId: number;
+  operationId?: number;
+  machineId?: number;
   drawingNumber?: string;
 }
 

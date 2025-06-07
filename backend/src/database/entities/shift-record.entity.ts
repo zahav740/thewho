@@ -1,9 +1,9 @@
 /**
  * @file: shift-record.entity.ts
- * @description: Entity для записей смен (ИСПРАВЛЕНО - правильные типы и трансформеры)
+ * @description: Entity для записей смен (ИСПРАВЛЕНО - добавлен setupOperator)
  * @dependencies: typeorm, operation.entity, machine.entity
  * @created: 2025-01-28
- * @fixed: 2025-06-07 - Добавлены трансформеры для decimal полей
+ * @fixed: 2025-06-07 - Добавлено поле setupOperator
  */
 import {
   Entity,
@@ -42,6 +42,9 @@ export class ShiftRecord {
 
   @Column({ name: 'setupTime', nullable: true })
   setupTime: number;
+
+  @Column({ name: 'setupOperator', nullable: true })
+  setupOperator: string;
 
   @Column({ name: 'dayShiftQuantity', nullable: true })
   dayShiftQuantity: number;

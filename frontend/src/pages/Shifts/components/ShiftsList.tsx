@@ -1,12 +1,13 @@
 /**
  * @file: ShiftsList.tsx
- * @description: Компонент списка смен
+ * @description: Компонент списка смен (КОМПАКТНАЯ ВЕРСИЯ - убран скролл)
  * @dependencies: antd, shift.types
  * @created: 2025-01-28
+ * @fixed: 2025-06-07 - Компактная таблица, добавлен setupOperator
  */
 import React from 'react';
 import { Table, Tag, Button, Space, Popconfirm, Alert, Tooltip } from 'antd';
-import { EditOutlined, DeleteOutlined, UserOutlined, ClockCircleOutlined } from '@ant-design/icons';
+import { EditOutlined, DeleteOutlined, UserOutlined, ClockCircleOutlined, ToolOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import { ShiftRecord, ShiftType } from '../../../types/shift.types';
@@ -30,7 +31,7 @@ export const ShiftsList: React.FC<ShiftsListProps> = ({
     if (!minutes) return '-';
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
-    return `${hours}ч ${mins}м`;
+    return hours > 0 ? `${hours}ч ${mins}м` : `${mins}м`;
   };
 
   const getShiftTypeTag = (type: ShiftType) => {
@@ -46,69 +47,96 @@ export const ShiftsList: React.FC<ShiftsListProps> = ({
       title: 'Дата',
       dataIndex: 'date',
       key: 'date',
-      width: 120,
-      render: (date: string) => dayjs(date).format('DD.MM.YYYY'),
+      width: 80,
+      render: (date: string) => dayjs(date).format('DD.MM'),
       sorter: (a, b) => dayjs(a.date).unix() - dayjs(b.date).unix(),
     },
     {
       title: 'Смена',
       dataIndex: 'shiftType',
       key: 'shiftType',
-      width: 100,
-      render: getShiftTypeTag,
+      width: 70,
+      render: (type: ShiftType) => (
+        <Tag color={type === ShiftType.DAY ? "orange" : "blue"} style={{ fontSize: '11px', padding: '2px 6px' }}>
+          {type === ShiftType.DAY ? 'День' : 'Ночь'}
+        </Tag>
+      ),
     },
     {
       title: 'Станок',
-      dataIndex: 'machineId',
-      key: 'machineId',
-      width: 120,
-      render: (id: number) => (
-        <Tag color="geekblue">Станок {id}</Tag>
-      ),
+      key: 'machine',
+      width: 90,
+      render: (record: ShiftRecord) => {
+        if (!record.machineId) {
+          return <Tag color="default" style={{ fontSize: '11px' }}>Не указан</Tag>;
+        }
+        
+        return (
+          <Tooltip title={`Тип: ${record.machineType || 'Неизвестен'}`}>
+            <Tag color="geekblue" style={{ fontSize: '11px', padding: '2px 6px' }}>
+              {record.machineCode || `${record.machineId}`}
+            </Tag>
+          </Tooltip>
+        );
+      },
     },
     {
       title: 'Операция / Чертёж',
       key: 'operation',
-      width: 180,
+      width: 140,
       render: (record: ShiftRecord) => {
-        if (!record.operationId) {
-          return <Tag color="default">Операция не указана</Tag>;
+        // Проверяем сначала связанные данные, потом исходные
+        const operationNumber = record.operationNumber || 
+          (record.operation?.operationNumber) || 
+          record.operationId;
+        
+        const drawingNumber = record.orderDrawingNumber || 
+          record.operation?.order?.drawingNumber || 
+          record.drawingNumber;
+        
+        if (!operationNumber) {
+          return <Tag color="default" style={{ fontSize: '11px' }}>Операция не указана</Tag>;
         }
+        
         return (
-          <Space direction="vertical" size={0}>
-            <Tag color="green">Операция №{record.operationId}</Tag>
-            {record.drawingNumber && (
-              <span style={{ fontSize: '12px', color: '#666' }}>
-                Чертёж: {record.drawingNumber}
-              </span>
+          <div style={{ fontSize: '11px' }}>
+            <Tag color="green" style={{ fontSize: '10px', padding: '1px 4px', marginBottom: '2px' }}>
+              №{operationNumber}
+            </Tag>
+            {record.operationType && (
+              <div style={{ color: '#666', fontSize: '10px' }}>
+                {record.operationType}
+              </div>
             )}
-          </Space>
+            {drawingNumber && (
+              <div style={{ color: '#666', fontSize: '10px' }}>
+                {drawingNumber}
+              </div>
+            )}
+          </div>
         );
       },
     },
     {
       title: 'Наладка',
       key: 'setup',
-      width: 150,
+      width: 80,
       render: (record: ShiftRecord) => {
         if (!record.setupTime) {
-          return <Tag color="default">Не требовалась</Tag>;
+          return <span style={{ fontSize: '11px', color: '#ccc' }}>-</span>;
         }
         return (
-          <Tooltip
-            title={
-              <div>
-                <div>Оператор: {record.setupOperator || '-'}</div>
-                <div>Тип: {record.setupType || '-'}</div>
-                <div>Начало: {record.setupStartDate ? dayjs(record.setupStartDate).format('DD.MM') : '-'}</div>
-              </div>
-            }
-          >
-            <Space size="small">
-              <Tag color="orange" icon={<ClockCircleOutlined />}>
+          <Tooltip title={record.setupOperator ? `Оператор: ${record.setupOperator}` : 'Оператор не указан'}>
+            <div style={{ fontSize: '11px' }}>
+              <Tag color="orange" icon={<ToolOutlined />} style={{ fontSize: '10px', padding: '1px 4px' }}>
                 {formatTime(record.setupTime)}
               </Tag>
-            </Space>
+              {record.setupOperator && (
+                <div style={{ color: '#666', fontSize: '10px' }}>
+                  {record.setupOperator}
+                </div>
+              )}
+            </div>
           </Tooltip>
         );
       },
@@ -116,75 +144,79 @@ export const ShiftsList: React.FC<ShiftsListProps> = ({
     {
       title: 'Дневная смена',
       key: 'dayShift',
-      width: 180,
+      width: 120,
       render: (record: ShiftRecord) => {
         if (!record.dayShiftQuantity) {
-          return <Tag color="default">Не работала</Tag>;
+          return <span style={{ fontSize: '11px', color: '#ccc' }}>-</span>;
         }
         return (
-          <Space direction="vertical" size={0}>
-            <Space size="small">
-              <UserOutlined />
-              <strong>{record.dayShiftOperator || '-'}</strong>
-            </Space>
-            <div style={{ fontSize: '12px' }}>
-              <Tag color="blue">{record.dayShiftQuantity} шт</Tag>
+          <div style={{ fontSize: '11px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '2px' }}>
+              <UserOutlined style={{ fontSize: '10px' }} />
+              <strong style={{ fontSize: '11px' }}>{record.dayShiftOperator || '-'}</strong>
+            </div>
+            <div>
+              <Tag color="blue" style={{ fontSize: '10px', padding: '1px 4px' }}>
+                {record.dayShiftQuantity} шт
+              </Tag>
               {record.dayShiftTimePerUnit && (
-                <span style={{ color: '#666' }}>
+                <span style={{ color: '#666', fontSize: '10px', marginLeft: '4px' }}>
                   {record.dayShiftTimePerUnit.toFixed(1)} мин/шт
                 </span>
               )}
             </div>
-          </Space>
+          </div>
         );
       },
     },
     {
       title: 'Ночная смена',
       key: 'nightShift',
-      width: 180,
+      width: 120,
       render: (record: ShiftRecord) => {
         if (!record.nightShiftQuantity) {
-          return <Tag color="default">Не работала</Tag>;
+          return <span style={{ fontSize: '11px', color: '#ccc' }}>-</span>;
         }
         return (
-          <Space direction="vertical" size={0}>
-            <Space size="small">
-              <UserOutlined />
-              <strong>{record.nightShiftOperator || 'Аркадий'}</strong>
-            </Space>
-            <div style={{ fontSize: '12px' }}>
-              <Tag color="purple">{record.nightShiftQuantity} шт</Tag>
+          <div style={{ fontSize: '11px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '2px' }}>
+              <UserOutlined style={{ fontSize: '10px' }} />
+              <strong style={{ fontSize: '11px' }}>{record.nightShiftOperator || 'Аркадий'}</strong>
+            </div>
+            <div>
+              <Tag color="purple" style={{ fontSize: '10px', padding: '1px 4px' }}>
+                {record.nightShiftQuantity} шт
+              </Tag>
               {record.nightShiftTimePerUnit && (
-                <span style={{ color: '#666' }}>
+                <span style={{ color: '#666', fontSize: '10px', marginLeft: '4px' }}>
                   {record.nightShiftTimePerUnit.toFixed(1)} мин/шт
                 </span>
               )}
             </div>
-          </Space>
+          </div>
         );
       },
     },
     {
       title: 'Действия',
       key: 'actions',
-      width: 100,
+      width: 80,
       fixed: 'right',
       render: (_: any, record: ShiftRecord) => (
-        <Space>
+        <Space size="small">
           <Button
             type="link"
+            size="small"
             icon={<EditOutlined />}
             onClick={() => onEdit(record.id)}
           />
           <Popconfirm
-            title="Удалить запись?"
-            description="Это действие нельзя отменить"
+            title="Удалить?"
             onConfirm={() => onDelete(record.id)}
-            okText="Удалить"
-            cancelText="Отмена"
+            okText="Да"
+            cancelText="Нет"
           >
-            <Button type="link" danger icon={<DeleteOutlined />} />
+            <Button type="link" danger size="small" icon={<DeleteOutlined />} />
           </Popconfirm>
         </Space>
       ),
@@ -208,11 +240,16 @@ export const ShiftsList: React.FC<ShiftsListProps> = ({
       dataSource={shifts}
       rowKey="id"
       loading={loading}
-      scroll={{ x: 1200 }}
+      size="small"
+      scroll={{ x: 'max-content' }}
       pagination={{
         pageSize: 20,
         showSizeChanger: true,
-        showTotal: (total) => `Всего: ${total} записей`,
+        showTotal: (total) => `Всего: ${total}`,
+        simple: true,
+      }}
+      style={{
+        fontSize: '12px',
       }}
     />
   );

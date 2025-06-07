@@ -1,9 +1,9 @@
 /**
  * @file: create-shift-record.dto.ts
- * @description: DTO для создания записи смены (УПРОЩЕННЫЙ для отладки)
+ * @description: DTO для создания записи смены (ОБНОВЛЕН - добавлен setupOperator)
  * @dependencies: class-validator
  * @created: 2025-01-28
- * @fixed: 2025-06-07 - Упрощенная версия для отладки
+ * @fixed: 2025-06-07 - Добавлено поле setupOperator
  */
 import {
   IsDateString,
@@ -13,7 +13,7 @@ import {
   Min,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Transform, Type } from 'class-transformer';
+import { Type } from 'class-transformer';
 
 export class CreateShiftRecordDto {
   @ApiProperty({ example: '2024-01-15', description: 'Дата смены' })
@@ -30,6 +30,11 @@ export class CreateShiftRecordDto {
   @IsNumber({}, { message: 'Поле setupTime должно быть числом' })
   @Min(0, { message: 'Время наладки не может быть отрицательным' })
   setupTime?: number;
+
+  @ApiPropertyOptional({ example: 'Иван', description: 'Оператор наладки' })
+  @IsOptional()
+  @IsString({ message: 'Поле setupOperator должно быть строкой' })
+  setupOperator?: string;
 
   @ApiPropertyOptional({ example: 50, description: 'Количество деталей в дневную смену' })
   @IsOptional()

@@ -1,9 +1,9 @@
 /**
  * @file: shifts.service.ts
- * @description: Сервис для работы со сменами (ИСПРАВЛЕН - преобразование типов)
+ * @description: Сервис для работы со сменами (ИСПРАВЛЕН - полные данные с relations)
  * @dependencies: typeorm, shift-record.entity
  * @created: 2025-01-28
- * @fixed: 2025-06-07 - Добавлено преобразование строковых чисел в числа
+ * @fixed: 2025-06-07 - Добавлена правильная загрузка связанных данных
  */
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -22,9 +22,9 @@ export class ShiftsService {
   ) {}
 
   /**
-   * Преобразует строковые числовые значения в числа
+   * Преобразует строковые числовые значения в числа и обогащает данными
    */
-  private normalizeShiftRecord(record: ShiftRecord): ShiftRecord {
+  private normalizeShiftRecord(record: any): any {
     if (record) {
       // Преобразуем строки из БД в числа для корректной работы frontend
       record.dayShiftTimePerUnit = record.dayShiftTimePerUnit ? 
@@ -41,6 +41,22 @@ export class ShiftsService {
       
       record.nightShiftQuantity = record.nightShiftQuantity ? 
         parseInt(record.nightShiftQuantity.toString()) : null;
+
+      // Обогащаем данными для frontend
+      if (record.machine) {
+        record.machineCode = record.machine.code;
+        record.machineType = record.machine.type;
+      }
+
+      if (record.operation) {
+        record.operationNumber = record.operation.operationNumber;
+        record.operationType = record.operation.operationType;
+        
+        if (record.operation.order) {
+          record.orderDrawingNumber = record.operation.order.drawingNumber;
+          record.orderId = record.operation.order.id;
+        }
+      }
     }
     return record;
   }
@@ -48,40 +64,47 @@ export class ShiftsService {
   /**
    * Преобразует массив записей
    */
-  private normalizeShiftRecords(records: ShiftRecord[]): ShiftRecord[] {
+  private normalizeShiftRecords(records: any[]): any[] {
     return records.map(record => this.normalizeShiftRecord(record));
   }
 
-  async findAll(filterDto: ShiftsFilterDto): Promise<ShiftRecord[]> {
+  async findAll(filterDto: ShiftsFilterDto): Promise<any[]> {
     const { startDate, endDate, machineId, operationId } = filterDto;
-    const where: any = {};
+    const queryBuilder = this.shiftRecordRepository
+      .createQueryBuilder('shift')
+      .leftJoinAndSelect('shift.machine', 'machine')
+      .leftJoinAndSelect('shift.operation', 'operation')
+      .leftJoinAndSelect('operation.order', 'order')
+      .orderBy('shift.date', 'DESC');
 
+    // Применяем фильтры
     if (startDate && endDate) {
-      where.date = Between(new Date(startDate), new Date(endDate));
+      queryBuilder.andWhere('shift.date BETWEEN :startDate AND :endDate', {
+        startDate: new Date(startDate),
+        endDate: new Date(endDate),
+      });
     }
 
     if (machineId) {
-      where.machine = { id: machineId };
+      queryBuilder.andWhere('shift.machineId = :machineId', { machineId });
     }
 
     if (operationId) {
-      where.operation = { id: operationId };
+      queryBuilder.andWhere('shift.operationId = :operationId', { operationId });
     }
 
-    const records = await this.shiftRecordRepository.find({
-      where,
-      relations: ['operation', 'operation.order', 'machine'],
-      order: { date: 'DESC' },
-    });
-
+    const records = await queryBuilder.getMany();
     return this.normalizeShiftRecords(records);
   }
 
-  async findOne(id: number): Promise<ShiftRecord> {
-    const shiftRecord = await this.shiftRecordRepository.findOne({
-      where: { id },
-      relations: ['operation', 'operation.order', 'machine'],
-    });
+  async findOne(id: number): Promise<any> {
+    const shiftRecord = await this.shiftRecordRepository
+      .createQueryBuilder('shift')
+      .leftJoinAndSelect('shift.machine', 'machine')
+      .leftJoinAndSelect('shift.operation', 'operation')
+      .leftJoinAndSelect('operation.order', 'order')
+      .where('shift.id = :id', { id })
+      .getOne();
 
     if (!shiftRecord) {
       throw new NotFoundException(`Запись смены с ID ${id} не найдена`);
@@ -90,24 +113,35 @@ export class ShiftsService {
     return this.normalizeShiftRecord(shiftRecord);
   }
 
-  async create(createShiftRecordDto: CreateShiftRecordDto): Promise<ShiftRecord> {
+  async create(createShiftRecordDto: CreateShiftRecordDto): Promise<any> {
     const shiftRecord = this.shiftRecordRepository.create(createShiftRecordDto);
     const savedRecord = await this.shiftRecordRepository.save(shiftRecord);
-    return this.normalizeShiftRecord(savedRecord);
+    
+    // Загружаем с relations для возврата полных данных
+    return this.findOne(savedRecord.id);
   }
 
   async update(
     id: number,
     updateShiftRecordDto: UpdateShiftRecordDto,
-  ): Promise<ShiftRecord> {
-    const shiftRecord = await this.findOne(id);
-    Object.assign(shiftRecord, updateShiftRecordDto);
-    const savedRecord = await this.shiftRecordRepository.save(shiftRecord);
-    return this.normalizeShiftRecord(savedRecord);
+  ): Promise<any> {
+    const existingRecord = await this.shiftRecordRepository.findOne({ where: { id } });
+    if (!existingRecord) {
+      throw new NotFoundException(`Запись смены с ID ${id} не найдена`);
+    }
+
+    Object.assign(existingRecord, updateShiftRecordDto);
+    await this.shiftRecordRepository.save(existingRecord);
+    
+    // Загружаем с relations для возврата полных данных
+    return this.findOne(id);
   }
 
   async remove(id: number): Promise<void> {
-    const shiftRecord = await this.findOne(id);
+    const shiftRecord = await this.shiftRecordRepository.findOne({ where: { id } });
+    if (!shiftRecord) {
+      throw new NotFoundException(`Запись смены с ID ${id} не найдена`);
+    }
     await this.shiftRecordRepository.remove(shiftRecord);
   }
 
@@ -189,22 +223,26 @@ export class ShiftsService {
     };
   }
 
-  async getShiftsByDate(date: Date): Promise<ShiftRecord[]> {
-    const records = await this.shiftRecordRepository.find({
-      where: { date },
-      relations: ['operation', 'operation.order', 'machine'],
-    });
+  async getShiftsByDate(date: Date): Promise<any[]> {
+    const records = await this.shiftRecordRepository
+      .createQueryBuilder('shift')
+      .leftJoinAndSelect('shift.machine', 'machine')
+      .leftJoinAndSelect('shift.operation', 'operation')
+      .leftJoinAndSelect('operation.order', 'order')
+      .where('shift.date = :date', { date })
+      .getMany();
+    
     return this.normalizeShiftRecords(records);
   }
 
-  async getShiftsByOperator(operatorName: string): Promise<ShiftRecord[]> {
+  async getShiftsByOperator(operatorName: string): Promise<any[]> {
     const records = await this.shiftRecordRepository
       .createQueryBuilder('shift')
+      .leftJoinAndSelect('shift.machine', 'machine')
       .leftJoinAndSelect('shift.operation', 'operation')
       .leftJoinAndSelect('operation.order', 'order')
-      .leftJoinAndSelect('shift.machine', 'machine')
       .where(
-        '(shift.dayShiftOperator = :operatorName OR shift.nightShiftOperator = :operatorName OR shift.setupOperator = :operatorName)',
+        '(shift.dayShiftOperator = :operatorName OR shift.nightShiftOperator = :operatorName)',
         { operatorName },
       )
       .orderBy('shift.date', 'DESC')
