@@ -10,12 +10,12 @@ import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { MachinesModule } from './modules/machines/machines.module';
 import { OrdersModule } from './modules/orders/orders.module';
-// import { OperationsModule } from './modules/operations/operations.module';
+import { OperationsModule } from './modules/operations/operations.module';
 import { ShiftsModule } from './modules/shifts/shifts.module';
 import { CalendarModule } from './modules/calendar/calendar.module';
 import { FilesModule } from './modules/files/files.module';
 import { HealthModule } from './modules/health/health.module';
-// import { PlanningModule } from './modules/planning/planning.module';
+import { PlanningModule } from './modules/planning/planning.module';
 import { TestModule } from './modules/test/test.module';
 import { PetsModule } from './modules/pets/pets.module';
 import { HeaderSizeMiddleware } from './common/middleware/header-size.middleware';
@@ -43,7 +43,7 @@ import { OrdersDataMiddleware } from './modules/orders/orders.middleware';
     }),
     MachinesModule,
     OrdersModule,
-    // OperationsModule,
+    OperationsModule,
     ShiftsModule,
     CalendarModule,
     FilesModule,

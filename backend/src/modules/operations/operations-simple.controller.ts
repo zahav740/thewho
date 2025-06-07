@@ -22,6 +22,29 @@ export class OperationsSimpleController {
     private readonly dataSource: DataSource,
   ) {}
 
+  @Get('test')
+  @ApiOperation({ summary: 'Тестовый endpoint для операций' })
+  async test() {
+    try {
+      const count = await this.dataSource.query('SELECT COUNT(*) as count FROM operations');
+      const sample = await this.dataSource.query('SELECT * FROM operations LIMIT 3');
+      
+      return {
+        status: 'ok',
+        message: 'Operations controller is working',
+        count: count[0]?.count || 0,
+        sample,
+        timestamp: new Date().toISOString(),
+      };
+    } catch (error) {
+      return {
+        status: 'error',
+        error: error.message,
+        timestamp: new Date().toISOString(),
+      };
+    }
+  }
+
   @Get()
   @ApiOperation({ summary: 'Получить все операции' })
   async findAll(
@@ -34,13 +57,15 @@ export class OperationsSimpleController {
         SELECT 
           id,
           "operationNumber",
-          "machineId" as machine,
+          "machineId",
           operationtype as "operationType", 
           "estimatedTime",
           0 as "completedUnits",
           null as "actualTime",
-          status,
-          'system' as operators,
+          COALESCE(status, 'PENDING') as status,
+          '[]' as operators,
+          "orderId",
+          machineaxes as "machineAxes",
           "createdAt",
           "updatedAt"
         FROM operations
