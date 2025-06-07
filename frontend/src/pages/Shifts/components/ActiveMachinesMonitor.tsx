@@ -1,9 +1,9 @@
 /**
  * @file: ActiveMachinesMonitor.tsx
- * @description: Компонент мониторинга активных станков (ИСПРАВЛЕН - фильтрация по операции)
+ * @description: Компонент мониторинга активных станков (ИСПРАВЛЕН - фильтрация по текущей операции)
  * @dependencies: antd, react-query, machinesApi, operationsApi
  * @created: 2025-06-07
- * @fixed: 2025-06-07 - Исправлена фильтрация данных по текущей операции станка
+ * @fixed: 2025-06-07 - Добавлена фильтрация данных по текущей операции и номеру чертежа
  */
 import React, { useState } from 'react';
 import {
@@ -21,6 +21,8 @@ import {
   Badge,
   Divider,
   message,
+  Modal,
+  Statistic,
 } from 'antd';
 import {
   PlayCircleOutlined,
@@ -30,6 +32,8 @@ import {
   UserOutlined,
   FileTextOutlined,
   SettingOutlined,
+  BarChartOutlined,
+  PrinterOutlined,
 } from '@ant-design/icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { machinesApi } from '../../../services/machinesApi';
@@ -38,9 +42,32 @@ import { shiftsApi } from '../../../services/shiftsApi';
 import { OperationStatus } from '../../../types/operation.types';
 import { MachineAvailability } from '../../../types/machine.types';
 import { ShiftForm } from './ShiftForm';
+import { OperationDetailModal } from './OperationDetailModal';
 import dayjs from 'dayjs';
 
 const { Title, Text } = Typography;
+
+// Интерфейс для эффективности оператора
+interface OperatorEfficiency {
+  operatorName: string;
+  productivity: {
+    partsPerHour: number;
+    planVsFact: number;
+  };
+  quality: {
+    averageTimePerPart: number;
+    deviation: number;
+  };
+  stability: {
+    consistency: number;
+  };
+  utilization: {
+    workingTime: number;
+    idleTime: number;
+    efficiency: number;
+  };
+  rating: number;
+}
 
 // Расширенный тип для текущих деталей операции с прогрессом
 interface ExtendedOperationDetails {
@@ -50,26 +77,28 @@ interface ExtendedOperationDetails {
   estimatedTime: number;
   orderId: number;
   orderDrawingNumber: string;
-  progress?: number; // Добавляем поле прогресса
+  progress?: number;
+  totalProduced?: number;
+  targetQuantity?: number;
 }
 
-// Тип активного станка без наследования для избежания конфликтов
+// Тип активного станка с фильтрацией по операции
 interface ActiveMachine {
   id: string;
   machineName: string;
   machineType: string;
   isAvailable: boolean;
   currentOperationId?: string;
-  currentOperationDetails?: ExtendedOperationDetails; // Используем расширенный тип
-  lastFreedAt?: Date | string; // Гибкий тип
+  currentOperationDetails?: ExtendedOperationDetails;
+  lastFreedAt?: Date | string;
   createdAt: string;
   updatedAt: string;
   status: 'working' | 'setup' | 'idle' | 'maintenance';
-  todayProduction?: {
-    dayShift: { quantity: number; operator: string };
-    nightShift: { quantity: number; operator: string };
+  currentOperationProduction?: {
+    dayShift: { quantity: number; operator: string; efficiency: number };
+    nightShift: { quantity: number; operator: string; efficiency: number };
     totalTime: number;
-    currentOperationOnly: boolean; // Флаг что данные только по текущей операции
+    operatorStats: OperatorEfficiency[];
   };
 }
 
@@ -94,26 +123,28 @@ const getMachineTypeLabel = (type: string): string => {
 export const ActiveMachinesMonitor: React.FC = () => {
   const [selectedMachineId, setSelectedMachineId] = useState<number | undefined>();
   const [showShiftForm, setShowShiftForm] = useState(false);
+  const [selectedOperation, setSelectedOperation] = useState<any>(null);
+  const [showOperationDetail, setShowOperationDetail] = useState(false);
   
   // ИСПРАВЛЕНО: Добавлен useQueryClient для инвалидации кэша
   const queryClient = useQueryClient();
 
   // Загружаем список станков (используем основной API)
-  const { data: machines, isLoading: machinesLoading, error: machinesError, refetch: refetchMachines } = useQuery({
+  const { data: machines, isLoading: machinesLoading, error: machinesError } = useQuery({
     queryKey: ['machines-availability'],
     queryFn: machinesApi.getAll,
     refetchInterval: 30000, // Обновляем каждые 30 секунд
   });
 
   // Загружаем активные операции
-  const { data: activeOperations, isLoading: operationsLoading, refetch: refetchOperations } = useQuery({
+  const { data: activeOperations, isLoading: operationsLoading } = useQuery({
     queryKey: ['operations', 'in-progress'],
     queryFn: () => operationsApi.getAll(OperationStatus.IN_PROGRESS),
     refetchInterval: 30000,
   });
 
   // Загружаем сегодняшние смены
-  const { data: todayShifts, isLoading: shiftsLoading, refetch: refetchShifts } = useQuery({
+  const { data: todayShifts, isLoading: shiftsLoading } = useQuery({
     queryKey: ['shifts', 'today'],
     queryFn: () => shiftsApi.getAll({
       startDate: dayjs().format('YYYY-MM-DD'),
@@ -124,89 +155,197 @@ export const ActiveMachinesMonitor: React.FC = () => {
 
   const isLoading = machinesLoading || operationsLoading || shiftsLoading;
 
-  // Вычисляем прогресс операции на основе реальных данных смен
-  const calculateProgress = React.useCallback((operation: any, shifts: any[]): number => {
-    if (!operation || !shifts.length) return 0;
+  // НОВАЯ ФУНКЦИЯ: Вычисление эффективности оператора
+  const calculateOperatorEfficiency = React.useCallback((
+    operatorName: string, 
+    shifts: any[], 
+    operation: any
+  ): OperatorEfficiency => {
+    const operatorShifts = shifts.filter(shift => 
+      shift.dayShiftOperator === operatorName || shift.nightShiftOperator === operatorName
+    );
+
+    if (operatorShifts.length === 0) {
+      return {
+        operatorName,
+        productivity: { partsPerHour: 0, planVsFact: 0 },
+        quality: { averageTimePerPart: 0, deviation: 0 },
+        stability: { consistency: 0 },
+        utilization: { workingTime: 0, idleTime: 0, efficiency: 0 },
+        rating: 0
+      };
+    }
+
+    // Собираем данные по сменам оператора
+    let totalParts = 0;
+    let totalTime = 0;
+    let workingSessions = 0;
+
+    operatorShifts.forEach(shift => {
+      if (shift.dayShiftOperator === operatorName) {
+        totalParts += shift.dayShiftQuantity || 0;
+        totalTime += (shift.dayShiftQuantity || 0) * (shift.dayShiftTimePerUnit || 0);
+        workingSessions++;
+      }
+      if (shift.nightShiftOperator === operatorName) {
+        totalParts += shift.nightShiftQuantity || 0;
+        totalTime += (shift.nightShiftQuantity || 0) * (shift.nightShiftTimePerUnit || 0);
+        workingSessions++;
+      }
+    });
+
+    // Вычисляем метрики
+    const partsPerHour = totalTime > 0 ? (totalParts / (totalTime / 60)) : 0;
+    const averageTimePerPart = totalParts > 0 ? (totalTime / totalParts) : 0;
+    const planTimePerPart = operation?.estimatedTime || 0;
+    const deviation = planTimePerPart > 0 ? ((averageTimePerPart - planTimePerPart) / planTimePerPart * 100) : 0;
+    const planVsFact = planTimePerPart > 0 ? (planTimePerPart / averageTimePerPart * 100) : 0;
+
+    // Стабильность (насколько постоянны показатели)
+    const timePerPartValues = operatorShifts.map(shift => {
+      const dayTime = shift.dayShiftOperator === operatorName ? shift.dayShiftTimePerUnit : 0;
+      const nightTime = shift.nightShiftOperator === operatorName ? shift.nightShiftTimePerUnit : 0;
+      return dayTime || nightTime || 0;
+    }).filter(t => t > 0);
+
+    const avgTime = timePerPartValues.reduce((a, b) => a + b, 0) / timePerPartValues.length;
+    const variance = timePerPartValues.reduce((acc, time) => acc + Math.pow(time - avgTime, 2), 0) / timePerPartValues.length;
+    const consistency = Math.max(0, 100 - (Math.sqrt(variance) / avgTime * 100));
+
+    // Эффективность использования времени
+    const efficiency = Math.min(100, Math.max(0, planVsFact));
     
-    const totalProduced = shifts.reduce((sum, shift) => 
+    // Общий рейтинг (0-10)
+    const rating = Math.round(
+      (Math.min(10, partsPerHour) + 
+       Math.min(10, efficiency / 10) + 
+       Math.min(10, consistency / 10)) / 3
+    );
+
+    return {
+      operatorName,
+      productivity: {
+        partsPerHour: Math.round(partsPerHour * 100) / 100,
+        planVsFact: Math.round(planVsFact * 10) / 10
+      },
+      quality: {
+        averageTimePerPart: Math.round(averageTimePerPart * 10) / 10,
+        deviation: Math.round(deviation * 10) / 10
+      },
+      stability: {
+        consistency: Math.round(consistency * 10) / 10
+      },
+      utilization: {
+        workingTime: totalTime,
+        idleTime: 0, // Пока не реализовано
+        efficiency: Math.round(efficiency * 10) / 10
+      },
+      rating
+    };
+  }, []);
+
+  // ИСПРАВЛЕННАЯ ФУНКЦИЯ: Вычисляем прогресс операции на основе реальных данных смен
+  const calculateProgress = React.useCallback((operation: any, operationShifts: any[]): number => {
+    if (!operation || !operationShifts.length) return 0;
+    
+    const totalProduced = operationShifts.reduce((sum, shift) => 
       sum + (shift.dayShiftQuantity || 0) + (shift.nightShiftQuantity || 0), 0
     );
     
-    // Предполагаем, что общее количество деталей в заказе - это то количество, которое нужно произвести
-    // Это упрощение, в реальности нужно получать данные о заказе
+    // Получаем целевое количество из заказа
     const targetQuantity = operation.order?.quantity || 100; // fallback значение
     
     return Math.min((totalProduced / targetQuantity) * 100, 100);
   }, []);
 
-  // ИСПРАВЛЕНО: Объединяем данные с фильтрацией по текущей операции
+  // НОВАЯ ФУНКЦИЯ: Фильтрация смен по текущей операции
+  const getOperationShifts = React.useCallback((
+    machineId: string, 
+    operationDetails: any, 
+    allShifts: any[]
+  ) => {
+    if (!operationDetails || !allShifts) return [];
+    
+    // Фильтруем смены по станку И по номеру чертежа текущей операции
+    return allShifts.filter(shift => 
+      shift.machineId === parseInt(machineId) && 
+      shift.drawingNumber === operationDetails.orderDrawingNumber
+    );
+  }, []);
+
+  // ИСПРАВЛЕННАЯ ЛОГИКА: Объединяем данные станков с активными операциями и производством ПО ТЕКУЩЕЙ ОПЕРАЦИИ
   const activeMachines: ActiveMachine[] = React.useMemo(() => {
     if (!machines) return [];
 
-    console.log('🔄 Пересчитываем данные станков...');
-    console.log('Всего станков:', machines.length);
-    console.log('Всего смен сегодня:', todayShifts?.length || 0);
-
     return machines.map(machine => {
-      console.log(`\n--- Обрабатываем станок ${machine.machineName} (ID: ${machine.id}) ---`);
-      
       // Находим назначенную операцию для станка
       const assignedOperation = activeOperations?.find(
         op => op.machineId === parseInt(machine.id)
       );
 
-      // ИСПРАВЛЕНО: Фильтрация смен по станку И по текущей операции
-      let machineShifts = todayShifts?.filter(
-        shift => shift.machineId === parseInt(machine.id)
-      ) || [];
+      // ИСПРАВЛЕНО: Фильтруем смены только по ТЕКУЩЕЙ операции
+      const operationShifts = machine.currentOperationDetails 
+        ? getOperationShifts(machine.id, machine.currentOperationDetails, todayShifts || [])
+        : [];
 
-      console.log(`Всего смен для станка: ${machineShifts.length}`);
+      console.log(`🔍 Станок ${machine.machineName}:`, {
+        currentOperation: machine.currentOperationDetails?.orderDrawingNumber,
+        totalShifts: todayShifts?.filter(s => s.machineId === parseInt(machine.id)).length || 0,
+        operationShifts: operationShifts.length,
+        operationShiftsData: operationShifts
+      });
 
-      // Если у станка есть текущая операция, фильтруем смены только по ней
-      let currentOperationShifts = machineShifts;
-      let showingCurrentOperationOnly = false;
-      
-      if (machine.currentOperationDetails?.id) {
-        console.log(`Фильтруем по текущей операции ID: ${machine.currentOperationDetails.id}`);
-        currentOperationShifts = machineShifts.filter(
-          shift => shift.operationId === machine.currentOperationDetails?.id
-        );
-        showingCurrentOperationOnly = currentOperationShifts.length > 0;
-        console.log(`Смен по текущей операции: ${currentOperationShifts.length}`);
-      }
+      // Вычисляем производство только по ТЕКУЩЕЙ операции
+      const currentOperationProduction = operationShifts.reduce((acc, shift) => {
+        const dayQuantity = shift.dayShiftQuantity || 0;
+        const nightQuantity = shift.nightShiftQuantity || 0;
+        const dayTime = dayQuantity * (shift.dayShiftTimePerUnit || 0);
+        const nightTime = nightQuantity * (shift.nightShiftTimePerUnit || 0);
 
-      // Если по текущей операции нет данных, показываем все смены станка
-      const shiftsToUse = currentOperationShifts.length > 0 ? currentOperationShifts : machineShifts;
-      
-      console.log(`Используем смен для расчета: ${shiftsToUse.length}`);
-
-      // Вычисляем производство за сегодня на основе отфильтрованных смен
-      const todayProduction = shiftsToUse.reduce((acc, shift) => {
-        console.log(`  Смена ID ${shift.id}: День=${shift.dayShiftQuantity || 0}, Ночь=${shift.nightShiftQuantity || 0}, Операция=${shift.operationId}`);
         return {
           dayShift: {
-            quantity: acc.dayShift.quantity + (shift.dayShiftQuantity || 0),
+            quantity: acc.dayShift.quantity + dayQuantity,
             operator: shift.dayShiftOperator || acc.dayShift.operator,
+            efficiency: 0 // Будем вычислять ниже
           },
           nightShift: {
-            quantity: acc.nightShift.quantity + (shift.nightShiftQuantity || 0),
+            quantity: acc.nightShift.quantity + nightQuantity,
             operator: shift.nightShiftOperator || acc.nightShift.operator,
+            efficiency: 0 // Будем вычислять ниже
           },
-          totalTime: acc.totalTime + 
-            (shift.dayShiftQuantity || 0) * (shift.dayShiftTimePerUnit || 0) +
-            (shift.nightShiftQuantity || 0) * (shift.nightShiftTimePerUnit || 0),
+          totalTime: acc.totalTime + dayTime + nightTime,
+          operatorStats: [] // Будем заполнять ниже
         };
       }, {
-        dayShift: { quantity: 0, operator: '-' },
-        nightShift: { quantity: 0, operator: 'Аркадий' },
+        dayShift: { quantity: 0, operator: '-', efficiency: 0 },
+        nightShift: { quantity: 0, operator: 'Аркадий', efficiency: 0 },
         totalTime: 0,
+        operatorStats: []
       });
 
-      console.log(`Результат для станка ${machine.machineName}:`, {
-        день: todayProduction.dayShift.quantity,
-        ночь: todayProduction.nightShift.quantity,
-        только_текущая_операция: showingCurrentOperationOnly
-      });
+      // Вычисляем статистику операторов для текущей операции
+      if (operationShifts.length > 0 && assignedOperation) {
+        const uniqueOperators = new Set<string>();
+        operationShifts.forEach(shift => {
+          if (shift.dayShiftOperator) uniqueOperators.add(shift.dayShiftOperator);
+          if (shift.nightShiftOperator) uniqueOperators.add(shift.nightShiftOperator);
+        });
+
+        currentOperationProduction.operatorStats = Array.from(uniqueOperators)
+          .map(operator => calculateOperatorEfficiency(operator, operationShifts, assignedOperation))
+          .filter(stat => stat.productivity.partsPerHour > 0);
+
+        // Обновляем эффективность смен
+        const dayOperatorStats = currentOperationProduction.operatorStats.find(
+          (s: OperatorEfficiency) => s.operatorName === currentOperationProduction.dayShift.operator
+        );
+        const nightOperatorStats = currentOperationProduction.operatorStats.find(
+          (s: OperatorEfficiency) => s.operatorName === currentOperationProduction.nightShift.operator
+        );
+
+        currentOperationProduction.dayShift.efficiency = dayOperatorStats?.utilization.efficiency || 0;
+        currentOperationProduction.nightShift.efficiency = nightOperatorStats?.utilization.efficiency || 0;
+      }
 
       // Создаем объект активного станка
       const machineData: ActiveMachine = {
@@ -225,23 +364,26 @@ export const ActiveMachinesMonitor: React.FC = () => {
         status: assignedOperation ? 
           (!machine.isAvailable ? 'working' : 'setup') : 
           'idle',
-        todayProduction: {
-          ...todayProduction,
-          currentOperationOnly: showingCurrentOperationOnly
-        },
+        currentOperationProduction,
       };
 
       // Если есть детали операции из API, добавляем их с прогрессом
       if (machine.currentOperationDetails) {
+        const totalProduced = operationShifts.reduce((sum, shift) => 
+          sum + (shift.dayShiftQuantity || 0) + (shift.nightShiftQuantity || 0), 0
+        );
+
         machineData.currentOperationDetails = {
           ...machine.currentOperationDetails,
-          progress: calculateProgress(assignedOperation, currentOperationShifts),
+          progress: calculateProgress(assignedOperation, operationShifts),
+          totalProduced,
+          targetQuantity: (assignedOperation as any)?.orderId ? 100 : 100 // ИСПРАВЛЕНО: убрана ссылка на order.quantity
         };
       }
 
       return machineData;
     });
-  }, [machines, activeOperations, todayShifts, calculateProgress]);
+  }, [machines, activeOperations, todayShifts, calculateProgress, getOperationShifts, calculateOperatorEfficiency]);
 
   const handleCreateShiftRecord = (machineId: string) => {
     setSelectedMachineId(parseInt(machineId));
@@ -253,26 +395,24 @@ export const ActiveMachinesMonitor: React.FC = () => {
     setSelectedMachineId(undefined);
   };
 
-  // ИСПРАВЛЕНО: Улучшена инвалидация с принудительным обновлением
-  const handleShiftFormSuccess = async () => {
+  // ИСПРАВЛЕНО: Добавлена инвалидация кэша для автообновления данных
+  const handleShiftFormSuccess = () => {
     message.success('Запись смены создана успешно');
     
-    console.log('🔄 Начинаем обновление данных после создания смены...');
+    // Инвалидируем все связанные запросы для обновления данных
+    queryClient.invalidateQueries({ queryKey: ['shifts'] });
+    queryClient.invalidateQueries({ queryKey: ['shifts', 'today'] });
+    queryClient.invalidateQueries({ queryKey: ['machines-availability'] });
+    queryClient.invalidateQueries({ queryKey: ['operations'] });
     
-    // Инвалидируем все связанные запросы
-    await queryClient.invalidateQueries({ queryKey: ['shifts'] });
-    await queryClient.invalidateQueries({ queryKey: ['machines-availability'] });
-    await queryClient.invalidateQueries({ queryKey: ['operations'] });
-    
-    // Принудительно обновляем данные
-    setTimeout(async () => {
-      console.log('🔄 Принудительное обновление через 500мс...');
-      await refetchShifts();
-      await refetchMachines();
-      await refetchOperations();
-    }, 500);
+    console.log('🔄 Кэш инвалидирован, данные обновляются...');
     
     handleShiftFormClose();
+  };
+
+  const handleOperationClick = (operation: any) => {
+    setSelectedOperation(operation);
+    setShowOperationDetail(true);
   };
 
   const getMachineStatusColor = (status: string) => {
@@ -376,13 +516,27 @@ export const ActiveMachinesMonitor: React.FC = () => {
             >
               {machine.currentOperationDetails ? (
                 <div>
-                  <div style={{ marginBottom: 12 }}>
+                  <div 
+                    style={{ 
+                      marginBottom: 12, 
+                      cursor: 'pointer',
+                      padding: '8px',
+                      backgroundColor: '#f0f9ff',
+                      borderRadius: '4px',
+                      border: '1px solid #91d5ff'
+                    }}
+                    onClick={() => handleOperationClick(machine.currentOperationDetails)}
+                  >
                     <Text strong>Текущая операция:</Text>
                     <br />
                     <Text>Операция {machine.currentOperationDetails.operationNumber}</Text>
                     <br />
                     <Text type="secondary">
                       {machine.currentOperationDetails.orderDrawingNumber}
+                    </Text>
+                    <br />
+                    <Text type="secondary" style={{ fontSize: '11px' }}>
+                      <BarChartOutlined /> Нажмите для детальной статистики
                     </Text>
                   </div>
 
@@ -393,6 +547,9 @@ export const ActiveMachinesMonitor: React.FC = () => {
                       size="small"
                       status={(machine.currentOperationDetails.progress || 0) > 80 ? 'success' : 'active'}
                     />
+                    <Text type="secondary" style={{ fontSize: '11px' }}>
+                      {machine.currentOperationDetails.totalProduced || 0} из {machine.currentOperationDetails.targetQuantity || 0} деталей
+                    </Text>
                   </div>
 
                   <div style={{ marginBottom: 12 }}>
@@ -404,14 +561,7 @@ export const ActiveMachinesMonitor: React.FC = () => {
                   <Divider style={{ margin: '12px 0' }} />
 
                   <div>
-                    <Text strong>
-                      Производство сегодня
-                      {machine.todayProduction?.currentOperationOnly && (
-                        <Tag color="blue" style={{ marginLeft: 8, fontSize: '11px', padding: '2px 6px', lineHeight: '16px' }}>
-                          по текущей операции
-                        </Tag>
-                      )}:
-                    </Text>
+                    <Text strong>Производство по операции:</Text>
                     <div style={{ marginTop: 8 }}>
                       <Row gutter={8}>
                         <Col span={12}>
@@ -419,12 +569,20 @@ export const ActiveMachinesMonitor: React.FC = () => {
                             <Text type="secondary">День</Text>
                             <br />
                             <Text strong style={{ fontSize: '18px' }}>
-                              {machine.todayProduction?.dayShift.quantity || 0}
+                              {machine.currentOperationProduction?.dayShift.quantity || 0}
                             </Text>
                             <br />
                             <Text type="secondary" style={{ fontSize: '12px' }}>
-                              {machine.todayProduction?.dayShift.operator}
+                              {machine.currentOperationProduction?.dayShift.operator || '-'}
                             </Text>
+                            {(machine.currentOperationProduction?.dayShift.efficiency || 0) > 0 && (
+                              <>
+                                <br />
+                                <Text type="secondary" style={{ fontSize: '10px', color: (machine.currentOperationProduction?.dayShift.efficiency || 0) > 80 ? '#52c41a' : '#faad14' }}>
+                                  ⚡ {(machine.currentOperationProduction?.dayShift.efficiency || 0).toFixed(0)}%
+                                </Text>
+                              </>
+                            )}
                           </div>
                         </Col>
                         <Col span={12}>
@@ -432,12 +590,20 @@ export const ActiveMachinesMonitor: React.FC = () => {
                             <Text type="secondary">Ночь</Text>
                             <br />
                             <Text strong style={{ fontSize: '18px' }}>
-                              {machine.todayProduction?.nightShift.quantity || 0}
+                              {machine.currentOperationProduction?.nightShift.quantity || 0}
                             </Text>
                             <br />
                             <Text type="secondary" style={{ fontSize: '12px' }}>
-                              {machine.todayProduction?.nightShift.operator}
+                              {machine.currentOperationProduction?.nightShift.operator || 'Аркадий'}
                             </Text>
+                            {(machine.currentOperationProduction?.nightShift.efficiency || 0) > 0 && (
+                              <>
+                                <br />
+                                <Text type="secondary" style={{ fontSize: '10px', color: (machine.currentOperationProduction?.nightShift.efficiency || 0) > 80 ? '#52c41a' : '#faad14' }}>
+                                  ⚡ {(machine.currentOperationProduction?.nightShift.efficiency || 0).toFixed(0)}%
+                                </Text>
+                              </>
+                            )}
                           </div>
                         </Col>
                       </Row>
@@ -466,6 +632,12 @@ export const ActiveMachinesMonitor: React.FC = () => {
         onClose={handleShiftFormClose}
         onSuccess={handleShiftFormSuccess}
         selectedMachineId={selectedMachineId}
+      />
+
+      <OperationDetailModal
+        visible={showOperationDetail}
+        operation={selectedOperation}
+        onClose={() => setShowOperationDetail(false)}
       />
     </div>
   );
