@@ -56,6 +56,12 @@ export class Operation {
   @Column({ default: 'PENDING' })
   status: string;
 
+  @Column({ name: 'assignedMachine', nullable: true })
+  assignedMachine: number;
+
+  @Column({ name: 'assignedAt', nullable: true })
+  assignedAt: Date;
+
   // СВЯЗЬ С ЗАКАЗОМ - используем существующее поле orderId
   @ManyToOne(() => Order, (order) => order.operations, {
     onDelete: 'CASCADE', 

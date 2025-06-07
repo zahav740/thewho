@@ -38,6 +38,12 @@ export class Machine {
   @Column({ name: 'isOccupied', default: false })
   isOccupied: boolean;
 
+  @Column({ name: 'currentOperation', nullable: true })
+  currentOperation: number;
+
+  @Column({ name: 'assignedAt', nullable: true })
+  assignedAt: Date;
+
   // УБРАНА СВЯЗЬ С ОПЕРАЦИЯМИ - она не используется в текущей системе
   // @OneToMany(() => Operation, (operation) => operation.machineEntity, { nullable: true })
   // operations: Operation[];

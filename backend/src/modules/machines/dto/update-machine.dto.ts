@@ -1,13 +1,8 @@
-/**
- * @file: update-machine.dto.ts
- * @description: DTO для обновления станка
- * @dependencies: create-machine.dto
- * @created: 2025-01-28
- */
 import { PartialType } from '@nestjs/swagger';
 import { CreateMachineDto } from './create-machine.dto';
-import { IsBoolean, IsOptional } from 'class-validator';
+import { IsBoolean, IsOptional, IsNumber, IsDate } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 
 export class UpdateMachineDto extends PartialType(CreateMachineDto) {
   @ApiPropertyOptional({ description: 'Активен ли станок' })
@@ -19,4 +14,15 @@ export class UpdateMachineDto extends PartialType(CreateMachineDto) {
   @IsOptional()
   @IsBoolean()
   isOccupied?: boolean;
+
+  @ApiPropertyOptional({ description: 'ID текущей операции' })
+  @IsOptional()
+  @IsNumber()
+  currentOperation?: number;
+
+  @ApiPropertyOptional({ description: 'Время назначения операции' })
+  @IsOptional()
+  @Type(() => Date)
+  @IsDate()
+  assignedAt?: Date;
 }

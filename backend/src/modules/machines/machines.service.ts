@@ -54,6 +54,21 @@ export class MachinesService {
 
   async update(id: number, updateMachineDto: UpdateMachineDto): Promise<Machine> {
     const machine = await this.findOne(id);
+    
+    // Поддерживаем новые поля
+    if (updateMachineDto.hasOwnProperty('isOccupied')) {
+      machine.isOccupied = updateMachineDto.isOccupied;
+    }
+    
+    if (updateMachineDto.hasOwnProperty('currentOperation')) {
+      machine.currentOperation = updateMachineDto.currentOperation;
+    }
+    
+    if (updateMachineDto.hasOwnProperty('assignedAt')) {
+      machine.assignedAt = updateMachineDto.assignedAt;
+    }
+    
+    // Остальные поля
     Object.assign(machine, updateMachineDto);
     return this.machineRepository.save(machine);
   }

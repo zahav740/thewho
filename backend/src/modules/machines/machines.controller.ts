@@ -1,9 +1,9 @@
 /**
  * @file: machines.controller.ts
- * @description: Контроллер для управления станками и доступностью
+ * @description: Контроллер для управления станками (ИСПРАВЛЕННЫЙ)
  * @dependencies: services
  * @created: 2025-01-28
- * @updated: 2025-05-28
+ * @updated: 2025-06-07 - Исправлено для работы с существующей БД
  */
 import {
   Controller,
@@ -14,47 +14,54 @@ import {
   Body,
   Param,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { MachinesService } from './machines.service';
-import { MachineAvailabilityService } from './machine-availability.service';
-// import { PlanningAlgorithmService } from './planning-algorithm.service';
 import { CreateMachineDto } from './dto/create-machine.dto';
 import { UpdateMachineDto } from './dto/update-machine.dto';
 import { Machine } from '../../database/entities/machine.entity';
-import { MachineAvailability } from '../../database/entities/machine-availability.entity';
-import { RecommendedOrderDto } from './dto/recommended-order.dto';
+
+// Интерфейс для совместимости с frontend
+interface MachineAvailability {
+  id: string;
+  machineName: string;
+  machineType: string;
+  isAvailable: boolean;
+  currentOperationId?: string;
+  lastFreedAt?: Date;
+}
 
 @ApiTags('machines')
 @Controller('machines')
 export class MachinesController {
+  private readonly logger = new Logger(MachinesController.name);
+
   constructor(
     private readonly machinesService: MachinesService,
-    private readonly machineAvailabilityService: MachineAvailabilityService,
-    // private readonly planningAlgorithmService: PlanningAlgorithmService,
   ) {}
-
-  // Управление станками (старые методы)
-  @Get('legacy')
-  @ApiOperation({ summary: 'Получить все станки (legacy)' })
-  async findAllLegacy(): Promise<Machine[]> {
-    try {
-      return await this.machinesService.findAll();
-    } catch (error) {
-      console.error('Error in findAllLegacy:', error);
-      throw error;
-    }
-  }
-
-  // Новые методы для управления доступностью станков
 
   @Get()
   @ApiOperation({ summary: 'Получить все станки с доступностью' })
   async findAll(): Promise<MachineAvailability[]> {
     try {
-      return await this.machineAvailabilityService.findAll();
+      this.logger.log('Получение всех станков');
+      const machines = await this.machinesService.findAll();
+      
+      // Преобразуем данные из таблицы machines в формат MachineAvailability
+      const result = machines.map(machine => ({
+        id: machine.id.toString(),
+        machineName: machine.code, // используем code как имя станка
+        machineType: machine.type,
+        isAvailable: !machine.isOccupied, // инвертируем логику
+        currentOperationId: machine.currentOperation?.toString(),
+        lastFreedAt: machine.assignedAt,
+      }));
+      
+      this.logger.log(`Возвращено ${result.length} станков`);
+      return result;
     } catch (error) {
-      console.error('Error in findAll:', error);
+      this.logger.error('Ошибка при получении станков:', error);
       throw error;
     }
   }
@@ -62,13 +69,56 @@ export class MachinesController {
   @Get('available')
   @ApiOperation({ summary: 'Получить только доступные станки' })
   async findAvailable(): Promise<MachineAvailability[]> {
-    return this.machineAvailabilityService.getAvailableMachines();
+    try {
+      this.logger.log('Получение доступных станков');
+      const machines = await this.machinesService.findAll();
+      
+      // Фильтруем только доступные станки
+      const availableMachines = machines.filter(machine => 
+        machine.isActive && !machine.isOccupied
+      );
+      
+      const result = availableMachines.map(machine => ({
+        id: machine.id.toString(),
+        machineName: machine.code,
+        machineType: machine.type,
+        isAvailable: true,
+        currentOperationId: machine.currentOperation?.toString(),
+        lastFreedAt: machine.assignedAt,
+      }));
+      
+      this.logger.log(`Возвращено ${result.length} доступных станков`);
+      return result;
+    } catch (error) {
+      this.logger.error('Ошибка при получении доступных станков:', error);
+      throw error;
+    }
   }
 
   @Get(':machineName')
   @ApiOperation({ summary: 'Получить станок по имени' })
   async findByName(@Param('machineName') machineName: string): Promise<MachineAvailability> {
-    return this.machineAvailabilityService.findByName(machineName);
+    try {
+      this.logger.log(`Поиск станка по имени: ${machineName}`);
+      const machines = await this.machinesService.findAll();
+      const machine = machines.find(m => m.code === machineName);
+      
+      if (!machine) {
+        throw new BadRequestException(`Станок с именем ${machineName} не найден`);
+      }
+      
+      return {
+        id: machine.id.toString(),
+        machineName: machine.code,
+        machineType: machine.type,
+        isAvailable: !machine.isOccupied,
+        currentOperationId: machine.currentOperation?.toString(),
+        lastFreedAt: machine.assignedAt,
+      };
+    } catch (error) {
+      this.logger.error(`Ошибка при поиске станка ${machineName}:`, error);
+      throw error;
+    }
   }
 
   @Put(':machineName/availability')
@@ -77,21 +127,33 @@ export class MachinesController {
     @Param('machineName') machineName: string,
     @Body() body: { isAvailable: boolean },
   ): Promise<MachineAvailability> {
-    return this.machineAvailabilityService.updateAvailability(
-      machineName, 
-      body.isAvailable
-    );
+    try {
+      this.logger.log(`Обновление доступности станка ${machineName}: ${body.isAvailable}`);
+      const machines = await this.machinesService.findAll();
+      const machine = machines.find(m => m.code === machineName);
+      
+      if (!machine) {
+        throw new BadRequestException(`Станок с именем ${machineName} не найден`);
+      }
+      
+      // Обновляем статус занятости (инвертируем логику)
+      const updatedMachine = await this.machinesService.update(machine.id, {
+        isOccupied: !body.isAvailable
+      });
+      
+      return {
+        id: updatedMachine.id.toString(),
+        machineName: updatedMachine.code,
+        machineType: updatedMachine.type,
+        isAvailable: !updatedMachine.isOccupied,
+        currentOperationId: updatedMachine.currentOperation?.toString(),
+        lastFreedAt: updatedMachine.assignedAt,
+      };
+    } catch (error) {
+      this.logger.error(`Ошибка при обновлении доступности станка ${machineName}:`, error);
+      throw error;
+    }
   }
-
-  /*
-  @Get(':machineName/suggested-operations')
-  @ApiOperation({ summary: 'Получить рекомендуемые операции для станка' })
-  async getSuggestedOperations(
-    @Param('machineName') machineName: string,
-  ): Promise<RecommendedOrderDto[]> {
-    return this.planningAlgorithmService.planOperationsForMachine(machineName);
-  }
-  */
 
   @Post(':machineName/assign-operation')
   @ApiOperation({ summary: 'Назначить операцию на станок' })
@@ -99,13 +161,48 @@ export class MachinesController {
     @Param('machineName') machineName: string,
     @Body() body: { operationId: string },
   ): Promise<MachineAvailability> {
-    return this.machineAvailabilityService.assignOperation(
-      machineName, 
-      body.operationId
-    );
+    try {
+      this.logger.log(`Назначение операции ${body.operationId} на станок ${machineName}`);
+      const machines = await this.machinesService.findAll();
+      const machine = machines.find(m => m.code === machineName);
+      
+      if (!machine) {
+        throw new BadRequestException(`Станок с именем ${machineName} не найден`);
+      }
+      
+      // Назначаем операцию и помечаем станок как занятый
+      const updatedMachine = await this.machinesService.update(machine.id, {
+        isOccupied: true,
+        currentOperation: parseInt(body.operationId),
+        assignedAt: new Date(),
+      });
+      
+      return {
+        id: updatedMachine.id.toString(),
+        machineName: updatedMachine.code,
+        machineType: updatedMachine.type,
+        isAvailable: false,
+        currentOperationId: updatedMachine.currentOperation?.toString(),
+        lastFreedAt: updatedMachine.assignedAt,
+      };
+    } catch (error) {
+      this.logger.error(`Ошибка при назначении операции на станок ${machineName}:`, error);
+      throw error;
+    }
   }
 
-  // Legacy методы
+  // Legacy методы для обратной совместимости
+  @Get('legacy')
+  @ApiOperation({ summary: 'Получить все станки (legacy)' })
+  async findAllLegacy(): Promise<Machine[]> {
+    try {
+      return await this.machinesService.findAll();
+    } catch (error) {
+      this.logger.error('Ошибка в findAllLegacy:', error);
+      throw error;
+    }
+  }
+
   @Get('legacy/:id')
   @ApiOperation({ summary: 'Получить станок по ID (legacy)' })
   async findOne(@Param('id') id: string): Promise<Machine> {
