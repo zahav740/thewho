@@ -322,10 +322,12 @@ export class ProductionPlanningService {
       return {
         orderId: match.operation.orderId,
         operationId: match.operation.id,
+        operationNumber: match.operation.operationNumber, // Добавляем номер операции
+        operationType: match.operation.operationType, // Добавляем тип операции
         machineId: match.selectedMachine.id,
+        machineAxes: match.operation.machineAxes, // Добавляем количество осей
         priority: order?.priority || 999,
-        estimatedTime: match.operation.estimatedTime,
-        operationType: match.operation.operationType
+        estimatedTime: match.operation.estimatedTime
       };
     });
 

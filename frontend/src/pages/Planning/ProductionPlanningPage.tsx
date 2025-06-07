@@ -50,6 +50,9 @@ const ProductionPlanningPage: React.FC = () => {
   const [currentStep, setCurrentStep] = useState(0);
   const [planningResult, setPlanningResult] = useState<PlanningResult | null>(null);
   const [showResultModal, setShowResultModal] = useState(false);
+  const [selectedOperation, setSelectedOperation] = useState<any>(null);
+  const [selectedOrder, setSelectedOrder] = useState<any>(null);
+  const [showOperationModal, setShowOperationModal] = useState(false);
 
   // Загрузка списка станков
   const { data: machines, isLoading: machinesLoading, error: machinesError } = useQuery({
@@ -121,6 +124,48 @@ const ProductionPlanningPage: React.FC = () => {
   const handleDemoPlanning = () => {
     setCurrentStep(1);
     demoMutation.mutate();
+  };
+
+  const handleOperationClick = (operation: any, order: any) => {
+    setSelectedOperation(operation);
+    setSelectedOrder(order);
+    setShowOperationModal(true);
+  };
+
+  const handleAssignOperation = async () => {
+    if (!selectedOperation) return;
+    
+    try {
+      // Реальный API вызов для назначения операции
+      const result = await planningApi.assignOperation(
+        selectedOperation.operationId, 
+        selectedOperation.machineId
+      );
+      
+      if (result.success) {
+        Modal.success({
+          title: 'Операция назначена',
+          content: result.message,
+        });
+        
+        setShowOperationModal(false);
+        
+        // Обновляем список станков чтобы отобразить изменения
+        // machinesApi.invalidateQueries(); // Если используете React Query
+      } else {
+        Modal.error({
+          title: 'Ошибка назначения',
+          content: result.error || 'Не удалось назначить операцию',
+        });
+      }
+      
+    } catch (error) {
+      console.error('Ошибка при назначении операции:', error);
+      Modal.error({
+        title: 'Ошибка сети',
+        content: 'Не удалось связаться с сервером',
+      });
+    }
   };
 
   const formatTime = (minutes: number): string => {
@@ -530,21 +575,132 @@ const ProductionPlanningPage: React.FC = () => {
             <Title level={4}>Очередь операций</Title>
             <List
               dataSource={planningResult.operationsQueue}
-              renderItem={(operation, index) => (
-                <List.Item>
-                  <List.Item.Meta
-                    title={`${index + 1}. Операция #${operation.operationId}`}
-                    description={
-                      <Space>
-                        <Tag color="blue">Заказ #{operation.orderId}</Tag>
-                        <Tag color="green">Приоритет {operation.priority}</Tag>
-                        <Tag color="orange">{formatTime(operation.estimatedTime)}</Tag>
-                        <Text type="secondary">Станок #{operation.machineId}</Text>
-                      </Space>
-                    }
-                  />
-                </List.Item>
-              )}
+              renderItem={(operation, index) => {
+                // Найдем заказ для этой операции
+                const order = planningResult.selectedOrders.find(o => o.id === operation.orderId);
+                const drawingNumber = order?.drawingNumber || `Заказ #${operation.orderId}`;
+                
+                return (
+                  <List.Item 
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => handleOperationClick(operation, order)}
+                  >
+                    <List.Item.Meta
+                      title={
+                        <Space>
+                          <span>{index + 1}. Чертеж {drawingNumber}</span>
+                          <Tag color="blue">Операция {operation.operationNumber || operation.operationId}</Tag>
+                        </Space>
+                      }
+                      description={
+                        <Space>
+                          <Tag color="green">Приоритет {operation.priority}</Tag>
+                          <Tag color="orange">{formatTime(operation.estimatedTime)}</Tag>
+                          <Tag color="purple">Станок #{operation.machineId}</Tag>
+                          <Text type="secondary">Клик для деталей и назначения</Text>
+                        </Space>
+                      }
+                    />
+                  </List.Item>
+                );
+              }}
+            />
+          </div>
+        )}
+      </Modal>
+
+      {/* Модальное окно с деталями операции */}
+      <Modal
+        title="Детали операции и назначение"
+        open={showOperationModal}
+        onCancel={() => setShowOperationModal(false)}
+        width={700}
+        footer={[
+          <Button key="cancel" onClick={() => setShowOperationModal(false)}>
+            Отмена
+          </Button>,
+          <Button key="assign" type="primary" onClick={handleAssignOperation}>
+            Назначить в работу
+          </Button>
+        ]}
+      >
+        {selectedOperation && selectedOrder && (
+          <div>
+            <Row gutter={16} style={{ marginBottom: 24 }}>
+              <Col span={12}>
+                <Card size="small" title="Информация о заказе">
+                  <div style={{ marginBottom: 8 }}>
+                    <strong>Номер чертежа:</strong> {selectedOrder.drawingNumber}
+                  </div>
+                  <div style={{ marginBottom: 8 }}>
+                    <strong>Приоритет:</strong> 
+                    <Tag color={selectedOrder.priority === 1 ? 'red' : selectedOrder.priority === 2 ? 'orange' : 'green'}>
+                      {selectedOrder.priority}
+                    </Tag>
+                  </div>
+                  <div style={{ marginBottom: 8 }}>
+                    <strong>Количество:</strong> {selectedOrder.quantity} шт.
+                  </div>
+                  <div style={{ marginBottom: 8 }}>
+                    <strong>Срок:</strong> {new Date(selectedOrder.deadline).toLocaleDateString()}
+                  </div>
+                  {selectedOrder.workType && (
+                    <div>
+                      <strong>Тип работ:</strong> {selectedOrder.workType}
+                    </div>
+                  )}
+                </Card>
+              </Col>
+              <Col span={12}>
+                <Card size="small" title="Детали операции">
+                  <div style={{ marginBottom: 8 }}>
+                    <strong>Номер операции:</strong> {selectedOperation.operationNumber || selectedOperation.operationId}
+                  </div>
+                  <div style={{ marginBottom: 8 }}>
+                    <strong>Тип операции:</strong> 
+                    <Tag color="blue">{selectedOperation.operationType}</Tag>
+                  </div>
+                  <div style={{ marginBottom: 8 }}>
+                    <strong>Время выполнения:</strong> {formatTime(selectedOperation.estimatedTime)}
+                  </div>
+                  <div style={{ marginBottom: 8 }}>
+                    <strong>Количество осей:</strong> {selectedOperation.machineAxes || 'Не указано'}
+                  </div>
+                  <div>
+                    <strong>Назначенный станок:</strong> 
+                    <Tag color="purple">#{selectedOperation.machineId}</Tag>
+                  </div>
+                </Card>
+              </Col>
+            </Row>
+
+            {selectedOperation.startTime && selectedOperation.endTime && (
+              <Card size="small" title="Плановое время выполнения" style={{ marginBottom: 16 }}>
+                <Row gutter={16}>
+                  <Col span={12}>
+                    <div>
+                      <strong>Начало:</strong> {new Date(selectedOperation.startTime).toLocaleString()}
+                    </div>
+                  </Col>
+                  <Col span={12}>
+                    <div>
+                      <strong>Окончание:</strong> {new Date(selectedOperation.endTime).toLocaleString()}
+                    </div>
+                  </Col>
+                </Row>
+              </Card>
+            )}
+
+            <Alert
+              message="Подтверждение назначения"
+              description={
+                <div>
+                  После нажатия "Назначить в работу" операция <strong>{selectedOperation.operationNumber || selectedOperation.operationId}</strong> 
+                  будет назначена на станок <strong>#{selectedOperation.machineId}</strong> для выполнения.
+                </div>
+              }
+              type="info"
+              showIcon
             />
           </div>
         )}

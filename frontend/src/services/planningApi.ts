@@ -52,6 +52,7 @@ export interface DemoResult {
   result: PlanningResult;
 }
 
+// Добавляем API для назначения операций
 export const planningApi = {
   // Запуск планирования производства
   planProduction: async (request: PlanningRequest): Promise<PlanningResult> => {
@@ -59,9 +60,18 @@ export const planningApi = {
     return response.data;
   },
 
-  // Демонстрационное планирование
+  // Планирование с доступными станками (бывшее демо)
   demoPlanning: async (): Promise<DemoResult> => {
     const response = await planningApiInstance.post('/planning/demo');
+    return response.data;
+  },
+
+  // Назначить операцию на станок
+  assignOperation: async (operationId: number, machineId: number) => {
+    const response = await planningApiInstance.post('/planning/assign-operation', {
+      operationId,
+      machineId
+    });
     return response.data;
   },
 

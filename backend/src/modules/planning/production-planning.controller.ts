@@ -122,34 +122,36 @@ export class ProductionPlanningController {
 
   @Post('demo')
   @ApiOperation({ 
-    summary: 'Демонстрационный запуск планирования',
-    description: 'Запускает планирование с тестовыми данными для демонстрации алгоритма'
+    summary: 'Запуск планирования с доступными станками',
+    description: 'Запускает планирование используя все доступные станки из БД'
   })
   async demoPlanning() {
     try {
-      this.logger.log('Запуск демонстрационного планирования');
+      this.logger.log('Запуск планирования с доступными станками');
       
-      // Получаем все доступные станки для демо
+      // Получаем все доступные станки из БД
       const availableMachines = await this.planningService['getAvailableMachines']([]);
       const machineIds = availableMachines.map(m => m.id);
       
       if (machineIds.length === 0) {
         return {
-          error: 'Нет доступных станков для демонстрации',
-          suggestion: 'Убедитесь что в БД есть активные станки'
+          success: false,
+          error: 'Нет доступных станков для планирования',
+          suggestion: 'Убедитесь что в БД есть активные и свободные станки (isActive=true, isOccupied=false)'
         };
       }
       
-      const demoRequest: PlanningRequest = {
-        selectedMachines: machineIds,
-        excelData: null // Используем данные из БД
+      this.logger.log(`Используем ${machineIds.length} доступных станков: ${machineIds.join(', ')}`);
+      
+      const planningRequest: PlanningRequest = {
+        selectedMachines: machineIds
       };
       
-      const result = await this.planningService.planProduction(demoRequest);
+      const result = await this.planningService.planProduction(planningRequest);
       
       return {
         success: true,
-        message: 'Демонстрационное планирование выполнено',
+        message: `Планирование выполнено с ${machineIds.length} станками`,
         result: {
           selectedOrdersCount: result.selectedOrders.length,
           operationsQueueLength: result.operationsQueue.length,
@@ -161,9 +163,10 @@ export class ProductionPlanningController {
       };
       
     } catch (error) {
-      this.logger.error('Ошибка в демонстрационном планировании:', error);
+      this.logger.error('Ошибка при планировании:', error);
       return {
-        error: 'Ошибка при выполнении демонстрации',
+        success: false,
+        error: 'Ошибка при выполнении планирования',
         message: error.message,
         suggestion: 'Проверьте что в БД есть заказы с приоритетами 1, 2, 3 и соответствующие операции'
       };
@@ -171,8 +174,75 @@ export class ProductionPlanningController {
   }
 
   /**
-   * Форматирование времени в человеко-читаемый вид
+   * Назначить операцию на станок
    */
+  @Post('assign-operation')
+  @ApiOperation({ 
+    summary: 'Назначить операцию на станок',
+    description: 'Назначает операцию на конкретный станок для выполнения'
+  })
+  async assignOperation(@Body() request: { operationId: number; machineId: number; }) {
+    try {
+      this.logger.log(`Назначение операции ${request.operationId} на станок ${request.machineId}`);
+      
+      // Проверяем что операция существует
+      const operation = await this.planningService['dataSource'].query(
+        'SELECT * FROM operations WHERE id = $1',
+        [request.operationId]
+      );
+      
+      if (!operation || operation.length === 0) {
+        return {
+          success: false,
+          error: 'Операция не найдена'
+        };
+      }
+      
+      // Проверяем что станок доступен
+      const machine = await this.planningService['dataSource'].query(
+        'SELECT * FROM machines WHERE id = $1 AND "isActive" = true AND "isOccupied" = false',
+        [request.machineId]
+      );
+      
+      if (!machine || machine.length === 0) {
+        return {
+          success: false,
+          error: 'Станок недоступен или занят'
+        };
+      }
+      
+      // Назначаем операцию
+      await this.planningService['dataSource'].query(
+        'UPDATE machines SET "isOccupied" = true, "currentOperation" = $1, "assignedAt" = NOW() WHERE id = $2',
+        [request.operationId, request.machineId]
+      );
+      
+      // Отмечаем операцию как назначенную
+      await this.planningService['dataSource'].query(
+        'UPDATE operations SET "assignedMachine" = $1, "assignedAt" = NOW(), status = \'assigned\' WHERE id = $2',
+        [request.machineId, request.operationId]
+      );
+      
+      return {
+        success: true,
+        message: `Операция ${operation[0].operationNumber || request.operationId} назначена на станок ${machine[0].code}`,
+        data: {
+          operationId: request.operationId,
+          machineId: request.machineId,
+          machineName: machine[0].code,
+          assignedAt: new Date()
+        }
+      };
+      
+    } catch (error) {
+      this.logger.error('Ошибка при назначении операции:', error);
+      return {
+        success: false,
+        error: 'Ошибка при назначении операции',
+        message: error.message
+      };
+    }
+  }
   private formatTime(minutes: number): string {
     if (!minutes || minutes <= 0) return '0 мин';
     
