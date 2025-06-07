@@ -1,8 +1,9 @@
 /**
  * @file: ActiveMachinesMonitor.tsx
- * @description: Компонент мониторинга активных станков и выполнения заказов
+ * @description: Компонент мониторинга активных станков (ИСПРАВЛЕН - правильный порядок функций)
  * @dependencies: antd, react-query, machinesApi, operationsApi
  * @created: 2025-06-07
+ * @fixed: 2025-06-07 - Исправлен порядок объявления функций
  */
 import React, { useState } from 'react';
 import {
@@ -33,26 +34,37 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { machinesApi } from '../../../services/machinesApi';
 import { operationsApi } from '../../../services/operationsApi';
+import { shiftsApi } from '../../../services/shiftsApi';
 import { OperationStatus } from '../../../types/operation.types';
+import { MachineAvailability } from '../../../types/machine.types';
 import { ShiftForm } from './ShiftForm';
+import dayjs from 'dayjs';
 
 const { Title, Text } = Typography;
 
+// Расширенный тип для текущих деталей операции с прогрессом
+interface ExtendedOperationDetails {
+  id: number;
+  operationNumber: number;
+  operationType: string;
+  estimatedTime: number;
+  orderId: number;
+  orderDrawingNumber: string;
+  progress?: number; // Добавляем поле прогресса
+}
+
+// Тип активного станка без наследования для избежания конфликтов
 interface ActiveMachine {
   id: string;
-  name: string;
-  type: string;
+  machineName: string;
+  machineType: string;
+  isAvailable: boolean;
+  currentOperationId?: string;
+  currentOperationDetails?: ExtendedOperationDetails; // Используем расширенный тип
+  lastFreedAt?: Date | string; // Гибкий тип
+  createdAt: string;
+  updatedAt: string;
   status: 'working' | 'setup' | 'idle' | 'maintenance';
-  currentOperation?: {
-    id: number;
-    operationNumber: number;
-    orderDrawingNumber: string;
-    operationType: string;
-    estimatedTime: number;
-    progress: number;
-    startedAt?: string;
-    operator?: string;
-  };
   todayProduction?: {
     dayShift: { quantity: number; operator: string };
     nightShift: { quantity: number; operator: string };
@@ -60,68 +72,137 @@ interface ActiveMachine {
   };
 }
 
+// Утилитарная функция для получения названия типа станка
+const getMachineTypeLabel = (type: string): string => {
+  if (!type) return 'Станок';
+  
+  const upperType = type.toUpperCase();
+  if (upperType.includes('MILLING')) {
+    return 'Фрезерный';
+  } else if (upperType.includes('TURNING')) {
+    return 'Токарный';
+  } else if (upperType.includes('DRILLING')) {
+    return 'Сверлильный';
+  } else if (upperType.includes('GRINDING')) {
+    return 'Шлифовальный';
+  }
+  
+  return 'Станок';
+};
+
 export const ActiveMachinesMonitor: React.FC = () => {
-  const [selectedMachineId, setSelectedMachineId] = useState<string | undefined>();
+  const [selectedMachineId, setSelectedMachineId] = useState<number | undefined>();
   const [showShiftForm, setShowShiftForm] = useState(false);
 
-  // Загружаем список станков
-  const { data: machines, isLoading: machinesLoading } = useQuery({
-    queryKey: ['machines'],
+  // Загружаем список станков (используем основной API)
+  const { data: machines, isLoading: machinesLoading, error: machinesError } = useQuery({
+    queryKey: ['machines-availability'],
     queryFn: machinesApi.getAll,
+    refetchInterval: 30000, // Обновляем каждые 30 секунд
   });
 
   // Загружаем активные операции
   const { data: activeOperations, isLoading: operationsLoading } = useQuery({
     queryKey: ['operations', 'in-progress'],
     queryFn: () => operationsApi.getAll(OperationStatus.IN_PROGRESS),
+    refetchInterval: 30000,
   });
 
-  const isLoading = machinesLoading || operationsLoading;
+  // Загружаем сегодняшние смены
+  const { data: todayShifts, isLoading: shiftsLoading } = useQuery({
+    queryKey: ['shifts', 'today'],
+    queryFn: () => shiftsApi.getAll({
+      startDate: dayjs().format('YYYY-MM-DD'),
+      endDate: dayjs().format('YYYY-MM-DD'),
+    }),
+    refetchInterval: 60000, // Обновляем каждую минуту
+  });
 
-  // Объединяем данные станков с активными операциями
+  const isLoading = machinesLoading || operationsLoading || shiftsLoading;
+
+  // Вычисляем прогресс операции на основе реальных данных смен
+  const calculateProgress = React.useCallback((operation: any, shifts: any[]): number => {
+    if (!operation || !shifts.length) return 0;
+    
+    const totalProduced = shifts.reduce((sum, shift) => 
+      sum + (shift.dayShiftQuantity || 0) + (shift.nightShiftQuantity || 0), 0
+    );
+    
+    // Предполагаем, что общее количество деталей в заказе - это то количество, которое нужно произвести
+    // Это упрощение, в реальности нужно получать данные о заказе
+    const targetQuantity = operation.order?.quantity || 100; // fallback значение
+    
+    return Math.min((totalProduced / targetQuantity) * 100, 100);
+  }, []);
+
+  // Объединяем данные станков с активными операциями и производством
   const activeMachines: ActiveMachine[] = React.useMemo(() => {
-    if (!machines || !activeOperations) return [];
+    if (!machines) return [];
 
-    return machines
-      .filter(machine => machine.isAvailable)
-      .map(machine => {
-        // Находим назначенную операцию для станка
-        const assignedOperation = activeOperations.find(
-          op => op.machineId === Number(machine.id)
-        );
+    return machines.map(machine => {
+      // Находим назначенную операцию для станка
+      const assignedOperation = activeOperations?.find(
+        op => op.machineId === parseInt(machine.id)
+      );
 
-        const machineData: ActiveMachine = {
-          id: machine.id,
-          name: machine.machineName || `Станок-${machine.id}`,
-          type: getMachineTypeLabel(machine.machineType),
-          status: assignedOperation ? 'working' : 'idle',
-        };
+      // Находим сегодняшние смены для этого станка
+      const machineShifts = todayShifts?.filter(
+        shift => shift.machineId === parseInt(machine.id)
+      ) || [];
 
-        if (assignedOperation) {
-          machineData.currentOperation = {
-            id: assignedOperation.id,
-            operationNumber: assignedOperation.operationNumber,
-            orderDrawingNumber: assignedOperation.orderDrawingNumber || 'Не указан',
-            operationType: assignedOperation.operationType || 'Не указан',
-            estimatedTime: assignedOperation.estimatedTime || 0,
-            progress: Math.random() * 100, // Временно случайный прогресс
-            startedAt: assignedOperation.createdAt,
-          };
-        }
-
-        // Временные данные о производстве за сегодня
-        machineData.todayProduction = {
-          dayShift: { quantity: Math.floor(Math.random() * 50), operator: 'Иванов И.И.' },
-          nightShift: { quantity: Math.floor(Math.random() * 40), operator: 'Аркадий' },
-          totalTime: Math.floor(Math.random() * 480), // минуты
-        };
-
-        return machineData;
+      // Вычисляем производство за сегодня
+      const todayProduction = machineShifts.reduce((acc, shift) => ({
+        dayShift: {
+          quantity: acc.dayShift.quantity + (shift.dayShiftQuantity || 0),
+          operator: shift.dayShiftOperator || acc.dayShift.operator,
+        },
+        nightShift: {
+          quantity: acc.nightShift.quantity + (shift.nightShiftQuantity || 0),
+          operator: shift.nightShiftOperator || acc.nightShift.operator,
+        },
+        totalTime: acc.totalTime + 
+          (shift.dayShiftQuantity || 0) * (shift.dayShiftTimePerUnit || 0) +
+          (shift.nightShiftQuantity || 0) * (shift.nightShiftTimePerUnit || 0),
+      }), {
+        dayShift: { quantity: 0, operator: '-' },
+        nightShift: { quantity: 0, operator: 'Аркадий' },
+        totalTime: 0,
       });
-  }, [machines, activeOperations]);
+
+      // Создаем объект активного станка
+      const machineData: ActiveMachine = {
+        id: machine.id,
+        machineName: machine.machineName,
+        machineType: machine.machineType,
+        isAvailable: machine.isAvailable,
+        currentOperationId: machine.currentOperationId,
+        lastFreedAt: machine.lastFreedAt ? 
+          (typeof machine.lastFreedAt === 'string' ? 
+            new Date(machine.lastFreedAt) : 
+            machine.lastFreedAt) : 
+          undefined,
+        createdAt: machine.createdAt,
+        updatedAt: machine.updatedAt,
+        status: assignedOperation ? 
+          (!machine.isAvailable ? 'working' : 'setup') : 
+          'idle',
+        todayProduction,
+      };
+
+      // Если есть детали операции из API, добавляем их с прогрессом
+      if (machine.currentOperationDetails) {
+        machineData.currentOperationDetails = {
+          ...machine.currentOperationDetails,
+          progress: calculateProgress(assignedOperation, machineShifts),
+        };
+      }
+
+      return machineData;
+    });
+  }, [machines, activeOperations, todayShifts, calculateProgress]);
 
   const handleCreateShiftRecord = (machineId: string) => {
-    setSelectedMachineId(machineId);
+    setSelectedMachineId(parseInt(machineId));
     setShowShiftForm(true);
   };
 
@@ -170,6 +251,14 @@ export const ActiveMachinesMonitor: React.FC = () => {
     );
   }
 
+  if (machinesError) {
+    return (
+      <div style={{ textAlign: 'center', padding: '50px' }}>
+        <Text type="danger">Ошибка загрузки данных о станках</Text>
+      </div>
+    );
+  }
+
   if (activeMachines.length === 0) {
     return (
       <Empty
@@ -177,7 +266,7 @@ export const ActiveMachinesMonitor: React.FC = () => {
         description={
           <span>
             Нет активных станков.<br />
-            Проверьте настройки станков и назначенные операции.
+            Проверьте настройки станков в базе данных.
           </span>
         }
       />
@@ -203,9 +292,9 @@ export const ActiveMachinesMonitor: React.FC = () => {
                 <Space>
                   <Badge 
                     status={getMachineStatusColor(machine.status) as any} 
-                    text={machine.name}
+                    text={machine.machineName}
                   />
-                  <Tag color="blue">{machine.type}</Tag>
+                  <Tag color="blue">{getMachineTypeLabel(machine.machineType)}</Tag>
                 </Space>
               }
               extra={
@@ -226,30 +315,30 @@ export const ActiveMachinesMonitor: React.FC = () => {
               ]}
               size="small"
             >
-              {machine.currentOperation ? (
+              {machine.currentOperationDetails ? (
                 <div>
                   <div style={{ marginBottom: 12 }}>
                     <Text strong>Текущая операция:</Text>
                     <br />
-                    <Text>Операция {machine.currentOperation.operationNumber}</Text>
+                    <Text>Операция {machine.currentOperationDetails.operationNumber}</Text>
                     <br />
                     <Text type="secondary">
-                      Чертёж: {machine.currentOperation.orderDrawingNumber}
+                      {machine.currentOperationDetails.orderDrawingNumber}
                     </Text>
                   </div>
 
                   <div style={{ marginBottom: 12 }}>
                     <Text>Прогресс выполнения:</Text>
                     <Progress 
-                      percent={Math.round(machine.currentOperation.progress)} 
+                      percent={Math.round(machine.currentOperationDetails.progress || 0)} 
                       size="small"
-                      status={machine.currentOperation.progress > 80 ? 'success' : 'active'}
+                      status={(machine.currentOperationDetails.progress || 0) > 80 ? 'success' : 'active'}
                     />
                   </div>
 
                   <div style={{ marginBottom: 12 }}>
                     <Text>
-                      <ClockCircleOutlined /> Время: {machine.currentOperation.estimatedTime}мин
+                      <ClockCircleOutlined /> Время: {machine.currentOperationDetails.estimatedTime}мин
                     </Text>
                   </div>
 
@@ -310,25 +399,8 @@ export const ActiveMachinesMonitor: React.FC = () => {
         visible={showShiftForm}
         onClose={handleShiftFormClose}
         onSuccess={handleShiftFormSuccess}
-        // Если у нас есть выбранный станок, передаем его ID для предзаполнения
-        selectedMachineId={selectedMachineId ? Number(selectedMachineId) : undefined}
+        selectedMachineId={selectedMachineId}
       />
     </div>
   );
-};
-
-// Утилитарная функция для получения названия типа станка
-const getMachineTypeLabel = (type: string): string => {
-  if (!type) return 'Станок';
-  
-  const lowerType = type.toLowerCase();
-  if (lowerType.includes('milling') || lowerType.includes('фрез')) {
-    return 'Фрезерный';
-  } else if (lowerType.includes('turning') || lowerType.includes('токар')) {
-    return 'Токарный';
-  } else if (lowerType.includes('drilling') || lowerType.includes('сверл')) {
-    return 'Сверлильный';
-  }
-  
-  return 'Станок';
 };
