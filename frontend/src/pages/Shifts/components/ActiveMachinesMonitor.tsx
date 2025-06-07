@@ -1,9 +1,9 @@
 /**
  * @file: ActiveMachinesMonitor.tsx
- * @description: Компонент мониторинга активных станков (ИСПРАВЛЕН - автообновление данных)
+ * @description: Компонент мониторинга активных станков (ИСПРАВЛЕН - фильтрация по операции)
  * @dependencies: antd, react-query, machinesApi, operationsApi
  * @created: 2025-06-07
- * @fixed: 2025-06-07 - Исправлено автообновление данных после создания смены
+ * @fixed: 2025-06-07 - Исправлена фильтрация данных по текущей операции станка
  */
 import React, { useState } from 'react';
 import {
@@ -69,6 +69,7 @@ interface ActiveMachine {
     dayShift: { quantity: number; operator: string };
     nightShift: { quantity: number; operator: string };
     totalTime: number;
+    currentOperationOnly: boolean; // Флаг что данные только по текущей операции
   };
 }
 
@@ -98,21 +99,21 @@ export const ActiveMachinesMonitor: React.FC = () => {
   const queryClient = useQueryClient();
 
   // Загружаем список станков (используем основной API)
-  const { data: machines, isLoading: machinesLoading, error: machinesError } = useQuery({
+  const { data: machines, isLoading: machinesLoading, error: machinesError, refetch: refetchMachines } = useQuery({
     queryKey: ['machines-availability'],
     queryFn: machinesApi.getAll,
     refetchInterval: 30000, // Обновляем каждые 30 секунд
   });
 
   // Загружаем активные операции
-  const { data: activeOperations, isLoading: operationsLoading } = useQuery({
+  const { data: activeOperations, isLoading: operationsLoading, refetch: refetchOperations } = useQuery({
     queryKey: ['operations', 'in-progress'],
     queryFn: () => operationsApi.getAll(OperationStatus.IN_PROGRESS),
     refetchInterval: 30000,
   });
 
   // Загружаем сегодняшние смены
-  const { data: todayShifts, isLoading: shiftsLoading } = useQuery({
+  const { data: todayShifts, isLoading: shiftsLoading, refetch: refetchShifts } = useQuery({
     queryKey: ['shifts', 'today'],
     queryFn: () => shiftsApi.getAll({
       startDate: dayjs().format('YYYY-MM-DD'),
@@ -138,38 +139,73 @@ export const ActiveMachinesMonitor: React.FC = () => {
     return Math.min((totalProduced / targetQuantity) * 100, 100);
   }, []);
 
-  // Объединяем данные станков с активными операциями и производством
+  // ИСПРАВЛЕНО: Объединяем данные с фильтрацией по текущей операции
   const activeMachines: ActiveMachine[] = React.useMemo(() => {
     if (!machines) return [];
 
+    console.log('🔄 Пересчитываем данные станков...');
+    console.log('Всего станков:', machines.length);
+    console.log('Всего смен сегодня:', todayShifts?.length || 0);
+
     return machines.map(machine => {
+      console.log(`\n--- Обрабатываем станок ${machine.machineName} (ID: ${machine.id}) ---`);
+      
       // Находим назначенную операцию для станка
       const assignedOperation = activeOperations?.find(
         op => op.machineId === parseInt(machine.id)
       );
 
-      // Находим сегодняшние смены для этого станка
-      const machineShifts = todayShifts?.filter(
+      // ИСПРАВЛЕНО: Фильтрация смен по станку И по текущей операции
+      let machineShifts = todayShifts?.filter(
         shift => shift.machineId === parseInt(machine.id)
       ) || [];
 
-      // Вычисляем производство за сегодня
-      const todayProduction = machineShifts.reduce((acc, shift) => ({
-        dayShift: {
-          quantity: acc.dayShift.quantity + (shift.dayShiftQuantity || 0),
-          operator: shift.dayShiftOperator || acc.dayShift.operator,
-        },
-        nightShift: {
-          quantity: acc.nightShift.quantity + (shift.nightShiftQuantity || 0),
-          operator: shift.nightShiftOperator || acc.nightShift.operator,
-        },
-        totalTime: acc.totalTime + 
-          (shift.dayShiftQuantity || 0) * (shift.dayShiftTimePerUnit || 0) +
-          (shift.nightShiftQuantity || 0) * (shift.nightShiftTimePerUnit || 0),
-      }), {
+      console.log(`Всего смен для станка: ${machineShifts.length}`);
+
+      // Если у станка есть текущая операция, фильтруем смены только по ней
+      let currentOperationShifts = machineShifts;
+      let showingCurrentOperationOnly = false;
+      
+      if (machine.currentOperationDetails?.id) {
+        console.log(`Фильтруем по текущей операции ID: ${machine.currentOperationDetails.id}`);
+        currentOperationShifts = machineShifts.filter(
+          shift => shift.operationId === machine.currentOperationDetails?.id
+        );
+        showingCurrentOperationOnly = currentOperationShifts.length > 0;
+        console.log(`Смен по текущей операции: ${currentOperationShifts.length}`);
+      }
+
+      // Если по текущей операции нет данных, показываем все смены станка
+      const shiftsToUse = currentOperationShifts.length > 0 ? currentOperationShifts : machineShifts;
+      
+      console.log(`Используем смен для расчета: ${shiftsToUse.length}`);
+
+      // Вычисляем производство за сегодня на основе отфильтрованных смен
+      const todayProduction = shiftsToUse.reduce((acc, shift) => {
+        console.log(`  Смена ID ${shift.id}: День=${shift.dayShiftQuantity || 0}, Ночь=${shift.nightShiftQuantity || 0}, Операция=${shift.operationId}`);
+        return {
+          dayShift: {
+            quantity: acc.dayShift.quantity + (shift.dayShiftQuantity || 0),
+            operator: shift.dayShiftOperator || acc.dayShift.operator,
+          },
+          nightShift: {
+            quantity: acc.nightShift.quantity + (shift.nightShiftQuantity || 0),
+            operator: shift.nightShiftOperator || acc.nightShift.operator,
+          },
+          totalTime: acc.totalTime + 
+            (shift.dayShiftQuantity || 0) * (shift.dayShiftTimePerUnit || 0) +
+            (shift.nightShiftQuantity || 0) * (shift.nightShiftTimePerUnit || 0),
+        };
+      }, {
         dayShift: { quantity: 0, operator: '-' },
         nightShift: { quantity: 0, operator: 'Аркадий' },
         totalTime: 0,
+      });
+
+      console.log(`Результат для станка ${machine.machineName}:`, {
+        день: todayProduction.dayShift.quantity,
+        ночь: todayProduction.nightShift.quantity,
+        только_текущая_операция: showingCurrentOperationOnly
       });
 
       // Создаем объект активного станка
@@ -189,14 +225,17 @@ export const ActiveMachinesMonitor: React.FC = () => {
         status: assignedOperation ? 
           (!machine.isAvailable ? 'working' : 'setup') : 
           'idle',
-        todayProduction,
+        todayProduction: {
+          ...todayProduction,
+          currentOperationOnly: showingCurrentOperationOnly
+        },
       };
 
       // Если есть детали операции из API, добавляем их с прогрессом
       if (machine.currentOperationDetails) {
         machineData.currentOperationDetails = {
           ...machine.currentOperationDetails,
-          progress: calculateProgress(assignedOperation, machineShifts),
+          progress: calculateProgress(assignedOperation, currentOperationShifts),
         };
       }
 
@@ -214,17 +253,24 @@ export const ActiveMachinesMonitor: React.FC = () => {
     setSelectedMachineId(undefined);
   };
 
-  // ИСПРАВЛЕНО: Добавлена инвалидация кэша для автообновления данных
-  const handleShiftFormSuccess = () => {
+  // ИСПРАВЛЕНО: Улучшена инвалидация с принудительным обновлением
+  const handleShiftFormSuccess = async () => {
     message.success('Запись смены создана успешно');
     
-    // Инвалидируем все связанные запросы для обновления данных
-    queryClient.invalidateQueries({ queryKey: ['shifts'] });
-    queryClient.invalidateQueries({ queryKey: ['shifts', 'today'] });
-    queryClient.invalidateQueries({ queryKey: ['machines-availability'] });
-    queryClient.invalidateQueries({ queryKey: ['operations'] });
+    console.log('🔄 Начинаем обновление данных после создания смены...');
     
-    console.log('🔄 Кэш инвалидирован, данные обновляются...');
+    // Инвалидируем все связанные запросы
+    await queryClient.invalidateQueries({ queryKey: ['shifts'] });
+    await queryClient.invalidateQueries({ queryKey: ['machines-availability'] });
+    await queryClient.invalidateQueries({ queryKey: ['operations'] });
+    
+    // Принудительно обновляем данные
+    setTimeout(async () => {
+      console.log('🔄 Принудительное обновление через 500мс...');
+      await refetchShifts();
+      await refetchMachines();
+      await refetchOperations();
+    }, 500);
     
     handleShiftFormClose();
   };
@@ -358,7 +404,14 @@ export const ActiveMachinesMonitor: React.FC = () => {
                   <Divider style={{ margin: '12px 0' }} />
 
                   <div>
-                    <Text strong>Производство сегодня:</Text>
+                    <Text strong>
+                      Производство сегодня
+                      {machine.todayProduction?.currentOperationOnly && (
+                        <Tag color="blue" style={{ marginLeft: 8, fontSize: '11px', padding: '2px 6px', lineHeight: '16px' }}>
+                          по текущей операции
+                        </Tag>
+                      )}:
+                    </Text>
                     <div style={{ marginTop: 8 }}>
                       <Row gutter={8}>
                         <Col span={12}>

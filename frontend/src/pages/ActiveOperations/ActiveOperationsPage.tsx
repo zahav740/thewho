@@ -1,8 +1,9 @@
 /**
  * @file: ActiveOperationsPage.tsx
- * @description: Страница мониторинга активных операций на станках
+ * @description: Страница мониторинга активных операций (ИСПРАВЛЕНА - клики обновляют данные)
  * @dependencies: antd, machine.types
  * @created: 2025-06-07
+ * @fixed: 2025-06-07 - Добавлена возможность обновления данных по клику на операции
  */
 import React from 'react';
 import { 
@@ -16,27 +17,100 @@ import {
   Alert,
   Spin,
   Empty,
-  Progress
+  Progress,
+  message
 } from 'antd';
 import { 
   ToolOutlined, 
   ClockCircleOutlined, 
   PlayCircleOutlined,
   InfoCircleOutlined,
-  ReloadOutlined
+  ReloadOutlined,
+  EditOutlined,
+  CheckCircleOutlined
 } from '@ant-design/icons';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { machinesApi } from '../../services/machinesApi';
+import { shiftsApi } from '../../services/shiftsApi';
 import { formatEstimatedTime } from '../../types/machine.types';
 
 const { Title, Text } = Typography;
 
 export const ActiveOperationsPage: React.FC = () => {
+  const queryClient = useQueryClient();
+  
   const { data: machines, isLoading, error, refetch } = useQuery({
     queryKey: ['machines'],
     queryFn: machinesApi.getAll,
     refetchInterval: 5000, // Обновляем каждые 5 секунд
   });
+
+  // Функция обновления данных по клику на операцию
+  const handleOperationClick = async (machine: any) => {
+    try {
+      message.loading({ content: 'Обновление данных операции...', key: 'operation-update' });
+      
+      console.log(`🔄 Обновляем данные для операции на станке ${machine.machineName}`);
+      
+      // Инвалидируем все кэши для обновления данных
+      await queryClient.invalidateQueries({ queryKey: ['machines'] });
+      await queryClient.invalidateQueries({ queryKey: ['machines-availability'] });
+      await queryClient.invalidateQueries({ queryKey: ['shifts'] });
+      await queryClient.invalidateQueries({ queryKey: ['shifts', 'today'] });
+      await queryClient.invalidateQueries({ queryKey: ['operations'] });
+      
+      // Принудительно обновляем данные
+      await refetch();
+      
+      message.success({ 
+        content: `Данные операции на станке ${machine.machineName} обновлены`, 
+        key: 'operation-update',
+        duration: 2
+      });
+      
+      console.log('✅ Данные операции обновлены успешно');
+      
+    } catch (error) {
+      console.error('❌ Ошибка при обновлении данных операции:', error);
+      message.error({ 
+        content: 'Ошибка при обновлении данных', 
+        key: 'operation-update',
+        duration: 3
+      });
+    }
+  };
+
+  // Функция массового обновления всех данных
+  const handleRefreshAll = async () => {
+    try {
+      message.loading({ content: 'Обновление всех данных...', key: 'refresh-all' });
+      
+      console.log('🔄 Массовое обновление всех данных...');
+      
+      // Инвалидируем все кэши
+      await queryClient.invalidateQueries({ queryKey: ['machines'] });
+      await queryClient.invalidateQueries({ queryKey: ['machines-availability'] });
+      await queryClient.invalidateQueries({ queryKey: ['shifts'] });
+      await queryClient.invalidateQueries({ queryKey: ['operations'] });
+      
+      // Принудительно обновляем
+      await refetch();
+      
+      message.success({ 
+        content: 'Все данные обновлены успешно', 
+        key: 'refresh-all',
+        duration: 2
+      });
+      
+    } catch (error) {
+      console.error('❌ Ошибка при массовом обновлении:', error);
+      message.error({ 
+        content: 'Ошибка при обновлении данных', 
+        key: 'refresh-all',
+        duration: 3
+      });
+    }
+  };
 
   if (isLoading) {
     return (
@@ -82,14 +156,16 @@ export const ActiveOperationsPage: React.FC = () => {
             </Title>
           </Col>
           <Col>
-            <Button 
-              icon={<ReloadOutlined />} 
-              onClick={() => refetch()}
-              type="primary"
-              style={{ borderRadius: '8px' }}
-            >
-              Обновить
-            </Button>
+            <Space>
+              <Button 
+                icon={<ReloadOutlined />} 
+                onClick={handleRefreshAll}
+                type="primary"
+                style={{ borderRadius: '8px' }}
+              >
+                Обновить все
+              </Button>
+            </Space>
           </Col>
         </Row>
         
@@ -140,6 +216,11 @@ export const ActiveOperationsPage: React.FC = () => {
             </span>
           </Space>
         }
+        extra={
+          <Text type="secondary" style={{ fontSize: '12px' }}>
+            💡 Кликните на карточку операции для обновления данных
+          </Text>
+        }
         style={{ marginBottom: '24px', borderRadius: '12px' }}
       >
         {activeOperations.length > 0 ? (
@@ -148,10 +229,22 @@ export const ActiveOperationsPage: React.FC = () => {
               <Col key={machine.id} xs={24} sm={12} lg={8}>
                 <Card
                   size="small"
+                  hoverable
+                  onClick={() => handleOperationClick(machine)}
                   style={{
                     borderRadius: '12px',
                     borderColor: '#ff4d4f',
-                    backgroundColor: '#fff2f0'
+                    backgroundColor: '#fff2f0',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.boxShadow = '0 8px 16px rgba(255, 77, 79, 0.2)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '';
                   }}
                   title={
                     <Space>
@@ -159,6 +252,7 @@ export const ActiveOperationsPage: React.FC = () => {
                       <span style={{ color: '#ff4d4f', fontWeight: 'bold' }}>
                         {machine.machineName}
                       </span>
+                      <EditOutlined style={{ color: '#1890ff', fontSize: '12px' }} />
                     </Space>
                   }
                 >
@@ -189,6 +283,19 @@ export const ActiveOperationsPage: React.FC = () => {
                           </Text>
                         </div>
                       )}
+                      
+                      <div style={{ 
+                        marginTop: '12px', 
+                        padding: '8px', 
+                        backgroundColor: '#f0f9ff', 
+                        borderRadius: '6px',
+                        border: '1px dashed #1890ff'
+                      }}>
+                        <Text style={{ fontSize: '11px', color: '#1890ff' }}>
+                          <EditOutlined style={{ marginRight: '4px' }} />
+                          Кликните для обновления данных производства
+                        </Text>
+                      </div>
                     </>
                   ) : (
                     <div>
@@ -198,6 +305,19 @@ export const ActiveOperationsPage: React.FC = () => {
                       <div style={{ marginTop: '8px' }}>
                         <Text type="secondary" style={{ fontSize: '12px' }}>
                           Загрузка деталей...
+                        </Text>
+                      </div>
+                      
+                      <div style={{ 
+                        marginTop: '12px', 
+                        padding: '8px', 
+                        backgroundColor: '#f0f9ff', 
+                        borderRadius: '6px',
+                        border: '1px dashed #1890ff'
+                      }}>
+                        <Text style={{ fontSize: '11px', color: '#1890ff' }}>
+                          <EditOutlined style={{ marginRight: '4px' }} />
+                          Кликните для загрузки деталей операции
                         </Text>
                       </div>
                     </div>
@@ -253,15 +373,19 @@ export const ActiveOperationsPage: React.FC = () => {
                 <Col key={machine.id} xs={24} sm={12} lg={8}>
                   <Card
                     size="small"
+                    hoverable
+                    onClick={() => handleOperationClick(machine)}
                     style={{
                       borderRadius: '8px',
-                      borderColor: '#faad14'
+                      borderColor: '#faad14',
+                      cursor: 'pointer'
                     }}
                   >
                     <Space>
                       <ToolOutlined style={{ color: '#faad14' }} />
                       <Text strong>{machine.machineName}</Text>
                       <Tag color="orange">Занят</Tag>
+                      <EditOutlined style={{ color: '#1890ff', fontSize: '12px' }} />
                     </Space>
                   </Card>
                 </Col>
