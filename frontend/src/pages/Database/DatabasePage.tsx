@@ -11,7 +11,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ordersApi } from '../../services/ordersApi';
 import { OrdersFilter } from '../../types/order.types';
 import { OrdersList } from './components/OrdersList';
-import { OrderForm } from './components/OrderForm';
+import { OrderForm } from './components/OrderForm.SIMPLE';
 import ExcelUploaderWithSettings from '../../components/ExcelUploader/ExcelUploaderWithSettings';
 
 export const DatabasePage: React.FC = () => {
