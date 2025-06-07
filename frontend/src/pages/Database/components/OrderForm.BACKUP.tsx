@@ -1,11 +1,11 @@
 /**
- * @file: OrderForm.tsx (ИСПРАВЛЕНА ПРОБЛЕМА С УДАЛЕНИЕМ ОПЕРАЦИЙ)
+ * @file: OrderForm.tsx
  * @description: Форма создания/редактирования заказа
  * @dependencies: antd, react-hook-form, ordersApi
  * @created: 2025-01-28
- * @updated: 2025-06-07 // ИСПРАВЛЕНА логика удаления операций
+ * @updated: 2025-06-01 // Обновлена логика приоритетов
  */
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Modal,
   Form,
@@ -44,20 +44,19 @@ export const OrderForm: React.FC<OrderFormProps> = ({
 }) => {
   const [loading, setLoading] = useState(false);
   const isEdit = !!orderId;
-  const dataLoadedRef = useRef(false); // Флаг для предотвращения повторной загрузки
 
   const { control, handleSubmit, reset, formState: { errors } } = useForm<CreateOrderDto>({
     defaultValues: {
       drawingNumber: '',
       quantity: 1,
       deadline: dayjs().add(7, 'days').format('YYYY-MM-DD'),
-      priority: Priority.MEDIUM,
+      priority: Priority.MEDIUM, // Средний по умолчанию (2)
       workType: '',
       operations: [
         {
           operationNumber: 1,
           operationType: OperationType.MILLING,
-          machineAxes: 3,
+          machineAxes: 3, // Число, не строка
           estimatedTime: 60,
         },
       ],
@@ -77,20 +76,19 @@ export const OrderForm: React.FC<OrderFormProps> = ({
   });
 
   useEffect(() => {
-    if (orderData && !dataLoadedRef.current) {
-      // Загружаем данные только один раз
+    if (orderData) {
+      // Преобразуем machineAxes в число (3 или 4)
       const parseAxisValue = (value: any): number => {
         if (typeof value === 'number') return value;
         if (typeof value === 'string') {
+          // Извлекаем число из строки (например, из "3-axis")
           const match = value.match(/^(\d+)/);
           const parsedValue = match ? parseInt(match[1], 10) : 3;
+          // Проверяем, что значение либо 3, либо 4
           return (parsedValue === 3 || parsedValue === 4) ? parsedValue : 3;
         }
         return 3;
       };
-      
-      console.log('Загружаем данные заказа:', orderData);
-      console.log('Операции из БД:', orderData.operations);
       
       reset({
         drawingNumber: orderData.drawingNumber,
@@ -105,24 +103,14 @@ export const OrderForm: React.FC<OrderFormProps> = ({
           estimatedTime: op.estimatedTime,
         })),
       });
-      
-      dataLoadedRef.current = true; // Помечаем что данные загружены
     }
   }, [orderData, reset]);
-
-  // Сброс флага при закрытии формы
-  useEffect(() => {
-    if (!visible) {
-      dataLoadedRef.current = false;
-    }
-  }, [visible]);
 
   // Мутации для создания и обновления
   const createMutation = useMutation({
     mutationFn: ordersApi.create,
     onSuccess: () => {
       message.success('Заказ успешно создан');
-      dataLoadedRef.current = false; // Сброс флага
       onSuccess();
     },
     onError: (error: any) => {
@@ -136,7 +124,6 @@ export const OrderForm: React.FC<OrderFormProps> = ({
       ordersApi.update(id, data),
     onSuccess: () => {
       message.success('Заказ успешно обновлен');
-      dataLoadedRef.current = false; // Сброс флага
       onSuccess();
     },
     onError: (error: any) => {
@@ -149,6 +136,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
     setLoading(true);
     
     try {
+      // Клонируем данные, чтобы не изменять оригинальный объект
       const formattedData = { ...data };
       
       // Преобразуем операции для бэкенда
@@ -156,14 +144,16 @@ export const OrderForm: React.FC<OrderFormProps> = ({
         formattedData.operations = formattedData.operations.map(op => ({
           ...op,
           operationNumber: Number(op.operationNumber),
+          // Гарантируем, что machineAxes отправляется как число
           machineAxes: Number(op.machineAxes),
           estimatedTime: Number(op.estimatedTime)
         }));
-        console.log('Отправляем операции:', formattedData.operations);
+        console.log('Операции после форматирования:', formattedData.operations);
       }
       
+      // Отправляем приоритет как строку (согласно одному из сообщений об ошибке)
       formattedData.priority = String(formattedData.priority) as any;
-      console.log('Отформатированные данные:', formattedData);
+      console.log('Отформатированные данные перед отправкой:', formattedData);
       
       if (isEdit && orderId) {
         await updateMutation.mutateAsync({ id: orderId, data: formattedData });
@@ -182,17 +172,10 @@ export const OrderForm: React.FC<OrderFormProps> = ({
     const newOperation: OrderFormOperationDto = {
       operationNumber: lastOperation ? lastOperation.operationNumber + 1 : 1,
       operationType: OperationType.MILLING,
-      machineAxes: 3,
+      machineAxes: 3, // Число, не строка
       estimatedTime: 60,
     };
-    console.log('Добавляем операцию:', newOperation);
     append(newOperation);
-  };
-
-  const handleRemoveOperation = (index: number) => {
-    console.log(`Удаляем операцию с индексом ${index}`);
-    console.log('Операции до удаления:', fields);
-    remove(index);
   };
 
   const operationColumns = [
@@ -222,8 +205,6 @@ export const OrderForm: React.FC<OrderFormProps> = ({
             <Select {...field} style={{ width: '100%' }}>
               <Option value={OperationType.MILLING}>Фрезерная</Option>
               <Option value={OperationType.TURNING}>Токарная</Option>
-              <Option value={OperationType.DRILLING}>Сверление</Option>
-              <Option value={OperationType.GRINDING}>Шлифовка</Option>
             </Select>
           )}
         />
@@ -238,6 +219,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
           name={`operations.${index}.machineAxes`}
           control={control}
           render={({ field }) => (
+            // Выбор только 3 или 4
             <Select {...field} style={{ width: '100%' }}>
               <Option value={3}>3</Option>
               <Option value={4}>4</Option>
@@ -268,9 +250,8 @@ export const OrderForm: React.FC<OrderFormProps> = ({
           type="text"
           danger
           icon={<DeleteOutlined />}
-          onClick={() => handleRemoveOperation(index)}
+          onClick={() => remove(index)}
           disabled={fields.length === 1}
-          title={`Удалить операцию ${index + 1}`}
         />
       ),
     },
@@ -309,7 +290,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
               control={control}
               rules={{ required: 'Обязательное поле' }}
               render={({ field }) => (
-                <Input {...field} placeholder="Например: C6HP0021A" />
+                <Input {...field} placeholder="Например: DRW-2024-001" />
               )}
             />
           </Form.Item>
@@ -398,11 +379,6 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                 </Button>
               )}
             />
-            {fields.length > 0 && (
-              <div style={{ marginTop: 8, color: '#666', fontSize: '12px' }}>
-                Операций в форме: {fields.length}
-              </div>
-            )}
           </Form.Item>
         </Form>
       </Spin>
