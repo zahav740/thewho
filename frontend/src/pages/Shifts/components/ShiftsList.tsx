@@ -61,22 +61,39 @@ export const ShiftsList: React.FC<ShiftsListProps> = ({
       title: 'Станок',
       dataIndex: 'machineId',
       key: 'machineId',
-      width: 80,
-      render: (id: number) => `Станок ${id}`,
+      width: 120,
+      render: (id: number) => (
+        <Tag color="geekblue">Станок {id}</Tag>
+      ),
     },
     {
-      title: 'Операция',
-      dataIndex: 'operationId',
-      key: 'operationId',
-      width: 100,
-      render: (id: number) => `Операция ${id}`,
+      title: 'Операция / Чертёж',
+      key: 'operation',
+      width: 180,
+      render: (record: ShiftRecord) => {
+        if (!record.operationId) {
+          return <Tag color="default">Операция не указана</Tag>;
+        }
+        return (
+          <Space direction="vertical" size={0}>
+            <Tag color="green">Операция №{record.operationId}</Tag>
+            {record.drawingNumber && (
+              <span style={{ fontSize: '12px', color: '#666' }}>
+                Чертёж: {record.drawingNumber}
+              </span>
+            )}
+          </Space>
+        );
+      },
     },
     {
       title: 'Наладка',
       key: 'setup',
       width: 150,
       render: (record: ShiftRecord) => {
-        if (!record.setupTime) return '-';
+        if (!record.setupTime) {
+          return <Tag color="default">Не требовалась</Tag>;
+        }
         return (
           <Tooltip
             title={
@@ -88,8 +105,9 @@ export const ShiftsList: React.FC<ShiftsListProps> = ({
             }
           >
             <Space size="small">
-              <ClockCircleOutlined />
-              {formatTime(record.setupTime)}
+              <Tag color="orange" icon={<ClockCircleOutlined />}>
+                {formatTime(record.setupTime)}
+              </Tag>
             </Space>
           </Tooltip>
         );
@@ -100,16 +118,22 @@ export const ShiftsList: React.FC<ShiftsListProps> = ({
       key: 'dayShift',
       width: 180,
       render: (record: ShiftRecord) => {
-        if (!record.dayShiftQuantity) return '-';
+        if (!record.dayShiftQuantity) {
+          return <Tag color="default">Не работала</Tag>;
+        }
         return (
           <Space direction="vertical" size={0}>
             <Space size="small">
               <UserOutlined />
-              {record.dayShiftOperator || '-'}
+              <strong>{record.dayShiftOperator || '-'}</strong>
             </Space>
-            <div>
-              Кол-во: <strong>{record.dayShiftQuantity}</strong> | 
-              Время: {record.dayShiftTimePerUnit?.toFixed(1) || '-'} мин/шт
+            <div style={{ fontSize: '12px' }}>
+              <Tag color="blue">{record.dayShiftQuantity} шт</Tag>
+              {record.dayShiftTimePerUnit && (
+                <span style={{ color: '#666' }}>
+                  {record.dayShiftTimePerUnit.toFixed(1)} мин/шт
+                </span>
+              )}
             </div>
           </Space>
         );
@@ -120,16 +144,22 @@ export const ShiftsList: React.FC<ShiftsListProps> = ({
       key: 'nightShift',
       width: 180,
       render: (record: ShiftRecord) => {
-        if (!record.nightShiftQuantity) return '-';
+        if (!record.nightShiftQuantity) {
+          return <Tag color="default">Не работала</Tag>;
+        }
         return (
           <Space direction="vertical" size={0}>
             <Space size="small">
               <UserOutlined />
-              {record.nightShiftOperator || 'Аркадий'}
+              <strong>{record.nightShiftOperator || 'Аркадий'}</strong>
             </Space>
-            <div>
-              Кол-во: <strong>{record.nightShiftQuantity}</strong> | 
-              Время: {record.nightShiftTimePerUnit?.toFixed(1) || '-'} мин/шт
+            <div style={{ fontSize: '12px' }}>
+              <Tag color="purple">{record.nightShiftQuantity} шт</Tag>
+              {record.nightShiftTimePerUnit && (
+                <span style={{ color: '#666' }}>
+                  {record.nightShiftTimePerUnit.toFixed(1)} мин/шт
+                </span>
+              )}
             </div>
           </Space>
         );

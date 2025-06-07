@@ -1,12 +1,13 @@
 /**
  * @file: ShiftsPage.tsx
- * @description: Страница учета смен
- * @dependencies: ShiftsList, ShiftForm, ShiftStatistics
+ * @description: Страница учета смен с мониторингом активных станков
+ * @dependencies: ActiveMachinesMonitor, ShiftsList, ShiftForm, ShiftStatistics
  * @created: 2025-01-28
+ * @updated: 2025-06-07
  */
 import React, { useState } from 'react';
-import { Row, Col, Button, DatePicker, Space } from 'antd';
-import { PlusOutlined, BarChartOutlined } from '@ant-design/icons';
+import { Row, Col, Button, DatePicker, Space, Tabs } from 'antd';
+import { PlusOutlined, BarChartOutlined, MonitorOutlined, UnorderedListOutlined } from '@ant-design/icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs, { Dayjs } from 'dayjs';
 import { shiftsApi } from '../../services/shiftsApi';
@@ -14,13 +15,16 @@ import { ShiftsFilter } from '../../types/shift.types';
 import { ShiftsList } from './components/ShiftsList';
 import { ShiftForm } from './components/ShiftForm';
 import { ShiftStatistics } from './components/ShiftStatistics';
+import { ActiveMachinesMonitor } from './components/ActiveMachinesMonitor';
 
 const { RangePicker } = DatePicker;
+const { TabPane } = Tabs;
 
 export const ShiftsPage: React.FC = () => {
   const [showForm, setShowForm] = useState(false);
   const [editingShiftId, setEditingShiftId] = useState<number | undefined>();
   const [showStatistics, setShowStatistics] = useState(false);
+  const [activeTab, setActiveTab] = useState('monitor');
   const [dateRange, setDateRange] = useState<[Dayjs, Dayjs]>([
     dayjs().startOf('month'),
     dayjs().endOf('month'),
@@ -36,6 +40,7 @@ export const ShiftsPage: React.FC = () => {
   const { data: shifts, isLoading, error, refetch } = useQuery({
     queryKey: ['shifts', filter],
     queryFn: () => shiftsApi.getAll(filter),
+    enabled: activeTab === 'history', // Загружаем только на вкладке истории
   });
 
   const handleCreateShift = () => {
@@ -66,58 +71,80 @@ export const ShiftsPage: React.FC = () => {
 
   return (
     <div className="page-container">
-      <Row gutter={[16, 16]}>
-        <Col span={24}>
-          <div className="actions-bar">
-            <div className="actions-bar-left">
-              <Space>
-                <RangePicker
-                  value={dateRange}
-                  onChange={handleDateRangeChange}
-                  format="DD.MM.YYYY"
-                  allowClear={false}
-                />
-                <Button
-                  type="primary"
-                  icon={<PlusOutlined />}
-                  onClick={handleCreateShift}
-                >
-                  Новая запись
-                </Button>
-                <Button
-                  icon={<BarChartOutlined />}
-                  onClick={() => setShowStatistics(!showStatistics)}
-                >
-                  {showStatistics ? 'Скрыть статистику' : 'Показать статистику'}
-                </Button>
-              </Space>
-            </div>
-          </div>
-        </Col>
-      </Row>
+      <Tabs 
+        activeKey={activeTab} 
+        onChange={setActiveTab}
+        tabBarExtraContent={
+          activeTab === 'history' ? (
+            <Space>
+              <RangePicker
+                value={dateRange}
+                onChange={handleDateRangeChange}
+                format="DD.MM.YYYY"
+                allowClear={false}
+              />
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                onClick={handleCreateShift}
+              >
+                Новая запись
+              </Button>
+              <Button
+                icon={<BarChartOutlined />}
+                onClick={() => setShowStatistics(!showStatistics)}
+              >
+                {showStatistics ? 'Скрыть статистику' : 'Показать статистику'}
+              </Button>
+            </Space>
+          ) : null
+        }
+      >
+        <TabPane 
+          tab={
+            <span>
+              <MonitorOutlined />
+              Мониторинг производства
+            </span>
+          } 
+          key="monitor"
+        >
+          <ActiveMachinesMonitor />
+        </TabPane>
+        
+        <TabPane 
+          tab={
+            <span>
+              <UnorderedListOutlined />
+              История смен
+            </span>
+          } 
+          key="history"
+        >
+          {showStatistics && (
+            <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+              <Col span={24}>
+                <ShiftStatistics filter={filter} />
+              </Col>
+            </Row>
+          )}
 
-      {showStatistics && (
-        <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-          <Col span={24}>
-            <ShiftStatistics filter={filter} />
-          </Col>
-        </Row>
-      )}
-
-      <Row gutter={[16, 16]}>
-        <Col span={24}>
-          <ShiftsList
-            shifts={shifts || []}
-            loading={isLoading}
-            error={error}
-            onEdit={handleEditShift}
-            onDelete={async (id) => {
-              await shiftsApi.delete(id);
-              refetch();
-            }}
-          />
-        </Col>
-      </Row>
+          <Row gutter={[16, 16]}>
+            <Col span={24}>
+              <ShiftsList
+                shifts={shifts || []}
+                loading={isLoading}
+                error={error}
+                onEdit={handleEditShift}
+                onDelete={async (id) => {
+                  await shiftsApi.delete(id);
+                  refetch();
+                }}
+              />
+            </Col>
+          </Row>
+        </TabPane>
+      </Tabs>
 
       <ShiftForm
         visible={showForm}

@@ -1,8 +1,9 @@
 /**
  * @file: shifts.service.ts
- * @description: Сервис для работы со сменами
+ * @description: Сервис для работы со сменами (ИСПРАВЛЕН - преобразование типов)
  * @dependencies: typeorm, shift-record.entity
  * @created: 2025-01-28
+ * @fixed: 2025-06-07 - Добавлено преобразование строковых чисел в числа
  */
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -20,6 +21,37 @@ export class ShiftsService {
     private readonly shiftRecordRepository: Repository<ShiftRecord>,
   ) {}
 
+  /**
+   * Преобразует строковые числовые значения в числа
+   */
+  private normalizeShiftRecord(record: ShiftRecord): ShiftRecord {
+    if (record) {
+      // Преобразуем строки из БД в числа для корректной работы frontend
+      record.dayShiftTimePerUnit = record.dayShiftTimePerUnit ? 
+        parseFloat(record.dayShiftTimePerUnit.toString()) : null;
+      
+      record.nightShiftTimePerUnit = record.nightShiftTimePerUnit ? 
+        parseFloat(record.nightShiftTimePerUnit.toString()) : null;
+      
+      record.setupTime = record.setupTime ? 
+        parseInt(record.setupTime.toString()) : null;
+      
+      record.dayShiftQuantity = record.dayShiftQuantity ? 
+        parseInt(record.dayShiftQuantity.toString()) : null;
+      
+      record.nightShiftQuantity = record.nightShiftQuantity ? 
+        parseInt(record.nightShiftQuantity.toString()) : null;
+    }
+    return record;
+  }
+
+  /**
+   * Преобразует массив записей
+   */
+  private normalizeShiftRecords(records: ShiftRecord[]): ShiftRecord[] {
+    return records.map(record => this.normalizeShiftRecord(record));
+  }
+
   async findAll(filterDto: ShiftsFilterDto): Promise<ShiftRecord[]> {
     const { startDate, endDate, machineId, operationId } = filterDto;
     const where: any = {};
@@ -36,11 +68,13 @@ export class ShiftsService {
       where.operation = { id: operationId };
     }
 
-    return this.shiftRecordRepository.find({
+    const records = await this.shiftRecordRepository.find({
       where,
       relations: ['operation', 'operation.order', 'machine'],
       order: { date: 'DESC' },
     });
+
+    return this.normalizeShiftRecords(records);
   }
 
   async findOne(id: number): Promise<ShiftRecord> {
@@ -53,12 +87,13 @@ export class ShiftsService {
       throw new NotFoundException(`Запись смены с ID ${id} не найдена`);
     }
 
-    return shiftRecord;
+    return this.normalizeShiftRecord(shiftRecord);
   }
 
   async create(createShiftRecordDto: CreateShiftRecordDto): Promise<ShiftRecord> {
     const shiftRecord = this.shiftRecordRepository.create(createShiftRecordDto);
-    return this.shiftRecordRepository.save(shiftRecord);
+    const savedRecord = await this.shiftRecordRepository.save(shiftRecord);
+    return this.normalizeShiftRecord(savedRecord);
   }
 
   async update(
@@ -67,7 +102,8 @@ export class ShiftsService {
   ): Promise<ShiftRecord> {
     const shiftRecord = await this.findOne(id);
     Object.assign(shiftRecord, updateShiftRecordDto);
-    return this.shiftRecordRepository.save(shiftRecord);
+    const savedRecord = await this.shiftRecordRepository.save(shiftRecord);
+    return this.normalizeShiftRecord(savedRecord);
   }
 
   async remove(id: number): Promise<void> {
@@ -154,14 +190,15 @@ export class ShiftsService {
   }
 
   async getShiftsByDate(date: Date): Promise<ShiftRecord[]> {
-    return this.shiftRecordRepository.find({
+    const records = await this.shiftRecordRepository.find({
       where: { date },
       relations: ['operation', 'operation.order', 'machine'],
     });
+    return this.normalizeShiftRecords(records);
   }
 
   async getShiftsByOperator(operatorName: string): Promise<ShiftRecord[]> {
-    return this.shiftRecordRepository
+    const records = await this.shiftRecordRepository
       .createQueryBuilder('shift')
       .leftJoinAndSelect('shift.operation', 'operation')
       .leftJoinAndSelect('operation.order', 'order')
@@ -172,5 +209,7 @@ export class ShiftsService {
       )
       .orderBy('shift.date', 'DESC')
       .getMany();
+    
+    return this.normalizeShiftRecords(records);
   }
 }

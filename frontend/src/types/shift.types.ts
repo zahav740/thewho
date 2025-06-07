@@ -26,6 +26,7 @@ export interface ShiftRecord {
   nightShiftTimePerUnit?: number;
   operationId: number;
   machineId: number;
+  drawingNumber?: string;
   createdAt: string;
 }
 
@@ -42,8 +43,9 @@ export interface CreateShiftRecordDto {
   nightShiftQuantity?: number;
   nightShiftOperator?: string;
   nightShiftTimePerUnit?: number;
-  operationId: number;
+  operationId?: number; // Сделаем опциональным
   machineId: number;
+  drawingNumber?: string;
 }
 
 export interface UpdateShiftRecordDto extends Partial<CreateShiftRecordDto> {}

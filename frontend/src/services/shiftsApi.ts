@@ -28,6 +28,7 @@ export const shiftsApi = {
 
   // Создать запись смены
   create: async (data: CreateShiftRecordDto): Promise<ShiftRecord> => {
+    console.log('shiftsApi.create: Отправляемые данные:', data);
     const response = await api.post('/shifts', data);
     return response.data;
   },

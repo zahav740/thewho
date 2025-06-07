@@ -74,4 +74,10 @@ export const operationsApi = {
     const response = await api.get(`/operations/machine/${machineId}`);
     return response.data;
   },
+
+  // Получить назначенную операцию для станка
+  getAssignedToMachine: async (machineId: number): Promise<{success: boolean, message: string, operation: Operation | null}> => {
+    const response = await api.get(`/operations/assigned-to-machine/${machineId}`);
+    return response.data;
+  },
 };

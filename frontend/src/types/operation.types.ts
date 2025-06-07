@@ -28,6 +28,7 @@ export interface Operation {
   status: string;
   orderId: number;
   machineId?: number;
+  orderDrawingNumber?: string; // Номер чертежа из связанного заказа
   createdAt: string;
   updatedAt: string;
 }

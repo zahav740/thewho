@@ -32,6 +32,7 @@ const { Option } = Select;
 interface ShiftFormProps {
   visible: boolean;
   shiftId?: number;
+  selectedMachineId?: number; // Новое поле для предвыбора станка
   onClose: () => void;
   onSuccess: () => void;
 }
@@ -39,19 +40,24 @@ interface ShiftFormProps {
 export const ShiftForm: React.FC<ShiftFormProps> = ({
   visible,
   shiftId,
+  selectedMachineId,
   onClose,
   onSuccess,
 }) => {
   const [loading, setLoading] = useState(false);
   const isEdit = !!shiftId;
 
-  const { control, handleSubmit, reset } = useForm<CreateShiftRecordDto>({
+  const { control, handleSubmit, reset, watch, setValue } = useForm<CreateShiftRecordDto>({
     defaultValues: {
       date: dayjs().format('YYYY-MM-DD'),
       shiftType: ShiftType.DAY,
       nightShiftOperator: 'Аркадий',
     },
   });
+
+  const currentMachineId = watch('machineId');
+  const [assignedOperation, setAssignedOperation] = useState<any>(null);
+  const [operationLoading, setOperationLoading] = useState(false);
 
   // const shiftType = watch('shiftType'); // unused
 
@@ -69,10 +75,85 @@ export const ShiftForm: React.FC<ShiftFormProps> = ({
     type: machine.machineType || machine.type
   }));
 
+  // Получаем операции с данными о заказах (для обратной совместимости)
   const { data: operations } = useQuery({
     queryKey: ['operations', 'in-progress'],
     queryFn: () => operationsApi.getAll(OperationStatus.IN_PROGRESS),
+    enabled: false, // Отключаем автоматический запрос
   });
+
+  // Предзаполнение станка при открытии формы
+  React.useEffect(() => {
+    if (visible && selectedMachineId && !isEdit) {
+      setValue('machineId', selectedMachineId);
+      // Принудительно запускаем поиск операции для этого станка
+      setOperationLoading(true);
+      operationsApi.getAssignedToMachine(selectedMachineId)
+        .then(response => {
+          if (response.success && response.operation) {
+            setAssignedOperation(response.operation);
+            setValue('operationId', response.operation.id);
+            setValue('drawingNumber', response.operation.orderDrawingNumber || '');
+          } else {
+            setAssignedOperation(null);
+            setValue('operationId', undefined);
+            setValue('drawingNumber', '');
+          }
+        })
+        .catch(error => {
+          console.error('Ошибка при получении операции для предвыбранного станка:', error);
+          setAssignedOperation(null);
+        })
+        .finally(() => {
+          setOperationLoading(false);
+        });
+    }
+  }, [visible, selectedMachineId, isEdit, setValue]);
+
+  // Получение назначенной операции при выборе станка
+  React.useEffect(() => {
+    if (currentMachineId) {
+      setOperationLoading(true);
+      operationsApi.getAssignedToMachine(currentMachineId)
+        .then(response => {
+          if (response.success && response.operation) {
+            setAssignedOperation(response.operation);
+            setValue('operationId', response.operation.id);
+            setValue('drawingNumber', response.operation.orderDrawingNumber || '');
+          } else {
+            setAssignedOperation(null);
+            setValue('operationId', undefined);
+            setValue('drawingNumber', '');
+            message.warning(response.message || 'На данный станок не назначено операций');
+          }
+        })
+        .catch(error => {
+          console.error('Ошибка при получении назначенной операции:', error);
+          setAssignedOperation(null);
+          message.error('Ошибка при получении информации о назначенной операции');
+        })
+        .finally(() => {
+          setOperationLoading(false);
+        });
+    } else {
+      // Очищаем данные об операции, если станок не выбран
+      setAssignedOperation(null);
+      setValue('operationId', undefined);
+      setValue('drawingNumber', '');
+    }
+  }, [currentMachineId, setValue]);
+
+  // Очищаем форму при закрытии
+  React.useEffect(() => {
+    if (!visible) {
+      reset({
+        date: dayjs().format('YYYY-MM-DD'),
+        shiftType: ShiftType.DAY,
+        nightShiftOperator: 'Аркадий',
+      });
+      setAssignedOperation(null);
+    }
+  }, [visible, reset]);
 
   const { data: shiftData } = useQuery({
     queryKey: ['shift', shiftId],
@@ -97,7 +178,25 @@ export const ShiftForm: React.FC<ShiftFormProps> = ({
         nightShiftTimePerUnit: shiftData.nightShiftTimePerUnit,
         operationId: shiftData.operationId,
         machineId: shiftData.machineId,
+        drawingNumber: shiftData.drawingNumber,
       });
+      
+      // При редактировании также загружаем информацию об операции
+      if (shiftData.machineId) {
+        setOperationLoading(true);
+        operationsApi.getAssignedToMachine(shiftData.machineId)
+          .then(response => {
+            if (response.success && response.operation) {
+              setAssignedOperation(response.operation);
+            }
+          })
+          .catch(error => {
+            console.error('Ошибка при загрузке операции для редактирования:', error);
+          })
+          .finally(() => {
+            setOperationLoading(false);
+          });
+      }
     }
   }, [shiftData, reset]);
 
@@ -126,12 +225,29 @@ export const ShiftForm: React.FC<ShiftFormProps> = ({
   });
 
   const onSubmit = async (data: CreateShiftRecordDto) => {
+    // Для новых записей проверяем наличие станка
+    if (!data.machineId && !isEdit) {
+      message.error('Пожалуйста, выберите станок');
+      return;
+    }
+
+    // Проверяем наличие данных смены (дневной или ночной)
+    if (!data.dayShiftQuantity && !data.nightShiftQuantity) {
+      message.error('Заполните данные хотя бы для одной смены');
+      return;
+    }
+
+    // Исключаем поля, которых нет в базе данных
+    const { setupStartDate, setupOperator, setupType, operationId, drawingNumber, ...cleanData } = data;
+    
+    console.log('📝 Отправляем данные:', cleanData);
+    
     setLoading(true);
     try {
       if (isEdit) {
-        await updateMutation.mutateAsync({ id: shiftId, data });
+        await updateMutation.mutateAsync({ id: shiftId, data: cleanData });
       } else {
-        await createMutation.mutateAsync(data);
+        await createMutation.mutateAsync(cleanData);
       }
     } finally {
       setLoading(false);
@@ -183,40 +299,126 @@ export const ShiftForm: React.FC<ShiftFormProps> = ({
           </Space>
 
           <Space size="large" style={{ width: '100%' }}>
-            <Form.Item label="Станок" required style={{ width: 200 }}>
+            <Form.Item label="Станок" required style={{ width: 250 }}>
               <Controller
                 name="machineId"
                 control={control}
                 rules={{ required: 'Обязательное поле' }}
                 render={({ field }) => (
-                  <Select {...field} placeholder="Выберите станок">
-                    {machinesList?.map((machine) => (
-                      <Option key={machine.id} value={machine.id}>
-                        {machine.code} ({machine.type === 'MILLING' || machine.type?.includes('milling') ? 'Фрез.' : 'Ток.'})
-                      </Option>
-                    ))}
-                  </Select>
-                )}
-              />
-            </Form.Item>
-
-            <Form.Item label="Операция" required style={{ width: 200 }}>
-              <Controller
-                name="operationId"
-                control={control}
-                rules={{ required: 'Обязательное поле' }}
-                render={({ field }) => (
-                  <Select {...field} placeholder="Выберите операцию">
-                    {operations?.map((operation) => (
-                      <Option key={operation.id} value={operation.id}>
-                        Операция {operation.operationNumber}
-                      </Option>
-                    ))}
+                  <Select {...field} placeholder="Выберите станок" showSearch optionFilterProp="children">
+                    {machinesList?.map((machine) => {
+                      const machineTypeLabel = machine.machineType === 'MILLING' || machine.machineType?.includes('milling') 
+                        ? 'Фрезерный' 
+                        : machine.machineType === 'TURNING' || machine.machineType?.includes('turning')
+                        ? 'Токарный'
+                        : 'Станок';
+                      return (
+                        <Option key={machine.id} value={machine.id}>
+                          {machine.machineName} - {machineTypeLabel}
+                        </Option>
+                      );
+                    })}
                   </Select>
                 )}
               />
             </Form.Item>
           </Space>
+
+          {/* Информация о назначенной операции */}
+          {currentMachineId && (
+            <div style={{ 
+              padding: '16px', 
+              backgroundColor: assignedOperation ? '#f6f9f6' : '#fff2f0', 
+              borderRadius: '6px', 
+              marginBottom: '16px',
+              border: `1px solid ${assignedOperation ? '#b7eb8f' : '#ffccc7'}`
+            }}>
+              <h4 style={{ 
+                margin: '0 0 12px 0', 
+                color: '#262626',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                {assignedOperation ? '✅' : '⚠️'} Информация об операции:
+              </h4>
+              {operationLoading ? (
+                <div style={{ textAlign: 'center', padding: '12px' }}>
+                  <Spin size="small" /> Поиск операции...
+                </div>
+              ) : assignedOperation ? (
+                <div style={{ 
+                  display: 'flex', 
+                  flexDirection: 'column',
+                  gap: '8px'
+                }}>
+                  <div style={{ 
+                    display: 'flex', 
+                    gap: '24px', 
+                    alignItems: 'center',
+                    flexWrap: 'wrap'
+                  }}>
+                    <div style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '8px',
+                      fontSize: '16px',
+                      fontWeight: '500'
+                    }}>
+                      <span style={{ color: '#1890ff' }}>Операция №:</span> 
+                      <span style={{ color: '#262626', fontWeight: 'bold' }}>{assignedOperation.operationNumber}</span>
+                    </div>
+                    <div style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '8px',
+                      fontSize: '16px',
+                      fontWeight: '500'
+                    }}>
+                      <span style={{ color: '#1890ff' }}>Чертёж:</span> 
+                      <span style={{ color: '#262626', fontWeight: 'bold' }}>{assignedOperation.orderDrawingNumber || 'Не указан'}</span>
+                    </div>
+                  </div>
+                  <div style={{ 
+                    display: 'flex', 
+                    gap: '16px',
+                    fontSize: '14px',
+                    color: '#8c8c8c',
+                    marginTop: '4px'
+                  }}>
+                    <span>Тип: {assignedOperation.operationType || 'Не указан'}</span>
+                    <span>Время: {assignedOperation.estimatedTime || 0} мин</span>
+                    <span>Статус: {assignedOperation.status}</span>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ 
+                  textAlign: 'center', 
+                  padding: '12px',
+                  color: '#ff4d4f'
+                }}>
+                  <div style={{ fontSize: '16px', marginBottom: '4px' }}>⚠️ На данный станок не назначено операций</div>
+                  <div style={{ fontSize: '12px', color: '#8c8c8c' }}>Запись смены все равно можно создать</div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Скрытые поля для операции */}
+          {assignedOperation && (
+            <>
+              <Controller
+                name="operationId"
+                control={control}
+                render={({ field }) => <input type="hidden" {...field} />}
+              />
+              <Controller
+                name="drawingNumber"
+                control={control}
+                render={({ field }) => <input type="hidden" {...field} />}
+              />
+            </>
+          )}
 
           <Divider orientation="left">Наладка</Divider>
 
