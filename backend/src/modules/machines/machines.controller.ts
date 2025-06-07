@@ -1,9 +1,9 @@
 /**
  * @file: machines.controller.ts
- * @description: Контроллер для управления станками (УПРОЩЕННЫЙ - исправлена проблема с БД)
+ * @description: Контроллер для управления станками (ИСПРАВЛЕН - реальные данные операций)
  * @dependencies: services
  * @created: 2025-01-28
- * @updated: 2025-06-07 - Упрощен для устранения ошибок
+ * @updated: 2025-06-07 - Исправлено получение реальных данных операций
  */
 import {
   Controller,
@@ -17,6 +17,8 @@ import {
   Logger,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { InjectDataSource } from '@nestjs/typeorm';
+import { DataSource } from 'typeorm';
 import { MachinesService } from './machines.service';
 import { CreateMachineDto } from './dto/create-machine.dto';
 import { UpdateMachineDto } from './dto/update-machine.dto';
@@ -30,7 +32,16 @@ interface MachineAvailability {
   isAvailable: boolean;
   currentOperationId?: string;
   lastFreedAt?: Date;
-  currentOperationDetails?: any;
+  currentOperationDetails?: {
+    id: number;
+    operationNumber: number;
+    operationType: string;
+    estimatedTime: number;
+    orderId: number;
+    orderDrawingNumber: string;
+  };
+  createdAt: string;
+  updatedAt: string;
 }
 
 @ApiTags('machines')
@@ -40,17 +51,58 @@ export class MachinesController {
 
   constructor(
     private readonly machinesService: MachinesService,
+    @InjectDataSource()
+    private readonly dataSource: DataSource,
   ) {}
+
+  /**
+   * Получить реальные данные операции по ID
+   */
+  private async getOperationDetails(operationId: number) {
+    try {
+      const result = await this.dataSource.query(`
+        SELECT 
+          op.id,
+          op."operationNumber",
+          op.operationtype as "operationType",
+          op."estimatedTime",
+          op."orderId",
+          ord.drawing_number as "orderDrawingNumber"
+        FROM operations op
+        LEFT JOIN orders ord ON op."orderId" = ord.id
+        WHERE op.id = $1
+      `, [operationId]);
+      
+      return result[0] || null;
+    } catch (error) {
+      this.logger.error(`Ошибка при получении данных операции ${operationId}:`, error);
+      return null;
+    }
+  }
 
   @Get()
   @ApiOperation({ summary: 'Получить все станки с доступностью' })
   async findAll(): Promise<MachineAvailability[]> {
     try {
-      this.logger.log('Получение всех станков');
+      this.logger.log('Получение всех станков с реальными данными операций');
       const machines = await this.machinesService.findAll();
       
       // Преобразуем данные из таблицы machines в формат MachineAvailability
-      const result = machines.map(machine => {        
+      const result = await Promise.all(machines.map(async (machine) => {
+        let currentOperationDetails = null;
+        
+        // Если у станка есть текущая операция, получаем реальные данные
+        if (machine.currentOperation) {
+          this.logger.log(`Получение деталей операции ${machine.currentOperation} для станка ${machine.code}`);
+          currentOperationDetails = await this.getOperationDetails(machine.currentOperation);
+          
+          if (currentOperationDetails) {
+            this.logger.log(`✅ Найдена операция ${currentOperationDetails.operationNumber} (${currentOperationDetails.operationType}, ${currentOperationDetails.estimatedTime}мин)`);
+          } else {
+            this.logger.warn(`❌ Операция ${machine.currentOperation} не найдена в БД`);
+          }
+        }
+        
         return {
           id: machine.id.toString(),
           machineName: machine.code, // используем code как имя станка
@@ -58,17 +110,13 @@ export class MachinesController {
           isAvailable: !machine.isOccupied, // инвертируем логику
           currentOperationId: machine.currentOperation?.toString(),
           lastFreedAt: machine.assignedAt,
-          // Временно убираем детали операции, чтобы избежать ошибок
-          currentOperationDetails: machine.currentOperation ? {
-            operationNumber: machine.currentOperation,
-            operationType: 'Производство',
-            estimatedTime: 120,
-            orderDrawingNumber: `Операция #${machine.currentOperation}`
-          } : null
+          currentOperationDetails,
+          createdAt: machine.createdAt.toISOString(),
+          updatedAt: machine.updatedAt.toISOString(),
         };
-      });
+      }));
       
-      this.logger.log(`Возвращено ${result.length} станков`);
+      this.logger.log(`Возвращено ${result.length} станков с реальными данными операций`);
       return result;
     } catch (error) {
       this.logger.error('Ошибка при получении станков:', error);
@@ -95,6 +143,9 @@ export class MachinesController {
         isAvailable: true,
         currentOperationId: machine.currentOperation?.toString(),
         lastFreedAt: machine.assignedAt,
+        currentOperationDetails: null, // Доступные станки не имеют текущих операций
+        createdAt: machine.createdAt.toISOString(),
+        updatedAt: machine.updatedAt.toISOString(),
       }));
       
       this.logger.log(`Возвращено ${result.length} доступных станков`);
@@ -117,6 +168,12 @@ export class MachinesController {
         throw new BadRequestException(`Станок с именем ${machineName} не найден`);
       }
       
+      // Получаем реальные данные операции если есть
+      let currentOperationDetails = null;
+      if (machine.currentOperation) {
+        currentOperationDetails = await this.getOperationDetails(machine.currentOperation);
+      }
+      
       return {
         id: machine.id.toString(),
         machineName: machine.code,
@@ -124,6 +181,9 @@ export class MachinesController {
         isAvailable: !machine.isOccupied,
         currentOperationId: machine.currentOperation?.toString(),
         lastFreedAt: machine.assignedAt,
+        currentOperationDetails,
+        createdAt: machine.createdAt.toISOString(),
+        updatedAt: machine.updatedAt.toISOString(),
       };
     } catch (error) {
       this.logger.error(`Ошибка при поиске станка ${machineName}:`, error);
@@ -146,10 +206,24 @@ export class MachinesController {
         throw new BadRequestException(`Станок с именем ${machineName} не найден`);
       }
       
-      // Обновляем статус занятости (инвертируем логику)
-      const updatedMachine = await this.machinesService.update(machine.id, {
+      // Если станок становится доступным, очищаем текущую операцию
+      const updateData: any = {
         isOccupied: !body.isAvailable
-      });
+      };
+      
+      if (body.isAvailable) {
+        updateData.currentOperation = null;
+        updateData.assignedAt = null;
+      }
+      
+      // Обновляем статус занятости
+      const updatedMachine = await this.machinesService.update(machine.id, updateData);
+      
+      // Получаем реальные данные операции если есть
+      let currentOperationDetails = null;
+      if (updatedMachine.currentOperation) {
+        currentOperationDetails = await this.getOperationDetails(updatedMachine.currentOperation);
+      }
       
       return {
         id: updatedMachine.id.toString(),
@@ -158,6 +232,9 @@ export class MachinesController {
         isAvailable: !updatedMachine.isOccupied,
         currentOperationId: updatedMachine.currentOperation?.toString(),
         lastFreedAt: updatedMachine.assignedAt,
+        currentOperationDetails,
+        createdAt: updatedMachine.createdAt.toISOString(),
+        updatedAt: updatedMachine.updatedAt.toISOString(),
       };
     } catch (error) {
       this.logger.error(`Ошибка при обновлении доступности станка ${machineName}:`, error);
@@ -180,12 +257,33 @@ export class MachinesController {
         throw new BadRequestException(`Станок с именем ${machineName} не найден`);
       }
       
+      const operationId = parseInt(body.operationId);
+      
+      // Проверяем, что операция существует
+      const operationDetails = await this.getOperationDetails(operationId);
+      if (!operationDetails) {
+        throw new BadRequestException(`Операция с ID ${operationId} не найдена`);
+      }
+      
       // Назначаем операцию и помечаем станок как занятый
       const updatedMachine = await this.machinesService.update(machine.id, {
         isOccupied: true,
-        currentOperation: parseInt(body.operationId),
+        currentOperation: operationId,
         assignedAt: new Date(),
       });
+      
+      // Также обновляем статус операции в таблице operations
+      try {
+        await this.dataSource.query(`
+          UPDATE operations 
+          SET status = 'IN_PROGRESS', "assignedMachine" = $1, "assignedAt" = NOW()
+          WHERE id = $2
+        `, [machine.id, operationId]);
+        
+        this.logger.log(`✅ Операция ${operationId} назначена на станок ${machineName} и отмечена как IN_PROGRESS`);
+      } catch (dbError) {
+        this.logger.error('Ошибка при обновлении статуса операции:', dbError);
+      }
       
       return {
         id: updatedMachine.id.toString(),
@@ -194,6 +292,9 @@ export class MachinesController {
         isAvailable: false,
         currentOperationId: updatedMachine.currentOperation?.toString(),
         lastFreedAt: updatedMachine.assignedAt,
+        currentOperationDetails: operationDetails,
+        createdAt: updatedMachine.createdAt.toISOString(),
+        updatedAt: updatedMachine.updatedAt.toISOString(),
       };
     } catch (error) {
       this.logger.error(`Ошибка при назначении операции на станок ${machineName}:`, error);

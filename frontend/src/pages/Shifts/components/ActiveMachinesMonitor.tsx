@@ -1,9 +1,9 @@
 /**
  * @file: ActiveMachinesMonitor.tsx
- * @description: Компонент мониторинга активных станков (ИСПРАВЛЕН - правильный порядок функций)
+ * @description: Компонент мониторинга активных станков (ИСПРАВЛЕН - автообновление данных)
  * @dependencies: antd, react-query, machinesApi, operationsApi
  * @created: 2025-06-07
- * @fixed: 2025-06-07 - Исправлен порядок объявления функций
+ * @fixed: 2025-06-07 - Исправлено автообновление данных после создания смены
  */
 import React, { useState } from 'react';
 import {
@@ -31,7 +31,7 @@ import {
   FileTextOutlined,
   SettingOutlined,
 } from '@ant-design/icons';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { machinesApi } from '../../../services/machinesApi';
 import { operationsApi } from '../../../services/operationsApi';
 import { shiftsApi } from '../../../services/shiftsApi';
@@ -93,6 +93,9 @@ const getMachineTypeLabel = (type: string): string => {
 export const ActiveMachinesMonitor: React.FC = () => {
   const [selectedMachineId, setSelectedMachineId] = useState<number | undefined>();
   const [showShiftForm, setShowShiftForm] = useState(false);
+  
+  // ИСПРАВЛЕНО: Добавлен useQueryClient для инвалидации кэша
+  const queryClient = useQueryClient();
 
   // Загружаем список станков (используем основной API)
   const { data: machines, isLoading: machinesLoading, error: machinesError } = useQuery({
@@ -211,8 +214,18 @@ export const ActiveMachinesMonitor: React.FC = () => {
     setSelectedMachineId(undefined);
   };
 
+  // ИСПРАВЛЕНО: Добавлена инвалидация кэша для автообновления данных
   const handleShiftFormSuccess = () => {
     message.success('Запись смены создана успешно');
+    
+    // Инвалидируем все связанные запросы для обновления данных
+    queryClient.invalidateQueries({ queryKey: ['shifts'] });
+    queryClient.invalidateQueries({ queryKey: ['shifts', 'today'] });
+    queryClient.invalidateQueries({ queryKey: ['machines-availability'] });
+    queryClient.invalidateQueries({ queryKey: ['operations'] });
+    
+    console.log('🔄 Кэш инвалидирован, данные обновляются...');
+    
     handleShiftFormClose();
   };
 
