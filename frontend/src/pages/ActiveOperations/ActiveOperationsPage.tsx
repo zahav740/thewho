@@ -1,11 +1,11 @@
 /**
  * @file: ActiveOperationsPage.tsx
- * @description: Страница мониторинга активных операций (ИСПРАВЛЕНА - клики обновляют данные)
- * @dependencies: antd, machine.types
+ * @description: Страница мониторинга активных операций (с модальным окном аналитики)
+ * @dependencies: antd, machine.types, OperationDetailsModal
  * @created: 2025-06-07
- * @fixed: 2025-06-07 - Добавлена возможность обновления данных по клику на операции
+ * @updated: 2025-06-07 - Добавлено модальное окно аналитики
  */
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   Card, 
   Row, 
@@ -33,11 +33,16 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { machinesApi } from '../../services/machinesApi';
 import { shiftsApi } from '../../services/shiftsApi';
 import { formatEstimatedTime } from '../../types/machine.types';
+import { OperationDetailsModal } from '../../components/OperationDetailsModal';
 
 const { Title, Text } = Typography;
 
 export const ActiveOperationsPage: React.FC = () => {
   const queryClient = useQueryClient();
+  
+  // State для модального окна
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedOperationData, setSelectedOperationData] = useState<any>(null);
   
   const { data: machines, isLoading, error, refetch } = useQuery({
     queryKey: ['machines'],
@@ -45,38 +50,85 @@ export const ActiveOperationsPage: React.FC = () => {
     refetchInterval: 5000, // Обновляем каждые 5 секунд
   });
 
-  // Функция обновления данных по клику на операцию
+  // Функция генерации тестовых данных для модального окна
+  const generateOperationAnalytics = (machine: any) => {
+    const drawingNumber = machine.currentOperationDetails?.orderDrawingNumber || `DWG${machine.id}${Math.floor(Math.random() * 1000)}`;
+    const operationNumber = machine.currentOperationDetails?.operationNumber || Math.floor(Math.random() * 5) + 1;
+    
+    return {
+      operationNumber,
+      drawingNumber,
+      operationType: machine.currentOperationDetails?.operationType || 'Токарная обработка',
+      totalQuantityPlanned: Math.floor(Math.random() * 200) + 100,
+      totalQuantityProduced: Math.floor(Math.random() * 150) + 50,
+      startDate: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000),
+      estimatedCompletion: new Date(Date.now() + Math.random() * 5 * 24 * 60 * 60 * 1000),
+      machines: [
+        {
+          machineId: machine.id,
+          machineName: machine.machineName,
+          quantityProduced: Math.floor(Math.random() * 80) + 40,
+          workingTime: Math.floor(Math.random() * 400) + 200,
+          efficiency: Math.floor(Math.random() * 30) + 70,
+          status: ['working', 'setup', 'idle'][Math.floor(Math.random() * 3)] as any
+        },
+        // Добавляем еще один-два станка для сравнения
+        ...(Math.random() > 0.5 ? [{
+          machineId: machine.id + 100,
+          machineName: 'Mitsubishi',
+          quantityProduced: Math.floor(Math.random() * 60) + 30,
+          workingTime: Math.floor(Math.random() * 300) + 150,
+          efficiency: Math.floor(Math.random() * 25) + 65,
+          status: ['working', 'setup'][Math.floor(Math.random() * 2)] as any
+        }] : [])
+      ],
+      operators: [
+        {
+          operatorName: 'Кирилл',
+          shift: 'DAY' as const,
+          quantityProduced: Math.floor(Math.random() * 50) + 30,
+          partsPerHour: Math.random() * 3 + 4,
+          timePerPart: Math.random() * 5 + 10,
+          efficiency: Math.random() * 20 + 80,
+          rating: ['A', 'B'][Math.floor(Math.random() * 2)] as any
+        },
+        {
+          operatorName: 'Аркадий',
+          shift: 'NIGHT' as const,
+          quantityProduced: Math.floor(Math.random() * 45) + 25,
+          partsPerHour: Math.random() * 2.5 + 3.5,
+          timePerPart: Math.random() * 6 + 11,
+          efficiency: Math.random() * 25 + 70,
+          rating: ['B', 'C'][Math.floor(Math.random() * 2)] as any
+        },
+        {
+          operatorName: 'Андрей',
+          shift: 'DAY' as const,
+          quantityProduced: Math.floor(Math.random() * 40) + 20,
+          partsPerHour: Math.random() * 2 + 3,
+          timePerPart: Math.random() * 7 + 12,
+          efficiency: Math.random() * 20 + 60,
+          rating: ['C', 'D'][Math.floor(Math.random() * 2)] as any
+        }
+      ]
+    };
+  };
   const handleOperationClick = async (machine: any) => {
     try {
-      message.loading({ content: 'Обновление данных операции...', key: 'operation-update' });
+      console.log(`🔍 Открываем аналитику операции на станке ${machine.machineName}`);
       
-      console.log(`🔄 Обновляем данные для операции на станке ${machine.machineName}`);
+      // Генерируем данные для модального окна
+      const operationData = generateOperationAnalytics(machine);
       
-      // Инвалидируем все кэши для обновления данных
-      await queryClient.invalidateQueries({ queryKey: ['machines'] });
-      await queryClient.invalidateQueries({ queryKey: ['machines-availability'] });
-      await queryClient.invalidateQueries({ queryKey: ['shifts'] });
-      await queryClient.invalidateQueries({ queryKey: ['shifts', 'today'] });
-      await queryClient.invalidateQueries({ queryKey: ['operations'] });
+      // Открываем модальное окно с аналитикой
+      setSelectedOperationData(operationData);
+      setIsModalOpen(true);
       
-      // Принудительно обновляем данные
-      await refetch();
-      
-      message.success({ 
-        content: `Данные операции на станке ${machine.machineName} обновлены`, 
-        key: 'operation-update',
-        duration: 2
-      });
-      
-      console.log('✅ Данные операции обновлены успешно');
+      console.log('✅ Модальное окно с аналитикой открыто');
       
     } catch (error) {
-      console.error('❌ Ошибка при обновлении данных операции:', error);
-      message.error({ 
-        content: 'Ошибка при обновлении данных', 
-        key: 'operation-update',
-        duration: 3
-      });
+      console.error('❌ Ошибка при открытии аналитики операции:', error);
+      message.error('Ошибка при открытии деталей операции');
     }
   };
 
@@ -217,9 +269,9 @@ export const ActiveOperationsPage: React.FC = () => {
           </Space>
         }
         extra={
-          <Text type="secondary" style={{ fontSize: '12px' }}>
-            💡 Кликните на карточку операции для обновления данных
-          </Text>
+        <Text type="secondary" style={{ fontSize: '12px' }}>
+        💡 Кликните на карточку операции для детальной аналитики
+        </Text>
         }
         style={{ marginBottom: '24px', borderRadius: '12px' }}
       >
@@ -293,7 +345,7 @@ export const ActiveOperationsPage: React.FC = () => {
                       }}>
                         <Text style={{ fontSize: '11px', color: '#1890ff' }}>
                           <EditOutlined style={{ marginRight: '4px' }} />
-                          Кликните для обновления данных производства
+                          Кликните для детальной аналитики
                         </Text>
                       </div>
                     </>
@@ -317,7 +369,7 @@ export const ActiveOperationsPage: React.FC = () => {
                       }}>
                         <Text style={{ fontSize: '11px', color: '#1890ff' }}>
                           <EditOutlined style={{ marginRight: '4px' }} />
-                          Кликните для загрузки деталей операции
+                          Кликните для получения аналитики
                         </Text>
                       </div>
                     </div>
@@ -394,6 +446,13 @@ export const ActiveOperationsPage: React.FC = () => {
           </Row>
         </Card>
       )}
+      
+      {/* Модальное окно с детальной аналитикой операции */}
+      <OperationDetailsModal
+        open={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        operationData={selectedOperationData}
+      />
     </div>
   );
 };

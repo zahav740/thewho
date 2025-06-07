@@ -14,6 +14,7 @@ import {
   CalendarOutlined,
   SettingOutlined,
   PlayCircleOutlined,
+  HistoryOutlined,
 } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
 
@@ -37,6 +38,12 @@ export const Layout: React.FC = () => {
       icon: <PlayCircleOutlined />,
       label: 'Активные операции',
       onClick: () => navigate('/operations'),
+    },
+    {
+      key: '/operation-history',
+      icon: <HistoryOutlined />,
+      label: 'История операций',
+      onClick: () => navigate('/operation-history'),
     },
     {
       key: '/database',
@@ -116,6 +123,8 @@ function getPageTitle(pathname: string): string {
       return 'Производство';
     case '/operations':
       return 'Мониторинг активных операций';
+    case '/operation-history':
+      return 'История операций и аналитика';
     case '/database':
       return 'База данных заказов';
     case '/shifts':

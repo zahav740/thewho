@@ -7,6 +7,7 @@ import { ShiftsPage } from './pages/Shifts/ShiftsPage';
 import { CalendarPage } from './pages/Calendar/CalendarPage';
 import { ProductionPlanningPage } from './pages/Planning';
 import { ActiveOperationsPage } from './pages/ActiveOperations';
+import { OperationHistory } from './pages/OperationHistory';
 
 const App: React.FC = () => {
   return (
@@ -24,6 +25,7 @@ const App: React.FC = () => {
           <Route path="shifts" element={<ShiftsPage />} />
           <Route path="planning" element={<ProductionPlanningPage />} />
           <Route path="operations" element={<ActiveOperationsPage />} />
+          <Route path="operation-history" element={<OperationHistory />} />
           <Route path="calendar" element={<CalendarPage />} />
         </Route>
       </Routes>
