@@ -327,15 +327,15 @@ export const ShiftForm: React.FC<ShiftFormProps> = ({
               marginBottom: '16px',
               border: `1px solid ${assignedOperation ? '#b7eb8f' : '#ffccc7'}`
             }}>
-              <h4 style={{ 
-                margin: '0 0 12px 0', 
-                color: '#262626',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px'
-              }}>
-                {assignedOperation ? '✅' : '⚠️'} Информация об операции:
-              </h4>
+      <h4 style={{ 
+        margin: '0 0 12px 0', 
+        color: '#262626',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px'
+      }}>
+        {assignedOperation ? '✅' : '⚠️'} Информация об операции:
+      </h4>
               {operationLoading ? (
                 <div style={{ textAlign: 'center', padding: '12px' }}>
                   <Spin size="small" /> Поиск операции...
@@ -344,7 +344,7 @@ export const ShiftForm: React.FC<ShiftFormProps> = ({
                 <div style={{ 
                   display: 'flex', 
                   flexDirection: 'column',
-                  gap: '8px'
+                  gap: '12px'
                 }}>
                   <div style={{ 
                     display: 'flex', 
@@ -373,6 +373,69 @@ export const ShiftForm: React.FC<ShiftFormProps> = ({
                       <span style={{ color: '#262626', fontWeight: 'bold' }}>{assignedOperation.orderDrawingNumber || 'Не указан'}</span>
                     </div>
                   </div>
+                  
+                  {/* 🆕 Добавляем информацию о заказе */}
+                  {(assignedOperation.orderQuantity || assignedOperation.orderPriority || assignedOperation.orderDeadline) && (
+                    <div style={{
+                      padding: '12px',
+                      backgroundColor: '#e6f7ff',
+                      borderRadius: '4px',
+                      border: '1px solid #91d5ff'
+                    }}>
+                      <div style={{ 
+                        fontSize: '14px', 
+                        fontWeight: '600', 
+                        color: '#0050b3',
+                        marginBottom: '8px'
+                      }}>
+                        📋 Информация о заказе:
+                      </div>
+                      <div style={{ 
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+                        gap: '12px',
+                        fontSize: '13px'
+                      }}>
+                        {assignedOperation.orderQuantity && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ color: '#1890ff', fontWeight: '500' }}>📦 Количество:</span>
+                            <span style={{ color: '#262626', fontWeight: 'bold', fontSize: '14px' }}>
+                              {assignedOperation.orderQuantity} шт.
+                            </span>
+                          </div>
+                        )}
+                        {assignedOperation.orderPriority && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ color: '#1890ff', fontWeight: '500' }}>🎯 Приоритет:</span>
+                            <span style={{ 
+                              color: assignedOperation.orderPriority === 1 ? '#ff4d4f' : 
+                                     assignedOperation.orderPriority === 2 ? '#fa8c16' : '#52c41a',
+                              fontWeight: 'bold'
+                            }}>
+                              {assignedOperation.orderPriority}
+                            </span>
+                          </div>
+                        )}
+                        {assignedOperation.orderDeadline && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ color: '#1890ff', fontWeight: '500' }}>📅 Дедлайн:</span>
+                            <span style={{ color: '#262626' }}>
+                              {new Date(assignedOperation.orderDeadline).toLocaleDateString('ru-RU')}
+                            </span>
+                          </div>
+                        )}
+                        {assignedOperation.orderWorkType && assignedOperation.orderWorkType !== '' && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ color: '#1890ff', fontWeight: '500' }}>🔧 Тип работы:</span>
+                            <span style={{ color: '#262626' }}>
+                              {assignedOperation.orderWorkType}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  
                   <div style={{ 
                     display: 'flex', 
                     gap: '16px',

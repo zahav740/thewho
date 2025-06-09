@@ -47,7 +47,7 @@ export class OperationsSimpleController {
   }
 
   @Get('assigned-to-machine/:machineId')
-  @ApiOperation({ summary: 'Получить назначенную операцию для станка' })
+  @ApiOperation({ summary: 'Получить назначенную операцию для станка с данными заказа' })
   async getAssignedOperationByMachine(@Param('machineId') machineId: string) {
     try {
       console.log('OperationsSimpleController.getAssignedOperationByMachine: Поиск операции для станка:', machineId);
@@ -64,7 +64,11 @@ export class OperationsSimpleController {
           op.machineaxes as "machineAxes",
           op."createdAt",
           op."updatedAt",
-          ord.drawing_number as "orderDrawingNumber"
+          ord.drawing_number as "orderDrawingNumber",
+          ord.quantity as "orderQuantity",
+          ord.priority as "orderPriority",
+          ord.deadline as "orderDeadline",
+          ord."workType" as "orderWorkType"
         FROM operations op
         LEFT JOIN orders ord ON op."orderId" = ord.id
         WHERE op."assignedMachine" = $1 
