@@ -20,6 +20,7 @@ import { HealthModule } from './modules/health/health.module';
 import { PlanningModule } from './modules/planning/planning.module';
 import { TestModule } from './modules/test/test.module';
 import { PetsModule } from './modules/pets/pets.module';
+import { TranslationsModule } from './modules/translations/translations.module';
 import { HeaderSizeMiddleware } from './common/middleware/header-size.middleware';
 import { OrdersDataMiddleware } from './modules/orders/orders.middleware';
 
@@ -54,14 +55,15 @@ import { OrdersDataMiddleware } from './modules/orders/orders.middleware';
     MachinesModule,
     OrdersModule,
     OperationsModule,
-    OperatorsModule, // 🆕 Модуль операторов
+    OperatorsModule,
     ShiftsModule,
     CalendarModule,
     FilesModule,
     PlanningModule,
     HealthModule,
     TestModule,
-    PetsModule, // FindThePuppy модуль
+    PetsModule,
+    TranslationsModule, // Модуль переводов
   ],
 })
 export class AppModule implements NestModule {

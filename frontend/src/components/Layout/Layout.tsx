@@ -1,12 +1,13 @@
 /**
  * @file: Layout.tsx
- * @description: Основной layout приложения
+ * @description: Основной layout приложения с поддержкой интернационализации
  * @dependencies: antd, react-router-dom
  * @created: 2025-01-28
+ * @updated: 2025-01-28 - Добавлена поддержка i18n
  */
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate, Outlet } from 'react-router-dom';
-import { Layout as AntLayout, Menu, Typography } from 'antd';
+import { Layout as AntLayout, Menu, Typography, Space } from 'antd';
 import {
   AppstoreOutlined,
   DatabaseOutlined,
@@ -15,9 +16,12 @@ import {
   SettingOutlined,
   PlayCircleOutlined,
   HistoryOutlined,
-  UserOutlined, // 🆕 Иконка для операторов
+  UserOutlined,
+  GlobalOutlined,
 } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
+import { useTranslation } from '../../i18n';
+import { LanguageSwitcher } from '../LanguageSwitcher';
 
 const { Header, Sider, Content } = AntLayout;
 const { Title } = Typography;
@@ -26,55 +30,62 @@ export const Layout: React.FC = () => {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   const menuItems: MenuProps['items'] = [
     {
       key: '/production',
       icon: <AppstoreOutlined />,
-      label: 'Производство',
+      label: t('menu.production'),
       onClick: () => navigate('/production'),
     },
     {
       key: '/operations',
       icon: <PlayCircleOutlined />,
-      label: 'Активные операции',
+      label: t('menu.operations'),
       onClick: () => navigate('/operations'),
     },
     {
       key: '/operation-history',
       icon: <HistoryOutlined />,
-      label: 'История операций',
+      label: t('menu.operation_history'),
       onClick: () => navigate('/operation-history'),
     },
     {
       key: '/database',
       icon: <DatabaseOutlined />,
-      label: 'База данных',
+      label: t('menu.database'),
       onClick: () => navigate('/database'),
     },
     {
       key: '/shifts',
       icon: <ScheduleOutlined />,
-      label: 'Смены',
+      label: t('menu.shifts'),
       onClick: () => navigate('/shifts'),
     },
     {
-      key: '/operators', // 🆕 Новый пункт меню
+      key: '/operators',
       icon: <UserOutlined />,
-      label: 'Операторы',
+      label: t('menu.operators'),
       onClick: () => navigate('/operators'),
     },
     {
       key: '/planning',
       icon: <SettingOutlined />,
-      label: 'Планирование',
+      label: t('menu.planning'),
       onClick: () => navigate('/planning'),
     },
     {
       key: '/calendar',
       icon: <CalendarOutlined />,
-      label: 'Календарь',
+      label: t('menu.calendar'),
       onClick: () => navigate('/calendar'),
+    },
+    {
+      key: '/translations',
+      icon: <GlobalOutlined />,
+      label: t('menu.translations'),
+      onClick: () => navigate('/translations'),
     },
   ];
 
@@ -94,7 +105,7 @@ export const Layout: React.FC = () => {
           color: '#fff'
         }}>
           <Title level={4} style={{ color: '#fff', margin: 0 }}>
-            {collapsed ? 'CRM' : 'Production CRM'}
+            {collapsed ? t('app.title.short') : t('app.title')}
           </Title>
         </div>
         <Menu
@@ -110,10 +121,14 @@ export const Layout: React.FC = () => {
           background: '#fff', 
           padding: '0 24px',
           boxShadow: '0 1px 4px rgba(0,21,41,.08)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
         }}>
           <Title level={3} style={{ margin: '16px 0' }}>
-            {getPageTitle(location.pathname)}
+            {getPageTitle(location.pathname, t)}
           </Title>
+          <LanguageSwitcher />
         </Header>
         
         <Content style={{ margin: '24px' }}>
@@ -124,25 +139,27 @@ export const Layout: React.FC = () => {
   );
 };
 
-function getPageTitle(pathname: string): string {
+function getPageTitle(pathname: string, t: (key: string) => string): string {
   switch (pathname) {
     case '/production':
-      return 'Производство';
+      return t('page.production.title');
     case '/operations':
-      return 'Мониторинг активных операций';
+      return t('page.operations.title');
     case '/operation-history':
-      return 'История операций и аналитика';
+      return t('page.operation_history.title');
     case '/database':
-      return 'База данных заказов';
+      return t('page.database.title');
     case '/shifts':
-      return 'Учет смен';
-    case '/operators': // 🆕 Заголовок для страницы операторов
-      return 'Управление операторами';
+      return t('page.shifts.title');
+    case '/operators':
+      return t('page.operators.title');
     case '/planning':
-      return 'Планирование производства';
+      return t('page.planning.title');
     case '/calendar':
-      return 'Производственный календарь';
+      return t('page.calendar.title');
+    case '/translations':
+      return t('translations.title');
     default:
-      return 'Production CRM';
+      return t('app.title');
   }
 }

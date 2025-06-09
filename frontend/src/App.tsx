@@ -1,5 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { I18nProvider } from './i18n';
 import { Layout } from './components/Layout/Layout';
 import { ProductionPage } from './pages/Production/ProductionPage';
 import { DatabasePage } from './pages/Database/DatabasePage';
@@ -8,30 +9,34 @@ import { CalendarPage } from './pages/Calendar/CalendarPage';
 import { ProductionPlanningPage } from './pages/Planning';
 import { ActiveOperationsPage } from './pages/ActiveOperations';
 import { OperationHistory } from './pages/OperationHistory';
-import { OperatorsPage } from './pages/Operators'; // 🆕 Страница операторов
+import { OperatorsPage } from './pages/Operators';
+import { TranslationsPage } from './pages/Translations';
 
 const App: React.FC = () => {
   return (
-    <Router
-      future={{
-        v7_startTransition: true,
-        v7_relativeSplatPath: true,
-      }}
-    >
-      <Routes>
-        <Route path="/" element={<Layout />}>
-          <Route index element={<Navigate to="/production" replace />} />
-          <Route path="production" element={<ProductionPage />} />
-          <Route path="database" element={<DatabasePage />} />
-          <Route path="shifts" element={<ShiftsPage />} />
-          <Route path="operators" element={<OperatorsPage />} /> {/* 🆕 Маршрут для операторов */}
-          <Route path="planning" element={<ProductionPlanningPage />} />
-          <Route path="operations" element={<ActiveOperationsPage />} />
-          <Route path="operation-history" element={<OperationHistory />} />
-          <Route path="calendar" element={<CalendarPage />} />
-        </Route>
-      </Routes>
-    </Router>
+    <I18nProvider>
+      <Router
+        future={{
+          v7_startTransition: true,
+          v7_relativeSplatPath: true,
+        }}
+      >
+        <Routes>
+          <Route path="/" element={<Layout />}>
+            <Route index element={<Navigate to="/production" replace />} />
+            <Route path="production" element={<ProductionPage />} />
+            <Route path="database" element={<DatabasePage />} />
+            <Route path="shifts" element={<ShiftsPage />} />
+            <Route path="operators" element={<OperatorsPage />} />
+            <Route path="planning" element={<ProductionPlanningPage />} />
+            <Route path="operations" element={<ActiveOperationsPage />} />
+            <Route path="operation-history" element={<OperationHistory />} />
+            <Route path="calendar" element={<CalendarPage />} />
+            <Route path="translations" element={<TranslationsPage />} />
+          </Route>
+        </Routes>
+      </Router>
+    </I18nProvider>
   );
 };
 

@@ -9,6 +9,7 @@ import React, { useState } from 'react';
 import { Row, Col, Spin, Alert, Button, Switch, Space, Card } from 'antd';
 import { ThunderboltOutlined, BugOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from '../../i18n';
 import { machinesApi } from '../../services/machinesApi';
 import { MachineAvailability } from '../../types/machine.types';
 import { MachineCard } from './components/MachineCard';
@@ -18,6 +19,7 @@ import { PlanningModal } from '../../components/PlanningModal';
 import PlanningModalImproved from '../../components/PlanningModal/PlanningModalImproved';
 
 export const ProductionPage: React.FC = () => {
+  const { t, currentLanguage } = useTranslation();
   const [selectedMachine, setSelectedMachine] = useState<MachineAvailability | null>(null);
   const [planningModalVisible, setPlanningModalVisible] = useState(false);
   const [planningMachine, setPlanningMachine] = useState<MachineAvailability | null>(null);
@@ -70,6 +72,30 @@ export const ProductionPage: React.FC = () => {
   return (
     <div className="page-container">
       {/* 🆕 ПАНЕЛЬ УПРАВЛЕНИЯ ПЛАНИРОВАНИЕМ */}
+      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+        <Col span={24}>
+          <Card 
+            size="small" 
+            style={{ 
+              background: 'linear-gradient(135deg, #e6f7ff 0%, #f0f9ff 100%)',
+              borderColor: '#1890ff',
+              borderRadius: '12px',
+              marginBottom: 16
+            }}
+          >
+            <Space align="center" style={{ width: '100%', justifyContent: 'space-between' }}>
+              <Space direction="vertical" size={4}>
+                <div style={{ fontWeight: 'bold', fontSize: '16px', color: '#1890ff' }}>
+                  🌐 {t('app.title')} - {t('language.current')}: {currentLanguage.toUpperCase()}
+                </div>
+                <div style={{ fontSize: '14px', color: '#595959' }}>
+                  {t('page.production.title')} | {t('menu.production')}
+                </div>
+              </Space>
+            </Space>
+          </Card>
+        </Col>
+      </Row>
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
         <Col span={24}>
           <Card 

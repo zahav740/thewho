@@ -1,0 +1,6 @@
+/**
+ * Тестовый файл для проверки i18n
+ */
+import { useTranslation } from '../i18n';
+
+console.log('i18n тест загружен успешно');
