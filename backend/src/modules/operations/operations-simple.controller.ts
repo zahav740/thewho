@@ -141,6 +141,52 @@ export class OperationsSimpleController {
     }
   }
 
+  @Get(':id/details')
+  @ApiOperation({ summary: 'Получить детальную информацию об операции' })
+  async getOperationDetails(@Param('id') operationId: string) {
+    try {
+      console.log('OperationsSimpleController.getOperationDetails: Получение деталей операции:', operationId);
+
+      const query = `
+        SELECT 
+          op.id,
+          op."operationNumber",
+          op."machineId",
+          op.operationtype, 
+          op."estimatedTime",
+          op.status,
+          op."orderId",
+          op.machineaxes,
+          op."createdAt",
+          op."updatedAt",
+          ord.drawing_number,
+          ord.quantity,
+          ord.priority,
+          ord.deadline,
+          ord."workType"
+        FROM operations op
+        LEFT JOIN orders ord ON op."orderId" = ord.id
+        WHERE op.id = $1
+      `;
+
+      const operation = await this.dataSource.query(query, [parseInt(operationId)]);
+
+      if (operation.length === 0) {
+        return {
+          success: false,
+          message: 'Операция не найдена',
+          operation: null
+        };
+      }
+
+      console.log(`OperationsSimpleController.getOperationDetails: Найдена операция:`, operation[0]);
+      return operation[0];
+    } catch (error) {
+      console.error('OperationsSimpleController.getOperationDetails: Ошибка:', error);
+      throw error;
+    }
+  }
+
   @Get()
   @ApiOperation({ summary: 'Получить все операции' })
   async findAll(

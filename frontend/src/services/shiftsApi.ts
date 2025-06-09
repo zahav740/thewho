@@ -61,4 +61,10 @@ export const shiftsApi = {
     const response = await api.get(`/shifts/by-operator/${operator}`);
     return response.data;
   },
+
+  // 🆕 Получить смены по станку
+  getByMachine: async (machineId: number): Promise<ShiftRecord[]> => {
+    const response = await api.get(`/shifts/machine/${machineId}`);
+    return response.data;
+  },
 };

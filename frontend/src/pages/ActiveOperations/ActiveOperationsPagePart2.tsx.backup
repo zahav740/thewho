@@ -1,0 +1,239 @@
+                      <Card
+                        size="small"
+                        hoverable
+                        onClick={() => handleOperationClick(machine)}
+                        style={{
+                          borderRadius: '12px',
+                          borderColor: getPriorityColor(priorityNum),
+                          backgroundColor: priorityNum === 1 ? '#fff2f0' : priorityNum === 2 ? '#fff7e6' : '#f6ffed',
+                          cursor: 'pointer',
+                          transition: 'all 0.3s ease',
+                          position: 'relative',
+                          overflow: 'hidden'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                          e.currentTarget.style.boxShadow = `0 8px 16px ${getPriorityColor(priorityNum)}30`;
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = 'translateY(0)';
+                          e.currentTarget.style.boxShadow = '';
+                        }}
+                        title={
+                          <Space style={{ width: '100%', justifyContent: 'space-between' }}>
+                            <Space>
+                              <ToolOutlined style={{ color: getPriorityColor(priorityNum) }} />
+                              <span style={{ color: getPriorityColor(priorityNum), fontWeight: 'bold' }}>
+                                {machine.machineName}
+                              </span>
+                            </Space>
+                            <Tooltip title="Открыть детальную аналитику">
+                              <EyeOutlined style={{ color: '#1890ff', fontSize: '12px' }} />
+                            </Tooltip>
+                          </Space>
+                        }
+                      >
+                        {/* Полоска приоритета */}
+                        <div style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          height: '3px',
+                          backgroundColor: getPriorityColor(priorityNum)
+                        }} />
+
+                        {machine.currentOperationDetails ? (
+                          <>
+                            <div style={{ marginBottom: '12px' }}>
+                              <Space wrap>
+                                <Tag color="blue" style={{ borderRadius: '12px' }}>
+                                  📋 #{machine.currentOperationDetails.operationNumber}
+                                </Tag>
+                                <Tag color="green" style={{ borderRadius: '12px', fontSize: '11px' }}>
+                                  {machine.currentOperationDetails.operationType}
+                                </Tag>
+                              </Space>
+                            </div>
+                            
+                            <div style={{ marginBottom: '12px' }}>
+                              <Text strong style={{ display: 'block', marginBottom: '4px', fontSize: '13px' }}>
+                                📄 {machine.currentOperationDetails.orderDrawingNumber}
+                              </Text>
+                              <Space style={{ width: '100%', justifyContent: 'space-between' }}>
+                                <Text type="secondary" style={{ fontSize: '11px' }}>
+                                  ⏱️ {formatEstimatedTime(machine.currentOperationDetails.estimatedTime)}
+                                </Text>
+                                <Text style={{ fontSize: '11px', color: deadline.color, fontWeight: 'bold' }}>
+                                  📅 {deadline.text}
+                                </Text>
+                              </Space>
+                            </div>
+
+                            {/* Прогресс выполнения */}
+                            {machine.currentOperationDetails.orderQuantity && (
+                              <div style={{ marginBottom: '12px' }}>
+                                <div style={{ marginBottom: '4px' }}>
+                                  <Text style={{ fontSize: '11px' }}>
+                                    📦 Выполнено: {machine.currentOperationDetails.producedQuantity || 0} / {machine.currentOperationDetails.orderQuantity}
+                                  </Text>
+                                </div>
+                                <Progress 
+                                  percent={Math.round(((machine.currentOperationDetails.producedQuantity || 0) / machine.currentOperationDetails.orderQuantity) * 100)}
+                                  size="small"
+                                  strokeColor={getPriorityColor(priorityNum)}
+                                  showInfo={false}
+                                />
+                              </div>
+                            )}
+                            
+                            {machine.lastFreedAt && (
+                              <div style={{ marginBottom: '12px' }}>
+                                <Text type="secondary" style={{ fontSize: '10px' }}>
+                                  🕒 Начато: {new Date(machine.lastFreedAt).toLocaleString('ru-RU')}
+                                </Text>
+                              </div>
+                            )}
+                            
+                            <div style={{ 
+                              padding: '8px', 
+                              backgroundColor: '#f0f9ff', 
+                              borderRadius: '6px',
+                              border: '1px dashed #1890ff',
+                              textAlign: 'center'
+                            }}>
+                              <Text style={{ fontSize: '11px', color: '#1890ff', fontWeight: 'bold' }}>
+                                <BarChartOutlined style={{ marginRight: '4px' }} />
+                                Полная аналитика операции
+                              </Text>
+                            </div>
+                          </>
+                        ) : (
+                          <div>
+                            <Tag color="orange" style={{ borderRadius: '12px' }}>
+                              Операция {machine.currentOperationId}
+                            </Tag>
+                            <div style={{ marginTop: '8px' }}>
+                              <Text type="secondary" style={{ fontSize: '12px' }}>
+                                Загрузка деталей...
+                              </Text>
+                            </div>
+                            
+                            <div style={{ 
+                              marginTop: '12px', 
+                              padding: '8px', 
+                              backgroundColor: '#f0f9ff', 
+                              borderRadius: '6px',
+                              border: '1px dashed #1890ff',
+                              textAlign: 'center'
+                            }}>
+                              <Text style={{ fontSize: '11px', color: '#1890ff' }}>
+                                <BarChartOutlined style={{ marginRight: '4px' }} />
+                                Открыть аналитику
+                              </Text>
+                            </div>
+                          </div>
+                        )}
+                      </Card>
+                    </Col>
+                  );
+                })}
+              </Row>
+            </Card>
+          );
+        })}
+
+      {/* Если нет активных операций */}
+      {activeOperations.length === 0 && (
+        <Card 
+          title={
+            <Space>
+              <PlayCircleOutlined style={{ color: '#52c41a' }} />
+              <span style={{ color: '#52c41a', fontWeight: 'bold' }}>
+                Активные операции
+              </span>
+            </Space>
+          }
+          style={{ marginBottom: '24px', borderRadius: '12px' }}
+        >
+          <Empty
+            image={Empty.PRESENTED_IMAGE_SIMPLE}
+            description={
+              <div>
+                <Text type="secondary" style={{ fontSize: '16px' }}>
+                  Нет активных операций
+                </Text>
+                <div style={{ marginTop: '8px' }}>
+                  <Text type="secondary" style={{ fontSize: '14px' }}>
+                    Все станки свободны и готовы к работе
+                  </Text>
+                </div>
+              </div>
+            }
+          />
+        </Card>
+      )}
+
+      {/* Занятые станки без операций */}
+      {occupiedMachines.filter(m => !m.currentOperationDetails && !m.currentOperationId).length > 0 && (
+        <Card 
+          title={
+            <Space>
+              <ToolOutlined style={{ color: '#faad14' }} />
+              <span style={{ color: '#faad14', fontWeight: 'bold' }}>
+                Станки требующие внимания
+              </span>
+            </Space>
+          }
+          style={{ marginBottom: '24px', borderRadius: '12px' }}
+        >
+          <Alert
+            message="⚠️ Внимание"
+            description="Эти станки помечены как занятые, но не имеют назначенных операций. Требуется ручная проверка."
+            type="warning"
+            showIcon
+            style={{ marginBottom: '16px' }}
+          />
+          
+          <Row gutter={[16, 16]}>
+            {occupiedMachines
+              .filter(m => !m.currentOperationDetails && !m.currentOperationId)
+              .map((machine) => (
+                <Col key={machine.id} xs={24} sm={12} lg={8}>
+                  <Card
+                    size="small"
+                    hoverable
+                    onClick={() => handleOperationClick(machine)}
+                    style={{
+                      borderRadius: '8px',
+                      borderColor: '#faad14',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <Space style={{ width: '100%', justifyContent: 'space-between' }}>
+                      <Space>
+                        <ToolOutlined style={{ color: '#faad14' }} />
+                        <Text strong>{machine.machineName}</Text>
+                      </Space>
+                      <Space>
+                        <Tag color="orange">Занят</Tag>
+                        <EyeOutlined style={{ color: '#1890ff', fontSize: '12px' }} />
+                      </Space>
+                    </Space>
+                  </Card>
+                </Col>
+              ))
+            }
+          </Row>
+        </Card>
+      )}
+
+      {/* Модальное окно аналитики */}
+      <EnhancedOperationAnalyticsModal
+        visible={analyticsModalVisible}
+        onClose={handleAnalyticsModalClose}
+        machine={selectedMachine}
+      />
+    </div>
+  );
+};

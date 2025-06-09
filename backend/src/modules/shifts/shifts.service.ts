@@ -250,4 +250,17 @@ export class ShiftsService {
     
     return this.normalizeShiftRecords(records);
   }
+
+  async getShiftsByMachine(machineId: number): Promise<any[]> {
+    const records = await this.shiftRecordRepository
+      .createQueryBuilder('shift')
+      .leftJoinAndSelect('shift.machine', 'machine')
+      .leftJoinAndSelect('shift.operation', 'operation')
+      .leftJoinAndSelect('operation.order', 'order')
+      .where('shift.machineId = :machineId', { machineId })
+      .orderBy('shift.date', 'DESC')
+      .getMany();
+    
+    return this.normalizeShiftRecords(records);
+  }
 }

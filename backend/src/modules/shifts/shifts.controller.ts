@@ -168,4 +168,16 @@ export class ShiftsController {
       throw error;
     }
   }
+
+  @Get('machine/:machineId')
+  @ApiOperation({ summary: 'Получить смены по станку' })
+  async getByMachine(@Param('machineId') machineId: string): Promise<ShiftRecord[]> {
+    try {
+      this.logger.log(`Получение смен по станку: ${machineId}`);
+      return await this.shiftsService.getShiftsByMachine(+machineId);
+    } catch (error) {
+      this.logger.error(`Ошибка при получении смен по станку ${machineId}: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
 }
