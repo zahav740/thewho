@@ -282,8 +282,6 @@ export const OrderForm: React.FC<OrderFormProps> = ({
             >
               <Option value={OperationType.MILLING}>Фрезерная</Option>
               <Option value={OperationType.TURNING}>Токарная</Option>
-              <Option value={OperationType.DRILLING}>Сверление</Option>
-              <Option value={OperationType.GRINDING}>Шлифовка</Option>
             </Select>
           )}
         />

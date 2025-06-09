@@ -8,6 +8,7 @@
 import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { MulterModule } from '@nestjs/platform-express';
 import { MachinesModule } from './modules/machines/machines.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { OperationsModule } from './modules/operations/operations.module';
@@ -25,6 +26,14 @@ import { OrdersDataMiddleware } from './modules/orders/orders.middleware';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+    }),
+    MulterModule.register({
+      // Глобальная конфигурация Multer для обработки файлов
+      // НЕ сохраняем файлы на диск - работаем только с buffer в памяти
+      limits: {
+        fileSize: 100 * 1024 * 1024, // 100MB максимум
+        files: 10, // максимум 10 файлов за раз
+      },
     }),
     TypeOrmModule.forRoot({
       type: 'postgres',

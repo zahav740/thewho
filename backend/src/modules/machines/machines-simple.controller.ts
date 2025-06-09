@@ -8,6 +8,8 @@ import {
   Controller,
   Get,
   Put,
+  Post,
+  Delete,
   Body,
   Param,
 } from '@nestjs/common';
@@ -84,6 +86,35 @@ export class MachinesSimpleController {
       return [];
     } catch (error) {
       console.error('MachinesSimpleController.getSuggestedOperations: Ошибка:', error);
+      throw error;
+    }
+  }
+
+  @Post(':machineName/assign-operation')
+  @ApiOperation({ summary: 'Назначить операцию на станок' })
+  async assignOperation(
+    @Param('machineName') machineName: string,
+    @Body() body: { operationId: string },
+  ): Promise<MachineAvailabilityDto> {
+    try {
+      console.log('MachinesSimpleController.assignOperation: Назначение операции для станка:', machineName, 'операция:', body.operationId);
+      return await this.machineAvailabilityService.assignOperation(machineName, body.operationId);
+    } catch (error) {
+      console.error('MachinesSimpleController.assignOperation: Ошибка:', error);
+      throw error;
+    }
+  }
+
+  @Delete(':machineName/assign-operation')
+  @ApiOperation({ summary: 'Отменить назначение операции на станок' })
+  async unassignOperation(
+    @Param('machineName') machineName: string,
+  ): Promise<MachineAvailabilityDto> {
+    try {
+      console.log('MachinesSimpleController.unassignOperation: Отмена операции для станка:', machineName);
+      return await this.machineAvailabilityService.unassignOperation(machineName);
+    } catch (error) {
+      console.error('MachinesSimpleController.unassignOperation: Ошибка:', error);
       throw error;
     }
   }

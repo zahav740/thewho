@@ -88,6 +88,17 @@ export const machinesApi = {
     }
   },
 
+  // Отменить назначение операции на станок
+  unassignOperation: async (machineName: string): Promise<MachineAvailability> => {
+    try {
+      const response = await api.delete(`/machines/${encodeURIComponent(machineName)}/assign-operation`);
+      return response.data;
+    } catch (error) {
+      console.error('machinesApi.unassignOperation error:', error);
+      throw error;
+    }
+  },
+
   // Legacy методы для обратной совместимости
   legacy: {
     // Получить все станки (legacy)
@@ -199,6 +210,17 @@ export const operationsApi = {
       return response.data;
     } catch (error) {
       console.error('operationsApi.getOperationsByMachine error:', error);
+      throw error;
+    }
+  },
+
+  // Отменить назначение операции
+  unassignOperation: async (operationId: string): Promise<any> => {
+    try {
+      const response = await api.put(`/operations/${operationId}/unassign`);
+      return response.data;
+    } catch (error) {
+      console.error('operationsApi.unassignOperation error:', error);
       throw error;
     }
   },

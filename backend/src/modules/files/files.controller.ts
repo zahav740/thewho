@@ -1,8 +1,9 @@
 /**
- * @file: files.controller.ts
- * @description: Контроллер для работы с файлами
+ * @file: files.controller.ts 
+ * @description: ИСПРАВЛЕННЫЙ контроллер для работы с файлами
  * @dependencies: files.service
  * @created: 2025-01-28
+ * @updated: 2025-06-09 // ИСПРАВЛЕНО: multer buffer конфигурация
  */
 import {
   Controller,
@@ -44,6 +45,81 @@ export class FilesController {
     };
   }
 
+  @Post('excel/parse')
+  @ApiOperation({ summary: 'ИСПРАВЛЕНО: Парсинг Excel файла с buffer' })
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FileInterceptor('file', {
+    // ✅ ИСПРАВЛЕНО: НЕ указываем storage - используем MemoryStorage по умолчанию
+    // ✅ ИСПРАВЛЕНО: Это заставляет multer сохранять файл в buffer вместо диска
+    fileFilter: (req, file, cb) => {
+      console.log('🔍 ИСПРАВЛЕННЫЙ FileInterceptor проверка:', {
+        originalname: file.originalname,
+        mimetype: file.mimetype,
+        size: file.size,
+        hasFieldname: !!file.fieldname
+      });
+      
+      const allowedTypes = [
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+        'application/vnd.ms-excel', // .xls
+        'application/octet-stream' // некоторые браузеры отправляют этот MIME type
+      ];
+      
+      const isValidType = allowedTypes.includes(file.mimetype) || file.originalname.match(/\.(xlsx?|csv)$/);
+      
+      if (isValidType) {
+        console.log('✅ ИСПРАВЛЕНО: Файл прошел проверку, будет сохранен в buffer');
+        cb(null, true);
+      } else {
+        console.error('❌ Недопустимый тип файла:', file.mimetype);
+        cb(new Error('Только Excel файлы (.xlsx, .xls) разрешены'), false);
+      }
+    },
+    limits: {
+      fileSize: 50 * 1024 * 1024, // 50MB максимум
+      fieldSize: 50 * 1024 * 1024, // ✅ ИСПРАВЛЕНО: Добавляем лимит поля
+    },
+  }))
+  async parseExcel(@UploadedFile() file: Express.Multer.File) {
+    console.log('📁 ИСПРАВЛЕННЫЙ FILES CONTROLLER: Получен файл:', {
+      originalname: file?.originalname,
+      size: file?.size,
+      mimetype: file?.mimetype,
+      hasBuffer: !!file?.buffer,
+      bufferSize: file?.buffer?.length,
+      fieldname: file?.fieldname
+    });
+    
+    // ✅ ИСПРАВЛЕНО: Более детальная проверка файла
+    if (!file) {
+      console.error('❌ ИСПРАВЛЕННЫЙ: Файл вообще не получен!');
+      throw new Error('Файл не получен контроллером');
+    }
+    
+    if (!file.buffer) {
+      console.error('❌ ИСПРАВЛЕННЫЙ: Файл получен, но buffer отсутствует!');
+      console.error('📊 Детали файла:', {
+        originalname: file.originalname,
+        size: file.size,
+        mimetype: file.mimetype,
+        fieldname: file.fieldname,
+        encoding: file.encoding,
+        hasPath: !!file.path,
+        hasDestination: !!file.destination
+      });
+      throw new Error('Файл получен без buffer - проблема конфигурации multer');
+    }
+    
+    if (file.buffer.length === 0) {
+      console.error('❌ ИСПРАВЛЕННЫЙ: Buffer пустой!');
+      throw new Error('Получен пустой файл');
+    }
+    
+    console.log('✅ ИСПРАВЛЕННЫЙ: Файл прошел все проверки, передаем в сервис');
+    
+    return this.filesService.parseExcel(file);
+  }
+
   @Get(':filename')
   @ApiOperation({ summary: 'Получить файл' })
   @ApiQuery({ name: 'folder', required: false })
@@ -54,7 +130,6 @@ export class FilesController {
   ): Promise<StreamableFile> {
     const buffer = await this.filesService.getFile(filename, folder);
     
-    // Определяем MIME-тип по расширению
     const extension = filename.split('.').pop()?.toLowerCase();
     let contentType = 'application/octet-stream';
     
@@ -92,14 +167,6 @@ export class FilesController {
   ) {
     await this.filesService.deleteFile(filename, folder);
     return { message: 'Файл успешно удален' };
-  }
-
-  @Post('excel/parse')
-  @ApiOperation({ summary: 'Парсинг Excel файла' })
-  @ApiConsumes('multipart/form-data')
-  @UseInterceptors(FileInterceptor('file'))
-  async parseExcel(@UploadedFile() file: Express.Multer.File) {
-    return this.filesService.parseExcel(file);
   }
 
   @Post('pdf/preview')

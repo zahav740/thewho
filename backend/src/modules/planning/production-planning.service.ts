@@ -323,31 +323,25 @@ export class ProductionPlanningService {
         
         let isCompatible = false;
         
-        // Логика сопоставления согласно обновленному алгоритму
+        // Логика сопоставления (ТОЛЬКО 3 ТИПА ОПЕРАЦИЙ)
         if (operation.operationType === 'TURNING') {
-          isCompatible = machine.type === 'TURNING'; // Okuma, JohnFord
+          // Только токарные станки (Okuma, JohnFord)
+          isCompatible = machine.type === 'TURNING';
           this.logger.log(`TURNING операция: совместим = ${isCompatible}`);
         } else if (operation.operationType === 'MILLING') {
           // Для фрезерных операций:
           if (operation.machineAxes === 4) {
-            // 4-осевые операции могут выполнять только 4-осевые станки
+            // 4-осевые операции только на 4+ осевых фрезерных станках
             isCompatible = machine.type === 'MILLING' && machine.axes >= 4;
             this.logger.log(`MILLING 4-осевая операция: совместим = ${isCompatible}`);
           } else {
-            // 3-осевые операции могут выполнять все фрезерные станки (и 3-осевые и 4-осевые)
+            // 3-осевые операции на любых фрезерных станках (3 или 4+ оси)
             isCompatible = machine.type === 'MILLING';
             this.logger.log(`MILLING 3-осевая операция: совместим = ${isCompatible}`);
           }
-        } else if (operation.operationType === 'DRILLING') {
-          // Сверление может выполняться на фрезерных станках
-          isCompatible = machine.type === 'MILLING';
-          this.logger.log(`DRILLING операция: совместим = ${isCompatible}`);
-        } else if (operation.operationType === 'GRINDING') {
-          // Шлифовка - специальная операция, может выполняться на любых станках
-          isCompatible = true; // Любой доступный станок
-          this.logger.log(`GRINDING операция: совместим = ${isCompatible}`);
         } else {
-          this.logger.warn(`Неизвестный тип операции: ${operation.operationType}`);
+          this.logger.warn(`Неподдерживаемый тип операции: ${operation.operationType}. Поддерживаются только: TURNING, MILLING (3-осевая), MILLING (4-осевая)`);
+          isCompatible = false;
         }
         
         return isCompatible;

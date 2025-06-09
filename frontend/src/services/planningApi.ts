@@ -3,6 +3,7 @@
  * @description: API для работы с планированием производства
  * @dependencies: api
  * @created: 2025-05-28
+ * @updated: 2025-06-08 - Исправлено дублирование и типы
  */
 import api from './api';
 import axios from 'axios';
@@ -52,9 +53,36 @@ export interface DemoResult {
   result: PlanningResult;
 }
 
-// Добавляем API для назначения операций
+// API для работы с планированием
 export const planningApi = {
-  // Запуск планирования производства
+  // 🆕 УЛУЧШЕННОЕ планирование производства
+  planProductionImproved: async (request: PlanningRequest): Promise<any> => {
+    const response = await planningApiInstance.post('/planning-improved/plan', request);
+    return response.data;
+  },
+
+  // 🆕 ДЕМО улучшенного планирования
+  demoImprovedPlanning: async (): Promise<any> => {
+    const response = await planningApiInstance.post('/planning-improved/demo');
+    return response.data;
+  },
+
+  // 📊 Анализ состояния системы
+  getSystemAnalysis: async () => {
+    const response = await planningApiInstance.get('/planning-improved/analysis');
+    return response.data;
+  },
+
+  // 🎯 Назначить операцию на станок (ИСПРАВЛЕНО - правильные типы)
+  assignOperation: async (operationId: string, machineId: string) => {
+    const response = await planningApiInstance.post('/planning/assign-operation', {
+      operationId: parseInt(operationId), // Преобразуем в number для backend
+      machineId: parseInt(machineId) // Преобразуем в number для backend
+    });
+    return response.data;
+  },
+
+  // Запуск планирования производства (оригинальный)
   planProduction: async (request: PlanningRequest): Promise<PlanningResult> => {
     const response = await planningApiInstance.post('/planning/plan', request);
     return response.data;
@@ -63,15 +91,6 @@ export const planningApi = {
   // Планирование с доступными станками (бывшее демо)
   demoPlanning: async (): Promise<DemoResult> => {
     const response = await planningApiInstance.post('/planning/demo');
-    return response.data;
-  },
-
-  // Назначить операцию на станок
-  assignOperation: async (operationId: number, machineId: number) => {
-    const response = await planningApiInstance.post('/planning/assign-operation', {
-      operationId,
-      machineId
-    });
     return response.data;
   },
 

@@ -120,6 +120,120 @@ export class OrdersController {
     }
   }
 
+  @Post('upload-excel')
+  @ApiOperation({ summary: 'ПРОДАКШЕН: Загрузить и обработать РЕАЛЬНЫЙ Excel файл (с buffer)' })
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FileInterceptor('excel', {
+    // НЕ сохраняем на диск - работаем с buffer напрямую
+    fileFilter: (req, file, cb) => {
+      console.log('🔍 Проверка реального файла:', {
+        originalname: file.originalname,
+        mimetype: file.mimetype,
+        size: file.size
+      });
+      
+      const allowedTypes = [
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+        'application/vnd.ms-excel', // .xls
+        'application/octet-stream' // некоторые браузеры отправляют этот MIME type
+      ];
+      
+      const isValidType = allowedTypes.includes(file.mimetype) || file.originalname.match(/\.(xlsx?|csv)$/);
+      
+      if (isValidType) {
+        console.log('✅ Файл прошел проверку');
+        cb(null, true);
+      } else {
+        console.error('❌ Недопустимый тип файла:', file.mimetype);
+        cb(new Error('ПРОДАКШЕН: Только Excel файлы (.xlsx, .xls) разрешены'), false);
+      }
+    },
+    limits: {
+      fileSize: 50 * 1024 * 1024, // 50MB максимум
+    },
+  }))
+  async uploadExcel(
+    @UploadedFile() file: Express.Multer.File,
+    @Body() body: any,
+  ) {
+    try {
+      console.log('📁 ПРОДАКШЕН: Получен РЕАЛЬНЫЙ Excel файл (с buffer):', {
+        originalname: file.originalname,
+        size: file.size,
+        mimetype: file.mimetype,
+        hasBuffer: !!file.buffer,
+        bufferSize: file.buffer?.length,
+        body: body
+      });
+
+      // Проверяем, что файл действительно существует и есть buffer
+      if (!file || !file.buffer) {
+        console.error('❌ Отсутствует file.buffer!');
+        throw new Error('ПУСТОЙ ИЛИ НЕКОРРЕКТНЫЙ ФАЙЛ - нет buffer');
+      }
+
+      if (file.buffer.length === 0) {
+        console.error('❌ Пустой buffer!');
+        throw new Error('ПУСТОЙ ФАЙЛ - buffer пустой');
+      }
+
+      console.log('✅ Файл прошел проверку, buffer доступен:', file.buffer.length, 'байт');
+
+      // Парсим фильтры цветов из запроса
+      let colorFilters: string[] = [];
+      if (body.colorFilters) {
+        try {
+          colorFilters = JSON.parse(body.colorFilters);
+          console.log('🎨 Применяем цветовые фильтры:', colorFilters);
+        } catch {
+          console.log('⚠️ Не удалось распарсить цветовые фильтры');
+        }
+      }
+
+      // Используем существующий сервис импорта для обработки РЕАЛЬНЫХ данных
+      console.log('🔄 Начинаем обработку реального Excel файла с buffer...');
+      const result = await this.excelImportService.importOrders(file, colorFilters);
+      
+      console.log('✅ ПРОДАКШЕН: Импорт реальных данных завершен:', {
+        created: result.created,
+        updated: result.updated,
+        errors: result.errors?.length || 0,
+        firstErrorExample: result.errors?.[0] || 'Нет ошибок'
+      });
+
+      return {
+        success: true,
+        message: 'ПРОДАКШЕН: Реальный Excel файл успешно обработан',
+        data: {
+          created: result.created,
+          updated: result.updated,
+          totalRows: result.created + result.updated + result.errors.length,
+          importedRows: result.created + result.updated,
+          skippedRows: result.errors.length,
+          errors: result.errors
+        },
+        file: {
+          originalname: file.originalname,
+          size: file.size,
+          realFile: true, // Подтверждаем, что это реальный файл
+          bufferProcessed: true // Подтверждаем, что обработали buffer
+        }
+      };
+    } catch (error) {
+      console.error('❌ ПРОДАКШЕН: Ошибка при импорте реального Excel:', error);
+      return {
+        success: false,
+        error: 'ПРОДАКШЕН: Ошибка при обработке реального Excel файла',
+        message: error.message,
+        details: {
+          hasFile: !!file,
+          hasBuffer: !!file?.buffer,
+          bufferSize: file?.buffer?.length || 0
+        }
+      };
+    }
+  }
+
   // Новый эндпоинт для улучшенного импорта Excel
   /*
   @Post('upload-excel')
@@ -147,7 +261,7 @@ export class OrdersController {
   }
 
   @Post(':id/upload-pdf')
-  @ApiOperation({ summary: 'Загрузить PDF файл для заказа' })
+  @ApiOperation({ summary: 'ПРОДАКШЕН: Загрузить PDF файл для заказа' })
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(
     FileInterceptor('file', {
@@ -159,11 +273,22 @@ export class OrdersController {
         },
       }),
       fileFilter: (req, file, cb) => {
+        console.log('📄 Проверка PDF файла:', {
+          originalname: file.originalname,
+          mimetype: file.mimetype,
+          size: file.size
+        });
+        
         if (file.mimetype === 'application/pdf') {
+          console.log('✅ PDF файл прошел проверку');
           cb(null, true);
         } else {
-          cb(new Error('Only PDF files are allowed'), false);
+          console.error('❌ Недопустимый тип файла для PDF:', file.mimetype);
+          cb(new Error('ПРОДАКШЕН: Только PDF файлы разрешены'), false);
         }
+      },
+      limits: {
+        fileSize: 100 * 1024 * 1024, // 100MB максимум для PDF
       },
     }),
   )
@@ -171,7 +296,26 @@ export class OrdersController {
     @Param('id') id: string,
     @UploadedFile() file: Express.Multer.File,
   ): Promise<Order> {
-    return this.ordersService.uploadPdf(id, file.filename);
+    try {
+      console.log(`📁 ПРОДАКШЕН: Загрузка PDF для заказа ${id}:`, {
+        originalname: file.originalname,
+        filename: file.filename,
+        size: file.size,
+        path: file.path
+      });
+      
+      if (!file || !file.filename) {
+        throw new Error('Ошибка сохранения PDF файла');
+      }
+      
+      const result = await this.ordersService.uploadPdf(id, file.filename);
+      console.log(`✅ PDF успешно загружен для заказа ${id}`);
+      
+      return result;
+    } catch (error) {
+      console.error(`❌ Ошибка загрузки PDF для заказа ${id}:`, error);
+      throw error;
+    }
   }
 
   @Get(':id/pdf')

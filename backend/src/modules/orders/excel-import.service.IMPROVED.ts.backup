@@ -1,0 +1,75 @@
+      } catch (error) {
+        console.error(`❌ Ошибка сохранения заказа ${orderData.drawingNumber}:`, error.message);
+        result.errors.push({
+          order: orderData.drawingNumber,
+          error: error.message,
+        });
+      }
+    }
+
+    console.log('🎉 ИМПОРТ ЗАВЕРШЕН:', {
+      created: result.created,
+      updated: result.updated,
+      errors: result.errors.length,
+      totalProcessed: result.totalProcessed,
+      skippedRows: result.skippedRows,
+      actualRowsInFile: result.actualRowsInFile
+    });
+
+    return result;
+  }
+
+  private async createNewOrder(orderData: ParsedOrder): Promise<void> {
+    // Создаем заказ
+    const order = this.orderRepository.create({
+      drawingNumber: orderData.drawingNumber,
+      quantity: orderData.quantity,
+      remainingQuantity: orderData.quantity,
+      deadline: orderData.deadline,
+      priority: orderData.priority,
+      workType: orderData.workType,
+      status: 'planned',
+    });
+
+    const savedOrder = await this.orderRepository.save(order);
+
+    // Создаем операции для заказа
+    for (const opData of orderData.operations) {
+      const operation = this.operationRepository.create({
+        operationNumber: opData.operationNumber,
+        operationType: opData.operationType,
+        estimatedTime: opData.estimatedTime,
+        machineAxes: opData.machineAxes,
+        status: 'PENDING',
+        order: savedOrder,
+      });
+      await this.operationRepository.save(operation);
+    }
+  }
+
+  private async updateExistingOrder(existingOrder: Order, orderData: ParsedOrder): Promise<void> {
+    // Обновляем данные заказа
+    existingOrder.quantity = orderData.quantity;
+    existingOrder.remainingQuantity = orderData.quantity;
+    existingOrder.deadline = orderData.deadline;
+    existingOrder.priority = orderData.priority;
+    existingOrder.workType = orderData.workType;
+
+    await this.orderRepository.save(existingOrder);
+
+    // Удаляем старые операции и создаем новые
+    await this.operationRepository.delete({ order: { id: existingOrder.id } });
+
+    for (const opData of orderData.operations) {
+      const operation = this.operationRepository.create({
+        operationNumber: opData.operationNumber,
+        operationType: opData.operationType,
+        estimatedTime: opData.estimatedTime,
+        machineAxes: opData.machineAxes,
+        status: 'PENDING',
+        order: existingOrder,
+      });
+      await this.operationRepository.save(operation);
+    }
+  }
+}

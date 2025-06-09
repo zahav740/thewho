@@ -1,0 +1,214 @@
+import React, { useState } from 'react';
+import { Modal, Card, Typography, Row, Col, Space, Alert, Spin, Button, Tag, Steps } from 'antd';
+import { PlayCircleOutlined, CheckCircleOutlined, ToolOutlined, ClockCircleOutlined, InfoCircleOutlined } from '@ant-design/icons';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { planningApi } from '../../services/planningApi';
+import { machinesApi } from '../../services/machinesApi';
+import { MachineAvailability } from '../../types/machine.types';
+
+const { Title, Text } = Typography;
+
+interface PlanningResult {
+  selectedOrders: any[];
+  operationsQueue: any[];
+  totalTime: number;
+  calculationDate: string;
+}
+
+interface PlanningModalProps {
+  visible: boolean;
+  onCancel: () => void;
+  selectedMachine: MachineAvailability | null;
+}
+
+const PlanningModal: React.FC<PlanningModalProps> = ({ visible, onCancel, selectedMachine }) => {
+  console.log('PlanningModal render:', { visible, selectedMachine: selectedMachine?.machineName });
+  
+  const [currentStep, setCurrentStep] = useState(0);
+  const [planningResult, setPlanningResult] = useState<PlanningResult | null>(null);
+
+  const planningMutation = useMutation({
+    mutationFn: planningApi.planProduction,
+    onSuccess: (result) => {
+      setPlanningResult(result);
+      setCurrentStep(2);
+    },
+    onError: (error) => {
+      console.error('Ошибка планирования:', error);
+    },
+  });
+
+  const demoMutation = useMutation({
+    mutationFn: planningApi.demoPlanning,
+    onSuccess: (result) => {
+      setPlanningResult(result.result);
+      setCurrentStep(2);
+    },
+    onError: (error) => {
+      console.error('Ошибка демо планирования:', error);
+    },
+  });
+
+  const handleStartPlanning = () => {
+    if (!selectedMachine) return;
+    setCurrentStep(1);
+    const machineIds = [parseInt(selectedMachine.id, 10)];
+    planningMutation.mutate({ selectedMachines: machineIds, excelData: null });
+  };
+
+  const handleDemoPlanning = () => {
+    setCurrentStep(1);
+    demoMutation.mutate();
+  };
+
+  const getMachineTypeColor = (type: string) => {
+    switch (type) {
+      case 'MILLING': return '#1890ff';
+      case 'TURNING': return '#52c41a';
+      default: return '#666';
+    }
+  };
+
+  const getMachineIcon = (type: string) => {
+    switch (type) {
+      case 'TURNING': return <ToolOutlined rotate={90} />;
+      default: return <ToolOutlined />;
+    }
+  };
+
+  const steps = [
+    { title: 'Выбранный станок', description: 'Информация о станке для планирования', icon: <ToolOutlined /> },
+    { title: 'Планирование', description: 'Выполнение алгоритма планирования операций', icon: <PlayCircleOutlined /> },
+    { title: 'Результаты', description: 'Просмотр результатов планирования', icon: <CheckCircleOutlined /> },
+  ];
+
+  const handleClose = () => {
+    setCurrentStep(0);
+    setPlanningResult(null);
+    onCancel();
+  };
+
+  if (!selectedMachine) return null;
+
+  const machineTypeColor = getMachineTypeColor(selectedMachine.machineType);
+
+  return (
+    <Modal
+      title={
+        <Space>
+          <span style={{ color: machineTypeColor, fontSize: '18px' }}>
+            {getMachineIcon(selectedMachine.machineType)}
+          </span>
+          <span style={{ fontSize: '18px', fontWeight: 'bold' }}>
+            Планирование для станка "{selectedMachine.machineName}"
+          </span>
+        </Space>
+      }
+      open={visible}
+      onCancel={handleClose}
+      width={800}
+      style={{ borderRadius: '12px' }}
+      footer={null}
+    >
+      <Steps current={currentStep} items={steps} style={{ marginBottom: 32 }} size="default" />
+
+      {currentStep === 0 && (
+        <>
+          <Alert
+            message="Станок выбран для планирования"
+            description={`Станок "${selectedMachine.machineName}" отмечен как свободный и готов для планирования операций.`}
+            type="success"
+            showIcon
+            style={{ marginBottom: 24, borderRadius: '8px' }}
+          />
+
+          <Card style={{ marginBottom: 24, borderColor: machineTypeColor, borderRadius: '12px', backgroundColor: `${machineTypeColor}08` }}>
+            <Row gutter={24}>
+              <Col span={12}>
+                <Card size="small" style={{ backgroundColor: `${machineTypeColor}15`, borderColor: machineTypeColor, borderRadius: '8px', textAlign: 'center' }}>
+                  <div style={{ color: machineTypeColor, fontSize: '32px', marginBottom: '12px' }}>
+                    {getMachineIcon(selectedMachine.machineType)}
+                  </div>
+                  <Title level={4} style={{ color: machineTypeColor, marginBottom: '8px' }}>
+                    {selectedMachine.machineName}
+                  </Title>
+                  <Tag color={selectedMachine.machineType === 'MILLING' ? 'blue' : 'green'} style={{ borderRadius: '16px', padding: '4px 12px' }}>
+                    {selectedMachine.machineType === 'MILLING' ? 'Фрезерный' : 'Токарный'}
+                  </Tag>
+                </Card>
+              </Col>
+              <Col span={12}>
+                <div style={{ padding: '20px 0' }}>
+                  <div style={{ marginBottom: '16px' }}>
+                    <Text strong style={{ fontSize: '16px' }}>Статус: </Text>
+                    <Tag color="green" style={{ borderRadius: '12px' }}>
+                      <CheckCircleOutlined /> Свободен
+                    </Tag>
+                  </div>
+                  <div>
+                    <Text strong>Готов к планированию:</Text>
+                    <div style={{ marginTop: '4px' }}>
+                      <Tag color="green" style={{ borderRadius: '12px' }}>
+                        <CheckCircleOutlined /> Да
+                      </Tag>
+                    </div>
+                  </div>
+                </div>
+              </Col>
+            </Row>
+          </Card>
+
+          <div style={{ textAlign: 'center' }}>
+            <Space size="large">
+              <Button
+                type="primary"
+                size="large"
+                icon={<PlayCircleOutlined />}
+                onClick={handleStartPlanning}
+                loading={planningMutation.isPending}
+                style={{ height: '48px', fontSize: '16px', borderRadius: '8px', minWidth: '240px', backgroundColor: machineTypeColor, borderColor: machineTypeColor }}
+              >
+                Запустить планирование
+              </Button>
+              <Button
+                size="large"
+                icon={<InfoCircleOutlined />}
+                onClick={handleDemoPlanning}
+                loading={demoMutation.isPending}
+                style={{ height: '48px', fontSize: '16px', borderRadius: '8px', minWidth: '200px' }}
+              >
+                Демо планирование
+              </Button>
+            </Space>
+          </div>
+        </>
+      )}
+
+      {currentStep === 1 && (
+        <div style={{ textAlign: 'center', padding: '80px 50px' }}>
+          <Spin size="large" />
+          <div style={{ marginTop: 24 }}>
+            <Title level={3} style={{ marginBottom: '8px' }}>Выполняется планирование...</Title>
+            <Text type="secondary" style={{ fontSize: '16px' }}>
+              Анализ заказов, операций и составление оптимальной очереди для станка "{selectedMachine.machineName}"
+            </Text>
+          </div>
+        </div>
+      )}
+
+      {currentStep === 2 && planningResult && (
+        <div style={{ textAlign: 'center', padding: '40px' }}>
+          <Title level={3} style={{ color: '#52c41a' }}>✅ Планирование завершено!</Title>
+          <Text>Обработано {planningResult.selectedOrders.length} заказов, {planningResult.operationsQueue.length} операций</Text>
+          <div style={{ marginTop: 24 }}>
+            <Button type="primary" onClick={() => setCurrentStep(0)}>
+              Новое планирование
+            </Button>
+          </div>
+        </div>
+      )}
+    </Modal>
+  );
+};
+
+export default PlanningModal;

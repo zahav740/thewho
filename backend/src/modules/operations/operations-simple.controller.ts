@@ -100,6 +100,43 @@ export class OperationsSimpleController {
     }
   }
 
+  @Get('active')
+  @ApiOperation({ summary: 'Получить активные операции' })
+  async getActiveOperations() {
+    try {
+      console.log('OperationsSimpleController.getActiveOperations: Получение активных операций');
+
+      const query = `
+        SELECT 
+          op.id,
+          op."operationNumber",
+          op.operationtype as "operationType", 
+          op."estimatedTime",
+          op.status,
+          op."assignedMachine" as "machineId",
+          m.code as "machineName",
+          ord.drawing_number as "orderDrawingNumber",
+          ord.id as "orderId",
+          op."assignedAt",
+          op."createdAt",
+          op."updatedAt"
+        FROM operations op
+        INNER JOIN machines m ON op."assignedMachine" = m.id
+        LEFT JOIN orders ord ON op."orderId" = ord.id
+        WHERE op.status IN ('in_progress', 'assigned')
+        ORDER BY op."assignedAt" DESC
+      `;
+
+      const operations = await this.dataSource.query(query);
+
+      console.log(`OperationsSimpleController.getActiveOperations: Найдено ${operations.length} активных операций`);
+      return operations;
+    } catch (error) {
+      console.error('OperationsSimpleController.getActiveOperations: Ошибка:', error);
+      throw error;
+    }
+  }
+
   @Get()
   @ApiOperation({ summary: 'Получить все операции' })
   async findAll(

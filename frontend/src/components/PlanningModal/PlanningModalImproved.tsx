@@ -1,0 +1,719 @@
+/**
+ * @file: PlanningModalImproved.tsx (ИСПРАВЛЕНО)
+ * @description: УЛУЧШЕННОЕ модальное окно планирования с правильным учетом операций в работе
+ * @dependencies: antd, planningApi, MachineAvailability
+ * @created: 2025-06-08
+ * @fixed: 2025-06-09 - исправлен незакрытый тег Result
+ */
+import React, { useState } from 'react';
+import {
+  Modal,
+  Card,
+  Typography,
+  Row,
+  Col,
+  Space,
+  Alert,
+  Spin,
+  Button,
+  Tag,
+  Statistic,
+  List,
+  Steps,
+  Result,
+  Collapse,
+  message,
+} from 'antd';
+import {
+  CheckCircleOutlined,
+  ToolOutlined,
+  ClockCircleOutlined,
+  InfoCircleOutlined,
+  WarningOutlined,
+  ThunderboltOutlined,
+} from '@ant-design/icons';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { planningApi } from '../../services/planningApi';
+import { MachineAvailability } from '../../types/machine.types';
+
+const { Title, Text } = Typography;
+
+interface PlanningResult {
+  selectedOrders: any[];
+  operationsQueue: any[];
+  totalTime: number;
+  calculationDate: string;
+  warnings?: string[];
+}
+
+interface ImprovedPlanningResult {
+  success: boolean;
+  message: string;
+  result: {
+    selectedOrdersCount: number;
+    operationsQueueLength: number;
+    totalTime: number;
+    totalTimeFormatted: string;
+    calculationDate: string;
+    hasWarnings: boolean;
+    warnings: string[];
+    details: PlanningResult;
+  };
+  analysis: {
+    availableOperations: number;
+    totalEstimatedTime: number;
+    operationsByType: Record<string, number>;
+    operationsByPriority: Record<string, number>;
+  };
+}
+
+interface PlanningModalImprovedProps {
+  visible: boolean;
+  onCancel: () => void;
+  selectedMachine: MachineAvailability | null;
+}
+
+const PlanningModalImproved: React.FC<PlanningModalImprovedProps> = ({
+  visible,
+  onCancel,
+  selectedMachine,
+}) => {
+  console.log('🎯 УЛУЧШЕННОЕ планирование: PlanningModal render:', { visible, selectedMachine: selectedMachine?.machineName });
+  
+  const [currentStep, setCurrentStep] = useState(0);
+  const [planningResult, setPlanningResult] = useState<ImprovedPlanningResult | null>(null);
+  const [showResultModal, setShowResultModal] = useState(false);
+  const [selectedOperation, setSelectedOperation] = useState<any>(null);
+  const [selectedOrder, setSelectedOrder] = useState<any>(null);
+  const [showOperationModal, setShowOperationModal] = useState(false);
+  const [showAnalysis, setShowAnalysis] = useState(false);
+  const [selectedOperationForAssign, setSelectedOperationForAssign] = useState<any>(null);
+
+  console.log('🎯 Current state:', { currentStep, planningResult: !!planningResult, showResultModal });
+
+  // Загрузка анализа системы
+  const { data: systemAnalysis } = useQuery({
+    queryKey: ['system-analysis'],
+    queryFn: planningApi.getSystemAnalysis,
+    enabled: visible,
+  });
+
+  // Мутация для запуска улучшенного планирования
+  const improvedPlanningMutation = useMutation({
+    mutationFn: planningApi.planProductionImproved,
+    onSuccess: (result: any) => {
+      console.log('✅ УЛУЧШЕННОЕ планирование успешно:', result);
+      // Приводим результат к нужному формату
+      setPlanningResult(result as ImprovedPlanningResult);
+      setCurrentStep(2);
+      setShowResultModal(true);
+    },
+    onError: (error) => {
+      console.error('❌ Ошибка улучшенного планирования:', error);
+    },
+  });
+
+  // Мутация для демо улучшенного планирования
+  const demoImprovedMutation = useMutation({
+    mutationFn: planningApi.demoImprovedPlanning,
+    onSuccess: (result: any) => {
+      console.log('✅ ДЕМО улучшенного планирования успешно:', result);
+      // Приводим результат к нужному формату
+      setPlanningResult(result as ImprovedPlanningResult);
+      setCurrentStep(2);
+      setShowResultModal(true);
+    },
+    onError: (error) => {
+      console.error('❌ Ошибка демо планирования:', error);
+    },
+  });
+
+  const handleStartImprovedPlanning = () => {
+    if (!selectedMachine) return;
+
+    setCurrentStep(1);
+    const machineIds = [parseInt(selectedMachine.id, 10)];
+    improvedPlanningMutation.mutate({
+      selectedMachines: machineIds,
+      excelData: null,
+    });
+  };
+
+  const handleDemoImprovedPlanning = () => {
+    setCurrentStep(1);
+    demoImprovedMutation.mutate();
+  };
+
+  // 🆕 Мутация для назначения операции
+  const assignOperationMutation = useMutation({
+    mutationFn: ({ operationId, machineId }: { operationId: string; machineId: number }) => {
+      // Используем API из planningApi для назначения
+      return planningApi.assignOperation(operationId, machineId.toString());
+    },
+    onSuccess: (result) => {
+      console.log('✅ Операция успешно назначена:', result);
+      message.success(`Операция успешно назначена на станок ${selectedMachine?.machineName}`);
+      // Закрываем модальное окно и обновляем список станков
+      handleClose();
+      // Можно добавить обновление списка станков
+      window.location.reload(); // Простое обновление
+    },
+    onError: (error) => {
+      console.error('❌ Ошибка при назначении операции:', error);
+      message.error('Ошибка при назначении операции. Попробуйте ещё раз.');
+    },
+  });
+
+  // Функция для обработки выбора операции
+  const handleSelectOperation = (operation: any) => {
+    console.log('🎯 Выбрана операция для назначения:', operation);
+    setSelectedOperationForAssign(operation);
+    
+    // Подтверждаем назначение
+    const order = planningResult?.result.details.selectedOrders.find(o => o.id === operation.orderId);
+    const drawingNumber = order?.drawingNumber || `Заказ #${operation.orderId}`;
+    
+    Modal.confirm({
+      title: 'Подтвердите назначение операции',
+      content: (
+        <div>
+          <p><strong>Чертёж:</strong> {drawingNumber}</p>
+          <p><strong>Операция:</strong> {operation.operationNumber} ({operation.operationType})</p>
+          <p><strong>Станок:</strong> {selectedMachine?.machineName}</p>
+          <p><strong>Время:</strong> {formatTime(operation.estimatedTime)}</p>
+          <p><strong>Приоритет:</strong> {operation.priority}</p>
+        </div>
+      ),
+      okText: 'Да, назначить',
+      cancelText: 'Отмена',
+      onOk: () => {
+        if (selectedMachine) {
+          assignOperationMutation.mutate({
+            operationId: operation.operationId.toString(),
+            machineId: parseInt(selectedMachine.id)
+          });
+        }
+      },
+    });
+  };
+
+  const formatTime = (minutes: number): string => {
+    if (!minutes || minutes <= 0) return '0 мин';
+    
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+    
+    if (hours === 0) {
+      return `${remainingMinutes} мин`;
+    } else if (remainingMinutes === 0) {
+      return `${hours} ч`;
+    } else {
+      return `${hours} ч ${remainingMinutes} мин`;
+    }
+  };
+
+  const getMachineTypeColor = (type: string) => {
+    switch (type) {
+      case 'MILLING':
+        return '#1890ff';
+      case 'TURNING':
+        return '#52c41a';
+      default:
+        return '#666';
+    }
+  };
+
+  const getMachineIcon = (type: string) => {
+    switch (type) {
+      case 'TURNING':
+        return <ToolOutlined rotate={90} />;
+      default:
+        return <ToolOutlined />;
+    }
+  };
+
+  const steps = [
+    {
+      title: 'Выбранный станок',
+      description: 'Информация о станке для планирования',
+      icon: <ToolOutlined />,
+    },
+    {
+      title: 'Планирование',
+      description: 'Выполнение улучшенного алгоритма планирования',
+      icon: <ThunderboltOutlined />,
+    },
+    {
+      title: 'Результаты',
+      description: 'Просмотр результатов планирования',
+      icon: <CheckCircleOutlined />,
+    },
+  ];
+
+  const handleClose = () => {
+    setCurrentStep(0);
+    setPlanningResult(null);
+    setShowResultModal(false);
+    setSelectedOperation(null);
+    setSelectedOrder(null);
+    setShowOperationModal(false);
+    onCancel();
+  };
+
+  // Сбрасываем состояние при открытии модального окна
+  React.useEffect(() => {
+    if (visible && selectedMachine) {
+      console.log('🔄 Модальное окно открылось, сбрасываем состояние');
+      setCurrentStep(0);
+      setPlanningResult(null);
+      setShowResultModal(false);
+    }
+  }, [visible, selectedMachine]);
+
+  if (!selectedMachine) {
+    console.log('🚫 PlanningModal: No selectedMachine, returning null');
+    return null;
+  }
+
+  const machineTypeColor = getMachineTypeColor(selectedMachine.machineType);
+
+  console.log('✅ PlanningModal: Rendering modal with machine:', selectedMachine.machineName);
+
+  return (
+    <>
+      <Modal
+        title={
+          <Space>
+            <span style={{ color: '#faad14', fontSize: '20px' }}>
+              <ThunderboltOutlined />
+            </span>
+            <span style={{ fontSize: '18px', fontWeight: 'bold' }}>
+              🆕 УЛУЧШЕННОЕ планирование для станка "{selectedMachine.machineName}"
+            </span>
+          </Space>
+        }
+        open={visible}
+        onCancel={handleClose}
+        width={900}
+        style={{ borderRadius: '12px' }}
+        footer={null}
+      >
+        <Steps 
+          current={currentStep} 
+          items={steps} 
+          style={{ marginBottom: 32 }}
+          size="default"
+        />
+
+        {currentStep === 0 && (
+          <>
+            {/* Анализ системы */}
+            {systemAnalysis?.success && (
+              <Alert
+                message="🔍 Анализ системы"
+                description={
+                  <div>
+                    <p><strong>Станков доступно:</strong> {systemAnalysis.analysis.machines.available} из {systemAnalysis.analysis.machines.active}</p>
+                    <p><strong>Операций в процессе:</strong> {systemAnalysis.analysis.operations.inProgress}</p>
+                    <p><strong>Заказов с приоритетами:</strong> {systemAnalysis.analysis.orders.withPriorities}</p>
+                    {systemAnalysis.analysis.recommendations.length > 0 && (
+                      <Button 
+                        type="link" 
+                        size="small"
+                        onClick={() => setShowAnalysis(!showAnalysis)}
+                        icon={<InfoCircleOutlined />}
+                      >
+                        {showAnalysis ? 'Скрыть' : 'Показать'} рекомендации
+                      </Button>
+                    )}
+                  </div>
+                }
+                type="info"
+                showIcon
+                style={{ marginBottom: 24, borderRadius: '8px' }}
+              />
+            )}
+
+            {/* Рекомендации системы */}
+            {showAnalysis && systemAnalysis?.analysis?.recommendations && (
+              <Card title="📋 Рекомендации системы" style={{ marginBottom: 24, borderRadius: '8px' }}>
+                {systemAnalysis.analysis.recommendations.map((rec: any, index: number) => (
+                  <Alert
+                    key={index}
+                    message={rec.message}
+                    description={rec.action}
+                    type={rec.type}
+                    showIcon
+                    style={{ marginBottom: 8 }}
+                  />
+                ))}
+              </Card>
+            )}
+
+            <Alert
+              message="🆕 Улучшенный алгоритм планирования"
+              description="Новый алгоритм правильно учитывает операции в работе, проверяет доступность станков в реальном времени и предоставляет детальный анализ."
+              type="success"
+              showIcon
+              style={{ marginBottom: 24, borderRadius: '8px' }}
+            />
+
+            <div style={{ textAlign: 'center' }}>
+              <Space size="large">
+                <Button
+                  type="primary"
+                  size="large"
+                  icon={<ThunderboltOutlined />}
+                  onClick={handleStartImprovedPlanning}
+                  loading={improvedPlanningMutation.isPending}
+                  style={{ 
+                    height: '48px',
+                    fontSize: '16px',
+                    borderRadius: '8px',
+                    minWidth: '260px',
+                    backgroundColor: '#faad14',
+                    borderColor: '#faad14',
+                  }}
+                >
+                  🆕 Улучшенное планирование
+                </Button>
+
+                <Button
+                  size="large"
+                  icon={<InfoCircleOutlined />}
+                  onClick={handleDemoImprovedPlanning}
+                  loading={demoImprovedMutation.isPending}
+                  style={{ 
+                    height: '48px',
+                    fontSize: '16px',
+                    borderRadius: '8px',
+                    minWidth: '220px'
+                  }}
+                >
+                  🎯 Демо улучшенного
+                </Button>
+              </Space>
+            </div>
+          </>
+        )}
+
+        {currentStep === 1 && (
+          <div style={{ textAlign: 'center', padding: '80px 50px' }}>
+            <Spin size="large" />
+            <div style={{ marginTop: 24 }}>
+              <Title level={3} style={{ marginBottom: '8px' }}>🔄 Выполняется улучшенное планирование...</Title>
+              <Text type="secondary" style={{ fontSize: '16px' }}>
+                Анализ операций в работе, проверка доступности станков и составление оптимальной очереди
+              </Text>
+            </div>
+          </div>
+        )}
+
+        {currentStep === 2 && planningResult && (
+          <Result
+            status={planningResult.success ? "success" : "warning"}
+            title={planningResult.success ? "✅ Планирование завершено" : "⚠️ Планирование завершено с предупреждениями"}
+            subTitle={
+              planningResult.success 
+                ? `Обработано ${planningResult.result.selectedOrdersCount} заказов, ${planningResult.result.operationsQueueLength} операций`
+                : `${planningResult.result.warnings.length} предупреждений обнаружено`
+            }
+            extra={[
+              <Button 
+                type="primary" 
+                key="view"
+                size="large"
+                onClick={() => setShowResultModal(true)}
+                style={{ borderRadius: '8px', backgroundColor: '#faad14', borderColor: '#faad14' }}
+              >
+                📊 Просмотреть детали
+              </Button>,
+              <Button 
+                key="restart"
+                size="large"
+                onClick={() => setCurrentStep(0)}
+                style={{ borderRadius: '8px' }}
+              >
+                🔄 Новое планирование
+              </Button>,
+            ]}
+          >
+            {planningResult.result.hasWarnings && (
+              <Alert
+                message="⚠️ Обнаружены предупреждения"
+                description={
+                  <ul style={{ margin: 0, paddingLeft: '20px' }}>
+                    {planningResult.result.warnings.map((warning, index) => (
+                      <li key={index}>{warning}</li>
+                    ))}
+                  </ul>
+                }
+                type="warning"
+                showIcon
+                style={{ marginBottom: 24, borderRadius: '8px' }}
+              />
+            )}
+
+            <div style={{ marginBottom: 24 }}>
+              <Card style={{ borderRadius: '8px', backgroundColor: '#f6ffed' }}>
+                <Statistic
+                  title="Общее время выполнения"
+                  value={planningResult.result.totalTimeFormatted}
+                  valueStyle={{ color: '#52c41a', fontSize: '24px', fontWeight: 'bold' }}
+                  prefix={<ClockCircleOutlined style={{ color: '#52c41a' }} />}
+                />
+              </Card>
+            </div>
+          </Result>
+        )}
+      </Modal>
+
+      {/* Модальное окно с результатами */}
+      <Modal
+        title={<span style={{ fontSize: '18px', fontWeight: 'bold' }}>📊 Результаты улучшенного планирования</span>}
+        open={showResultModal}
+        onCancel={() => setShowResultModal(false)}
+        width={1000}
+        style={{ borderRadius: '12px' }}
+        footer={[
+          <Button 
+            key="close" 
+            size="large"
+            onClick={() => setShowResultModal(false)}
+            style={{ borderRadius: '8px' }}
+          >
+            Закрыть
+          </Button>
+        ]}
+      >
+        {planningResult && (
+          <div>
+            {/* Статистика */}
+            <Row gutter={24} style={{ marginBottom: 32 }}>
+              <Col span={6}>
+                <Card size="small" style={{ textAlign: 'center', borderRadius: '8px' }}>
+                  <Statistic
+                    title="Заказов"
+                    value={planningResult.result.selectedOrdersCount}
+                    prefix={<InfoCircleOutlined style={{ color: '#1890ff' }} />}
+                    valueStyle={{ color: '#1890ff' }}
+                  />
+                </Card>
+              </Col>
+              <Col span={6}>
+                <Card size="small" style={{ textAlign: 'center', borderRadius: '8px' }}>
+                  <Statistic
+                    title="Операций"
+                    value={planningResult.result.operationsQueueLength}
+                    prefix={<ToolOutlined style={{ color: '#722ed1' }} />}
+                    valueStyle={{ color: '#722ed1' }}
+                  />
+                </Card>
+              </Col>
+              <Col span={6}>
+                <Card size="small" style={{ textAlign: 'center', borderRadius: '8px' }}>
+                  <Statistic
+                    title="Общее время"
+                    value={planningResult.result.totalTimeFormatted}
+                    prefix={<ClockCircleOutlined style={{ color: '#52c41a' }} />}
+                    valueStyle={{ color: '#52c41a' }}
+                  />
+                </Card>
+              </Col>
+              <Col span={6}>
+                <Card size="small" style={{ textAlign: 'center', borderRadius: '8px' }}>
+                  <Statistic
+                    title="Статус"
+                    value={planningResult.success ? 'Успешно' : 'С предупреждениями'}
+                    prefix={planningResult.success ? <CheckCircleOutlined style={{ color: '#52c41a' }} /> : <WarningOutlined style={{ color: '#faad14' }} />}
+                    valueStyle={{ color: planningResult.success ? '#52c41a' : '#faad14' }}
+                  />
+                </Card>
+              </Col>
+            </Row>
+
+            {/* Анализ */}
+            <Collapse 
+              style={{ marginBottom: 24 }}
+              items={[
+                {
+                  key: 'analysis',
+                  label: '📈 Анализ планирования',
+                  children: (
+                    <Row gutter={16}>
+                      <Col span={12}>
+                        <Card size="small" title="По типам операций">
+                          {Object.entries(planningResult.analysis.operationsByType).map(([type, count]) => (
+                            <div key={type} style={{ marginBottom: 8 }}>
+                              <Tag color="blue">{type}</Tag>
+                              <Text strong>{count}</Text>
+                            </div>
+                          ))}
+                        </Card>
+                      </Col>
+                      <Col span={12}>
+                        <Card size="small" title="По приоритетам">
+                          {Object.entries(planningResult.analysis.operationsByPriority).map(([priority, count]) => (
+                            <div key={priority} style={{ marginBottom: 8 }}>
+                              <Tag color={priority.includes('1') ? 'red' : priority.includes('2') ? 'orange' : 'green'}>
+                                Приоритет {priority.replace('priority_', '')}
+                              </Tag>
+                              <Text strong>{count}</Text>
+                            </div>
+                          ))}
+                        </Card>
+                      </Col>
+                    </Row>
+                  )
+                }
+              ]}
+            />
+
+            {/* Очередь операций */}
+            <Title level={4} style={{ marginBottom: '20px', color: '#262626' }}>
+              📋 Очередь операций для станка "{selectedMachine.machineName}"
+            </Title>
+            
+            {planningResult.result.details.operationsQueue && planningResult.result.details.operationsQueue.length > 0 && (
+              <Alert
+                message="🎯 Кликните на операцию для назначения на станок"
+                description={`Выберите одну операцию из списка для назначения на станок ${selectedMachine.machineName}`}
+                type="info"
+                showIcon
+                style={{ marginBottom: 16, borderRadius: '8px' }}
+              />
+            )}
+            
+            {planningResult.result.details.operationsQueue && planningResult.result.details.operationsQueue.length > 0 ? (
+              <List
+                dataSource={planningResult.result.details.operationsQueue}
+                renderItem={(operation, index) => {
+                  const order = planningResult.result.details.selectedOrders.find(o => o.id === operation.orderId);
+                  const drawingNumber = order?.drawingNumber || `Заказ #${operation.orderId}`;
+                  
+                  return (
+                    <List.Item 
+                      key={`operation-${operation.operationId}-${index}`}
+                      style={{ 
+                        padding: '20px',
+                        borderRadius: '12px',
+                        marginBottom: '12px',
+                        border: selectedOperationForAssign?.operationId === operation.operationId ? '2px solid #faad14' : '1px solid #f0f0f0',
+                        background: selectedOperationForAssign?.operationId === operation.operationId 
+                          ? 'linear-gradient(135deg, #fff7e6 0%, #fffbe6 100%)' 
+                          : 'linear-gradient(135deg, #fff 0%, #fafafa 100%)',
+                        boxShadow: selectedOperationForAssign?.operationId === operation.operationId 
+                          ? '0 4px 16px rgba(250, 173, 20, 0.3)' 
+                          : '0 2px 8px rgba(0, 0, 0, 0.04)',
+                        cursor: 'pointer',
+                        transition: 'all 0.3s ease'
+                      }}
+                      onClick={() => handleSelectOperation(operation)}
+                      onMouseEnter={(e) => {
+                        if (selectedOperationForAssign?.operationId !== operation.operationId) {
+                          e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)';
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (selectedOperationForAssign?.operationId !== operation.operationId) {
+                          e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.04)';
+                          e.currentTarget.style.transform = 'translateY(0)';
+                        }
+                      }}
+                    >
+                      <List.Item.Meta
+                        avatar={
+                          <div style={{
+                            width: '40px',
+                            height: '40px',
+                            borderRadius: '20px',
+                            background: 'linear-gradient(135deg, #faad14 0%, #fa8c16 100%)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: 'white',
+                            fontWeight: 'bold',
+                            fontSize: '16px'
+                          }}>
+                            {index + 1}
+                          </div>
+                        }
+                        title={
+                          <Space wrap>
+                            <span style={{ fontWeight: 'bold', fontSize: '16px', color: '#262626' }}>
+                              Чертеж {drawingNumber}
+                            </span>
+                            <Tag 
+                              color="blue" 
+                              style={{ 
+                                borderRadius: '16px',
+                                padding: '4px 12px',
+                                fontSize: '12px',
+                                fontWeight: '500'
+                              }}
+                            >
+                              Операция {operation.operationNumber || operation.operationId}
+                            </Tag>
+                          </Space>
+                        }
+                        description={
+                          <div style={{ marginTop: '8px' }}>
+                            <Space wrap size={[8, 8]}>
+                              <Tag color="green" style={{ borderRadius: '16px', padding: '4px 12px', fontSize: '12px' }}>
+                                🎯 Приоритет {operation.priority}
+                              </Tag>
+                              <Tag color="orange" style={{ borderRadius: '16px', padding: '4px 12px', fontSize: '12px' }}>
+                                ⏱️ {formatTime(operation.estimatedTime)}
+                              </Tag>
+                              <Tag color="purple" style={{ borderRadius: '16px', padding: '4px 12px', fontSize: '12px' }}>
+                                🏭 {selectedMachine.machineName}
+                              </Tag>
+                              <Tag color="cyan" style={{ borderRadius: '16px', padding: '4px 12px', fontSize: '12px' }}>
+                                🔧 {operation.operationType}
+                              </Tag>
+                            </Space>
+                          </div>
+                        }
+                      />
+                    </List.Item>
+                  );
+                }}
+              />
+            ) : (
+              <Alert
+                message="❌ Нет операций для планирования"
+                description={
+                  <div>
+                    <p style={{ marginBottom: '8px' }}>
+                      Для станка "{selectedMachine.machineName}" не найдено подходящих операций.
+                    </p>
+                    {planningResult.result.warnings.length > 0 && (
+                      <div>
+                        <p><strong>Причины:</strong></p>
+                        <ul style={{ margin: 0, paddingLeft: '20px' }}>
+                          {planningResult.result.warnings.map((warning, index) => (
+                            <li key={index}>{warning}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                }
+                type="warning"
+                showIcon
+                style={{ 
+                  borderRadius: '8px',
+                  backgroundColor: '#fff7e6',
+                  borderColor: '#ffd591'
+                }}
+              />
+            )}
+          </div>
+        )}
+      </Modal>
+    </>
+  );
+};
+
+export default PlanningModalImproved;

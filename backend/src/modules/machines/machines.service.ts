@@ -37,7 +37,7 @@ export class MachinesService {
   async findOne(id: number): Promise<Machine> {
     const machine = await this.machineRepository.findOne({
       where: { id },
-      relations: ['operations'],
+      // relations: ['operations'], // Убрано - связь отключена в entity
     });
 
     if (!machine) {
@@ -53,24 +53,41 @@ export class MachinesService {
   }
 
   async update(id: number, updateMachineDto: UpdateMachineDto): Promise<Machine> {
-    const machine = await this.findOne(id);
-    
-    // Поддерживаем новые поля
-    if (updateMachineDto.hasOwnProperty('isOccupied')) {
-      machine.isOccupied = updateMachineDto.isOccupied;
+    try {
+      console.log(`MachinesService.update: Обновление станка ID ${id}`);
+      console.log('updateMachineDto:', updateMachineDto);
+      
+      const machine = await this.findOne(id);
+      console.log(`Найден станок: ${machine.code}`);
+      
+      // Поддерживаем новые поля
+      if (updateMachineDto.hasOwnProperty('isOccupied')) {
+        machine.isOccupied = updateMachineDto.isOccupied;
+        console.log(`Обновляем isOccupied: ${updateMachineDto.isOccupied}`);
+      }
+      
+      if (updateMachineDto.hasOwnProperty('currentOperation')) {
+        machine.currentOperation = updateMachineDto.currentOperation;
+        console.log(`Обновляем currentOperation: ${updateMachineDto.currentOperation}`);
+      }
+      
+      if (updateMachineDto.hasOwnProperty('assignedAt')) {
+        machine.assignedAt = updateMachineDto.assignedAt;
+        console.log(`Обновляем assignedAt: ${updateMachineDto.assignedAt}`);
+      }
+      
+      // Остальные поля
+      Object.assign(machine, updateMachineDto);
+      
+      console.log('Сохраняем станок в БД...');
+      const result = await this.machineRepository.save(machine);
+      console.log('Станок успешно сохранён');
+      
+      return result;
+    } catch (error) {
+      console.error(`MachinesService.update Ошибка при обновлении станка ${id}:`, error);
+      throw error;
     }
-    
-    if (updateMachineDto.hasOwnProperty('currentOperation')) {
-      machine.currentOperation = updateMachineDto.currentOperation;
-    }
-    
-    if (updateMachineDto.hasOwnProperty('assignedAt')) {
-      machine.assignedAt = updateMachineDto.assignedAt;
-    }
-    
-    // Остальные поля
-    Object.assign(machine, updateMachineDto);
-    return this.machineRepository.save(machine);
   }
 
   async toggleOccupancy(id: number): Promise<Machine> {

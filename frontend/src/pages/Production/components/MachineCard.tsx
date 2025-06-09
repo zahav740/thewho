@@ -12,7 +12,9 @@ import {
   CheckCircleOutlined, 
   ClockCircleOutlined,
   PlayCircleOutlined,
-  StopOutlined 
+  StopOutlined,
+  CloseCircleOutlined,
+  ExclamationCircleOutlined
 } from '@ant-design/icons';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
@@ -21,7 +23,10 @@ import {
   getPriorityColor,
   formatEstimatedTime 
 } from '../../../types/machine.types';
-import { machinesApi } from '../../../services/machinesApi';
+import { machinesApi, operationsApi } from '../../../services/machinesApi';
+import { Modal, message } from 'antd';
+
+const { confirm } = Modal;
 
 const { Text } = Typography;
 
@@ -29,32 +34,107 @@ interface MachineCardProps {
   machine: MachineAvailability;
   isSelected: boolean;
   onSelect: () => void;
+  onOpenPlanningModal?: (machine: MachineAvailability) => void;
 }
 
 export const MachineCard: React.FC<MachineCardProps> = ({
   machine,
   isSelected,
   onSelect,
+  onOpenPlanningModal,
 }) => {
   const queryClient = useQueryClient();
 
   const updateAvailabilityMutation = useMutation({
-    mutationFn: (isAvailable: boolean) => 
-      machinesApi.updateAvailability(machine.machineName, isAvailable),
-    onSuccess: () => {
+    mutationFn: async (isAvailable: boolean) => {
+      console.log(`🔄 Смена статуса станка ${machine.machineName} на ${isAvailable}`);
+      
+      // Используем реальный API
+      return await machinesApi.updateAvailability(machine.machineName, isAvailable);
+    },
+    onSuccess: (updatedMachine) => {
       queryClient.invalidateQueries({ queryKey: ['machines'] });
-      if (!machine.isAvailable) {
+      const status = updatedMachine.isAvailable ? 'освобожден' : 'отмечен как занятый';
+      message.success(`Станок "${machine.machineName}" успешно ${status}`);
+      
+      // Если станок освободился, открываем модальное окно планирования
+      if (!machine.isAvailable && updatedMachine.isAvailable && onOpenPlanningModal) {
+        console.log('🎉 Станок освободился! Открываем модальное окно планирования');
+        // Небольшая задержка чтобы пользователь увидел сообщение об успешном освобождении
+        setTimeout(() => {
+          onOpenPlanningModal(updatedMachine);
+        }, 1000);
+      }
+      
+      if (!machine.isAvailable && updatedMachine.isAvailable) {
         // Если станок освободился, автоматически выбираем его
         onSelect();
       }
     },
     onError: (error) => {
       console.error('Ошибка обновления доступности станка:', error);
+      message.error('Не удалось изменить статус станка. Попробуйте еще раз.');
+    },
+  });
+
+  const unassignOperationMutation = useMutation({
+    mutationFn: () => machinesApi.unassignOperation(machine.machineName),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['machines'] });
+      message.success('Операция успешно отменена со станка');
+    },
+    onError: (error) => {
+      console.error('Ошибка отмены операции:', error);
+      message.error('Ошибка при отмене операции');
     },
   });
 
   const handleAvailabilityChange = (checked: boolean) => {
-    updateAvailabilityMutation.mutate(checked);
+    console.log('=== AVAILABILITY CHANGE ===');
+    console.log('checked:', checked);
+    console.log('machine.machineName:', machine.machineName);
+    
+    if (checked && machine.isAvailable && onOpenPlanningModal) {
+      // Если станок уже свободен и мы ставим галочку, открываем планирование
+      onOpenPlanningModal(machine);
+      console.log('🎯 Opening planning modal');
+    } else {
+      // Для изменения доступности станка показываем подтверждение
+      const action = checked ? 'освободить' : 'отметить как занятый';
+      const title = checked ? 'Освобождение станка' : 'Отметка станка как занятого';
+      
+      confirm({
+        title,
+        icon: <ExclamationCircleOutlined />,
+        content: `Вы уверены, что хотите ${action} станок "${machine.machineName}"?`,
+        okText: 'Да, подтверждаю',
+        cancelText: 'Отмена',
+        onOk() {
+          console.log(checked ? '✅ Making machine available' : '❌ Making machine unavailable');
+          updateAvailabilityMutation.mutate(checked);
+        },
+        onCancel() {
+          console.log('❌ Отмена изменения статуса');
+        }
+      });
+    }
+    
+    console.log('=== END AVAILABILITY CHANGE ===');
+  };
+
+  const handleUnassignOperation = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    confirm({
+      title: 'Отмена планирования',
+      icon: <ExclamationCircleOutlined />,
+      content: `Вы уверены, что хотите отменить планирование операции на станке "${machine.machineName}"?`,
+      okText: 'Да, отменить',
+      cancelText: 'Отмена',
+      onOk() {
+        unassignOperationMutation.mutate();
+      },
+    });
   };
 
   const getStatusBadge = () => {
@@ -153,24 +233,94 @@ export const MachineCard: React.FC<MachineCardProps> = ({
         
         <Col span={24}>
           <Card size="small" style={{ borderRadius: '8px' }}>
-            <Checkbox
-              checked={machine.isAvailable}
-              onChange={(e) => handleAvailabilityChange(e.target.checked)}
-              disabled={updateAvailabilityMutation.isPending}
-              onClick={(e) => e.stopPropagation()}
-              style={{ width: '100%' }}
-            >
-              <Space>
-                <span style={{ fontWeight: '500' }}>
-                  {machine.isAvailable ? 'Станок свободен' : 'Станок занят'}
-                </span>
-                {updateAvailabilityMutation.isPending && (
-                  <Text type="secondary" style={{ fontSize: '12px' }}>
-                    (обновляется...)
-                  </Text>
+            {machine.isAvailable ? (
+              // Для свободных станков - кнопка планирования с типом станка
+              <>
+                <div style={{ marginBottom: '12px', textAlign: 'center' }}>
+                  <Badge status="success" text="Станок свободен" />
+                </div>
+                
+                {onOpenPlanningModal && (
+                  <Button
+                    type="primary"
+                    block
+                    size="large"
+                    onClick={(e) => {
+                      console.log('🔥 Machine type button clicked for:', machine.machineName);
+                      console.log('🔥 onOpenPlanningModal exists:', !!onOpenPlanningModal);
+                      e.stopPropagation();
+                      console.log('🔥 About to call onOpenPlanningModal with:', machine);
+                      try {
+                        onOpenPlanningModal(machine);
+                        console.log('🔥 onOpenPlanningModal called successfully');
+                      } catch (error) {
+                        console.error('🔥 Error calling onOpenPlanningModal:', error);
+                      }
+                    }}
+                    style={{ 
+                      backgroundColor: machineTypeColor,
+                      borderColor: machineTypeColor,
+                      borderRadius: '8px',
+                      height: '50px',
+                      fontWeight: 'bold',
+                      fontSize: '16px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    <Space>
+                      {getMachineIcon(machine.machineType)}
+                      <span>{machine.machineType === 'MILLING' ? 'MILLING' : machine.machineType === 'TURNING' ? 'TURNING' : machine.machineType}</span>
+                    </Space>
+                  </Button>
                 )}
-              </Space>
-            </Checkbox>
+                
+                <Button
+                  danger
+                  size="small"
+                  type="text"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleAvailabilityChange(false);
+                  }}
+                  disabled={updateAvailabilityMutation.isPending}
+                  style={{ 
+                    marginTop: '8px',
+                    fontSize: '12px',
+                    height: 'auto',
+                    padding: '4px 0'
+                  }}
+                >
+                  ❌ Отметить как занятый
+                </Button>
+              </>
+            ) : (
+              // Для занятых станков - кнопка освобождения
+              <>
+                <div style={{ marginBottom: '12px', textAlign: 'center' }}>
+                  <Badge status="processing" text="Станок занят" />
+                </div>
+                
+                <Button
+                  type="default"
+                  block
+                  icon={<CheckCircleOutlined />}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleAvailabilityChange(true);
+                  }}
+                  loading={updateAvailabilityMutation.isPending}
+                  style={{ 
+                    borderRadius: '6px',
+                    height: '40px',
+                    fontWeight: '500'
+                  }}
+                >
+                  ✅ Освободить станок
+                </Button>
+              </>
+            )}
           </Card>
         </Col>
 
@@ -199,26 +349,62 @@ export const MachineCard: React.FC<MachineCardProps> = ({
                   📄 {machine.currentOperationDetails.orderDrawingNumber}
                 </Text>
               </div>
-              <div>
+              <div style={{ marginBottom: '12px' }}>
                 <Text type="secondary" style={{ fontSize: '12px' }}>
                   ⏱️ Время: {formatEstimatedTime(machine.currentOperationDetails.estimatedTime)}
                 </Text>
               </div>
+              
+              {/* Кнопка отмены планирования */}
+              <Button
+                danger
+                size="small"
+                block
+                icon={<CloseCircleOutlined />}
+                onClick={handleUnassignOperation}
+                loading={unassignOperationMutation.isPending}
+                style={{
+                  borderRadius: '6px',
+                  height: '32px',
+                  fontSize: '12px'
+                }}
+              >
+                {unassignOperationMutation.isPending ? 'Отменяем...' : 'Отменить планирование'}
+              </Button>
             </Card>
           </Col>
         )}
 
         {machine.currentOperationId && !machine.currentOperationDetails && (
           <Col span={24}>
-            <Card size="small" style={{ borderRadius: '8px', borderColor: '#faad14' }}>
-              <Space>
-                <Tag color="orange" style={{ borderRadius: '12px' }}>
-                  Операция
-                </Tag>
-                <Text code style={{ fontSize: '12px' }}>
-                  {machine.currentOperationId.slice(0, 12)}...
-                </Text>
-              </Space>
+            <Card size="small" style={{ borderRadius: '8px', borderColor: '#faad14', backgroundColor: '#fff7e6' }}>
+              <div style={{ marginBottom: '8px' }}>
+                <Space>
+                  <Tag color="orange" style={{ borderRadius: '12px' }}>
+                    Операция
+                  </Tag>
+                  <Text code style={{ fontSize: '12px' }}>
+                    {machine.currentOperationId.slice(0, 12)}...
+                  </Text>
+                </Space>
+              </div>
+              
+              {/* Кнопка отмены планирования для операций без деталей */}
+              <Button
+                danger
+                size="small"
+                block
+                icon={<CloseCircleOutlined />}
+                onClick={handleUnassignOperation}
+                loading={unassignOperationMutation.isPending}
+                style={{
+                  borderRadius: '6px',
+                  height: '32px',
+                  fontSize: '12px'
+                }}
+              >
+                {unassignOperationMutation.isPending ? 'Отменяем...' : 'Отменить планирование'}
+              </Button>
             </Card>
           </Col>
         )}

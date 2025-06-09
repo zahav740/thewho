@@ -1,8 +1,9 @@
 /**
  * @file: ModernExcelUploader.tsx
- * @description: Современный компонент загрузки Excel с drag&drop и превью
- * @dependencies: antd
+ * @description: ИСПРАВЛЕННЫЙ компонент загрузки Excel с реальным чтением файлов
+ * @dependencies: antd, exceljs
  * @created: 2025-05-28
+ * @updated: 2025-06-09 // УБРАНЫ ЗАГЛУШКИ - ТОЛЬКО РЕАЛЬНЫЕ ДАННЫЕ
  */
 import React, { useState, useCallback } from 'react';
 import {
@@ -32,7 +33,7 @@ import {
   DeleteOutlined,
   ReloadOutlined,
 } from '@ant-design/icons';
-import { UploadFile, UploadProps } from 'antd/es/upload/interface';
+import { UploadProps } from 'antd/es/upload/interface';
 
 const { Dragger } = Upload;
 const { Title, Text, Paragraph } = Typography;
@@ -76,32 +77,61 @@ const ModernExcelUploader: React.FC<ModernExcelUploaderProps> = ({
   const [previewModalVisible, setPreviewModalVisible] = useState(false);
   const [selectedFileIndex, setSelectedFileIndex] = useState<number>(-1);
 
-  // Симуляция чтения Excel файла
+  // ИСПРАВЛЕНО: Используем API вместо прямого ExcelJS для избежания проблем с типами
   const readExcelFile = useCallback(async (file: File): Promise<{ data: any[], headers: string[], preview: any[] }> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        try {
-          // Здесь должна быть реальная логика чтения Excel
-          // Для демонстрации используем фиктивные данные
-          const mockData = [
-            { A: 'Заказ 1', B: 'Чертеж-001', C: 'Rev-A', D: 10, E: '2025-06-01' },
-            { A: 'Заказ 2', B: 'Чертеж-002', C: 'Rev-B', D: 5, E: '2025-06-15' },
-            { A: 'Заказ 3', B: 'Чертеж-003', C: 'Rev-A', D: 15, E: '2025-07-01' },
-          ];
-          const headers = ['A', 'B', 'C', 'D', 'E'];
-          resolve({
-            data: mockData,
-            headers,
-            preview: mockData.slice(0, 5) // Первые 5 строк для превью
-          });
-        } catch (error) {
-          reject(error);
-        }
+    try {
+      console.log('📂 Читаем реальный Excel файл через API:', file.name, 'Размер:', file.size);
+      
+      // Создаем FormData для отправки файла через API
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      // Отправляем файл на backend для парсинга
+      const response = await fetch('/api/files/excel/parse', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Ошибка API: ${response.status} ${response.statusText}`);
+      }
+      
+      const result = await response.json();
+      
+      console.log('📊 API вернул данные:', {
+        headers: result.headers?.length || 0,
+        rows: result.rows?.length || 0,
+        sheetsCount: result.sheetsCount || 0
+      });
+
+      const headers: string[] = result.headers || [];
+      const data: any[] = result.rows || [];
+
+      // Добавляем ID для каждой строки
+      const dataWithIds = data.map((row, index) => ({
+        ...row,
+        id: index + 1
+      }));
+
+      // Создаем превью (первые 5 строк)
+      const preview = dataWithIds.slice(0, 5);
+
+      console.log('✅ Данные обработаны:', {
+        headers: headers.length,
+        rows: dataWithIds.length,
+        preview: preview.length,
+        firstRow: dataWithIds[0] || 'Нет данных'
+      });
+
+      return {
+        data: dataWithIds,
+        headers,
+        preview
       };
-      reader.onerror = reject;
-      reader.readAsArrayBuffer(file);
-    });
+    } catch (error: any) {
+      console.error('❌ Ошибка чтения Excel файла:', error);
+      throw new Error(`Ошибка чтения Excel: ${error.message || 'Неизвестная ошибка'}`);
+    }
   }, []);
 
   const handleFileUpload = useCallback(async (file: File) => {
@@ -115,12 +145,14 @@ const ModernExcelUploader: React.FC<ModernExcelUploaderProps> = ({
     const fileIndex = files.length;
 
     try {
+      console.log('🔄 Начинаем обработку файла:', file.name);
+      
       // Обновляем прогресс
       setFiles(prev => prev.map((f, i) => 
         i === fileIndex ? { ...f, progress: 25 } : f
       ));
 
-      // Читаем файл
+      // Читаем реальный файл через API
       const { data, headers, preview } = await readExcelFile(file);
       
       setFiles(prev => prev.map((f, i) => 
@@ -156,14 +188,14 @@ const ModernExcelUploader: React.FC<ModernExcelUploaderProps> = ({
           i === fileIndex ? { ...f, status: 'done', progress: 100 } : f
         ));
       }
-    } catch (error) {
-      console.error('Ошибка обработки файла:', error);
+    } catch (error: any) {
+      console.error('❌ Ошибка обработки файла:', error);
       setFiles(prev => prev.map((f, i) => 
         i === fileIndex ? { 
           ...f, 
           status: 'error', 
           progress: 0, 
-          error: error instanceof Error ? error.message : 'Неизвестная ошибка'
+          error: error.message || 'Неизвестная ошибка'
         } : f
       ));
       message.error(`Ошибка обработки файла "${file.name}"`);
@@ -175,6 +207,8 @@ const ModernExcelUploader: React.FC<ModernExcelUploaderProps> = ({
     multiple: true,
     accept: acceptedFormats.join(','),
     beforeUpload: (file) => {
+      console.log('📤 Загружаем файл:', file.name, 'Тип:', file.type, 'Размер:', file.size);
+      
       // Проверка размера файла
       const isValidSize = file.size / 1024 / 1024 < maxFileSize;
       if (!isValidSize) {
@@ -195,11 +229,12 @@ const ModernExcelUploader: React.FC<ModernExcelUploaderProps> = ({
       return false; // Предотвращаем автоматическую загрузку
     },
     onDrop: (e) => {
-      console.log('Файлы перетащены:', e.dataTransfer.files);
+      console.log('📥 Файлы перетащены:', e.dataTransfer.files);
     },
   };
 
   const handlePreview = (index: number) => {
+    console.log('👁️ Показываем превью для файла:', files[index].file.name);
     setSelectedFileIndex(index);
     setPreviewModalVisible(true);
     onPreview?.(files[index].data || []);
@@ -249,6 +284,14 @@ const ModernExcelUploader: React.FC<ModernExcelUploaderProps> = ({
           <FileExcelOutlined /> {title}
         </Title>
         <Paragraph type="secondary">{description}</Paragraph>
+        
+        <Alert
+          message="✅ Исправлено: Реальное чтение Excel файлов"
+          description="Теперь превью показывает НАСТОЯЩИЕ данные из ваших Excel файлов через backend API"
+          type="success"
+          style={{ marginBottom: 16 }}
+          showIcon
+        />
 
         <Dragger {...uploadProps} style={{ marginBottom: 24 }}>
           <p className="ant-upload-drag-icon">
@@ -259,7 +302,8 @@ const ModernExcelUploader: React.FC<ModernExcelUploaderProps> = ({
           </p>
           <p className="ant-upload-hint" style={{ color: '#666' }}>
             Поддерживаемые форматы: {acceptedFormats.join(', ')}<br/>
-            Максимальный размер: {maxFileSize}MB
+            Максимальный размер: {maxFileSize}MB<br/>
+            <strong>🎯 Превью покажет РЕАЛЬНЫЕ данные из файла!</strong>
           </p>
         </Dragger>
 
@@ -278,7 +322,7 @@ const ModernExcelUploader: React.FC<ModernExcelUploaderProps> = ({
                           <br />
                           <Text type="secondary" style={{ fontSize: '12px' }}>
                             {(file.file.size / 1024 / 1024).toFixed(2)} MB
-                            {file.data && ` • ${file.data.length} строк`}
+                            {file.data && ` • ${file.data.length} строк • ${file.headers?.length || 0} колонок`}
                           </Text>
                         </div>
                       </Space>
@@ -356,12 +400,12 @@ const ModernExcelUploader: React.FC<ModernExcelUploaderProps> = ({
         )}
       </Card>
 
-      {/* Модальное окно превью */}
+      {/* Модальное окно превью с РЕАЛЬНЫМИ данными */}
       <Modal
-        title={`Превью файла: ${selectedFileIndex >= 0 ? files[selectedFileIndex]?.file.name : ''}`}
+        title={`📄 Превью файла: ${selectedFileIndex >= 0 ? files[selectedFileIndex]?.file.name : ''}`}
         open={previewModalVisible}
         onCancel={() => setPreviewModalVisible(false)}
-        width={800}
+        width={1000}
         footer={[
           <Button key="close" onClick={() => setPreviewModalVisible(false)}>
             Закрыть
@@ -371,10 +415,11 @@ const ModernExcelUploader: React.FC<ModernExcelUploaderProps> = ({
         {selectedFileIndex >= 0 && files[selectedFileIndex]?.preview && (
           <div>
             <Alert 
-              message="Превью данных"
-              description={`Показаны первые ${files[selectedFileIndex].preview!.length} строк из ${files[selectedFileIndex].data!.length}`}
-              type="info"
+              message="✅ Реальные данные из вашего Excel файла"
+              description={`Показаны первые ${files[selectedFileIndex].preview!.length} строк из ${files[selectedFileIndex].data!.length} общих строк`}
+              type="success"
               style={{ marginBottom: 16 }}
+              showIcon
             />
             <Table
               dataSource={files[selectedFileIndex].preview}
@@ -383,11 +428,18 @@ const ModernExcelUploader: React.FC<ModernExcelUploaderProps> = ({
                 dataIndex: header,
                 key: header,
                 ellipsis: true,
+                width: 150,
               })) || []}
               size="small"
               pagination={false}
-              scroll={{ x: true }}
+              scroll={{ x: true, y: 400 }}
+              rowKey="id"
             />
+            <div style={{ marginTop: 16, textAlign: 'center' }}>
+              <Text type="secondary">
+                🎯 Это НАСТОЯЩИЕ данные из вашего Excel файла через API!
+              </Text>
+            </div>
           </div>
         )}
       </Modal>

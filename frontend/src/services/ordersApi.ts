@@ -174,24 +174,20 @@ export const ordersApi = {
     return response.data;
   },
 
-  // Импортировать заказы из Excel
+  // Импортировать заказы из Excel - ТОЛЬКО РЕАЛЬНЫЕ ДАННЫЕ
   importExcel: async (file: File, colorFilters?: string[]): Promise<any> => {
-    console.log('Начало импорта файла:', file.name);
+    console.log('📋 Начало реального импорта файла:', file.name, 'Размер:', Math.round(file.size / 1024), 'KB');
     
     const formData = new FormData();
-    formData.append('excel', file); // Изменено с 'file' на 'excel'
+    formData.append('excel', file); // Правильное имя поля для backend
     
-    // Добавляем маппинг колонок для нового API
-    const columnMapping = {
-      drawingNumber: 'C',
-      revision: 'D', 
-      quantity: 'E',
-      deadline: 'H',
-      priority: 'K'
-    };
-    
-    console.log('Настройки:', columnMapping);
-    formData.append('columnMapping', JSON.stringify(columnMapping));
+    // Добавляем фильтры цветов, если есть
+    if (colorFilters && colorFilters.length > 0) {
+      formData.append('colorFilters', JSON.stringify(colorFilters));
+      console.log('🎨 Применяем цветовые фильтры:', colorFilters);
+    } else {
+      console.log('📈 Импорт всех строк без фильтров');
+    }
 
     const response = await api.post('/orders/upload-excel', formData, {
       headers: {
@@ -199,44 +195,44 @@ export const ordersApi = {
       },
     });
     
-    console.log('Результат импорта:', response.data);
-    return response.data.result || response.data; // Возвращаем result или весь ответ
+    console.log('✅ Результат реального импорта:', response.data);
+    
+    // Проверяем, что получили реальные данные
+    if (response.data.success === false) {
+      console.error('❌ Ошибка импорта:', response.data.error);
+      throw new Error(response.data.message || 'Ошибка при импорте Excel');
+    }
+    
+    return response.data.data || response.data; // Возвращаем реальные данные
   },
 
-  // Предварительный просмотр Excel файла
+  // Предварительный просмотр Excel файла - ИСПОЛЬЗУЕТ РЕАЛЬНЫЕ ДАННЫЕ
   previewExcel: async (file: File): Promise<any[]> => {
-    console.log('Превью для файла:', file.name);
+    console.log('🔍 Реальный превью для файла:', file.name);
     
     const formData = new FormData();
-    formData.append('excel', file);
+    formData.append('file', file); // Используем 'file' для парсинга
     
-    // Тестовый маппинг для превью
-    const columnMapping = {
-      drawingNumber: 'C',
-      quantity: 'E', 
-      deadline: 'H'
-    };
-    
-    formData.append('columnMapping', JSON.stringify(columnMapping));
-
     try {
-      const response = await api.post('/orders/upload-excel', formData, {
+      // Используем Files API для парсинга Excel
+      const response = await api.post('/files/excel/parse', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
       });
       
-      // Симуляция превью данных
-      const preview = [
-        {id: 1, orderNumber: 'ORD-2025-001', drawingNumber: 'DWG-001-Rev-A', quantity: 10},
-        {id: 2, orderNumber: 'ORD-2025-002', drawingNumber: 'DWG-002-Rev-B', quantity: 25},
-        {id: 3, orderNumber: 'ORD-2025-003', drawingNumber: 'DWG-003-Rev-C', quantity: 15}
-      ];
+      console.log('✅ Реальные данные из Excel:', response.data);
       
-      console.log('Превью:', preview);
-      return preview;
+      // Возвращаем первые 5 строк для превью
+      const previewData = response.data.rows?.slice(0, 5).map((row: any, index: number) => ({
+        id: index + 1,
+        ...row
+      })) || [];
+      
+      console.log('📊 Превью данных:', previewData);
+      return previewData;
     } catch (error) {
-      console.error('Ошибка превью:', error);
+      console.error('❌ Ошибка получения реальных данных из Excel:', error);
       return [];
     }
   },

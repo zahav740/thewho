@@ -198,13 +198,21 @@ export class MachinesController {
     @Body() body: { isAvailable: boolean },
   ): Promise<MachineAvailability> {
     try {
-      this.logger.log(`Обновление доступности станка ${machineName}: ${body.isAvailable}`);
-      const machines = await this.machinesService.findAll();
-      const machine = machines.find(m => m.code === machineName);
+      this.logger.log(`Начало обновления доступности станка:`);
+      this.logger.log(`  - machineName: ${machineName}`);
+      this.logger.log(`  - isAvailable: ${body.isAvailable}`);
       
+      const machines = await this.machinesService.findAll();
+      this.logger.log(`Получено ${machines.length} станков из БД`);
+      
+      const machine = machines.find(m => m.code === machineName);
       if (!machine) {
+        this.logger.error(`Станок с именем "${machineName}" не найден`);
+        this.logger.log('Доступные станки:', machines.map(m => m.code));
         throw new BadRequestException(`Станок с именем ${machineName} не найден`);
       }
+      
+      this.logger.log(`Найден станок: ${machine.code} (ID: ${machine.id})`);
       
       // Если станок становится доступным, очищаем текущую операцию
       const updateData: any = {
@@ -214,10 +222,17 @@ export class MachinesController {
       if (body.isAvailable) {
         updateData.currentOperation = null;
         updateData.assignedAt = null;
+        this.logger.log('Очищаем текущую операцию (станок освобождается)');
+      } else {
+        updateData.assignedAt = new Date();
+        this.logger.log('Отмечаем станок как занятый');
       }
+      
+      this.logger.log('Данные для обновления:', updateData);
       
       // Обновляем статус занятости
       const updatedMachine = await this.machinesService.update(machine.id, updateData);
+      this.logger.log('Станок успешно обновлён');
       
       // Получаем реальные данные операции если есть
       let currentOperationDetails = null;
@@ -225,7 +240,7 @@ export class MachinesController {
         currentOperationDetails = await this.getOperationDetails(updatedMachine.currentOperation);
       }
       
-      return {
+      const result = {
         id: updatedMachine.id.toString(),
         machineName: updatedMachine.code,
         machineType: updatedMachine.type,
@@ -236,8 +251,96 @@ export class MachinesController {
         createdAt: updatedMachine.createdAt.toISOString(),
         updatedAt: updatedMachine.updatedAt.toISOString(),
       };
+      
+      this.logger.log(`Успешно обновлена доступность станка ${machineName}`);
+      return result;
     } catch (error) {
       this.logger.error(`Ошибка при обновлении доступности станка ${machineName}:`, error);
+      throw error;
+    }
+  }
+
+  @Delete(':machineName/assign-operation')
+  @ApiOperation({ summary: 'Отменить операцию со станка' })
+  async unassignOperation(
+    @Param('machineName') machineName: string,
+  ): Promise<MachineAvailability> {
+    try {
+      this.logger.log(`🗑️ Начало отмены операции со станка: ${machineName}`);
+      
+      // 1. Получаем список всех станков
+      const machines = await this.machinesService.findAll();
+      this.logger.log(`📊 Получено ${machines.length} станков из базы`);
+      
+      // 2. Находим нужный станок
+      const machine = machines.find(m => m.code === machineName);
+      if (!machine) {
+        this.logger.error(`❌ Станок с именем "${machineName}" не найден`);
+        this.logger.log('📝 Доступные станки:', machines.map(m => m.code));
+        throw new BadRequestException(`Станок с именем ${machineName} не найден`);
+      }
+      
+      this.logger.log(`✅ Найден станок: ID=${machine.id}, код=${machine.code}, занят=${machine.isOccupied}`);
+      
+      // 3. Сохраняем ID текущей операции
+      const currentOperationId = machine.currentOperation;
+      this.logger.log(`🔧 Текущая операция: ${currentOperationId || 'нет'}`);
+      
+      // 4. Освобождаем станок
+      this.logger.log('🔄 Обновляем статус станка...');
+      
+      const updateData = {
+        isOccupied: false,
+        currentOperation: null,
+        assignedAt: new Date(), // Время освобождения
+      };
+      
+      this.logger.log('📋 Данные для обновления:', updateData);
+      
+      const updatedMachine = await this.machinesService.update(machine.id, updateData);
+      this.logger.log('✅ Станок успешно обновлён');
+      
+      // 5. Обновляем статус операции (если была)
+      if (currentOperationId) {
+        try {
+          this.logger.log(`🔄 Обновляем статус операции ${currentOperationId}...`);
+          
+          const operationUpdateResult = await this.dataSource.query(`
+            UPDATE operations 
+            SET status = 'PENDING', "assignedMachine" = NULL, "assignedAt" = NULL
+            WHERE id = $1
+            RETURNING id, status
+          `, [currentOperationId]);
+          
+          this.logger.log(`✅ Операция ${currentOperationId} возвращена в статус PENDING:`, operationUpdateResult);
+        } catch (dbError) {
+          this.logger.error(`❌ Ошибка при обновлении статуса операции ${currentOperationId}:`, dbError);
+          // Не прерываем выполнение - станок уже освобождён
+        }
+      } else {
+        this.logger.log('📝 У станка не было назначенной операции');
+      }
+      
+      // 6. Формируем результат
+      const result = {
+        id: updatedMachine.id.toString(),
+        machineName: updatedMachine.code,
+        machineType: updatedMachine.type,
+        isAvailable: true, // Станок теперь свободен
+        currentOperationId: undefined,
+        lastFreedAt: updatedMachine.assignedAt,
+        currentOperationDetails: null,
+        createdAt: updatedMachine.createdAt.toISOString(),
+        updatedAt: updatedMachine.updatedAt.toISOString(),
+      };
+      
+      this.logger.log(`🎉 Отмена операции со станка ${machineName} завершена успешно`);
+      return result;
+      
+    } catch (error) {
+      this.logger.error(`🚫 Ошибка при отмене операции со станка ${machineName}:`);
+      this.logger.error(`Ошибка: ${error.message}`);
+      this.logger.error(`Стек: ${error.stack}`);
       throw error;
     }
   }

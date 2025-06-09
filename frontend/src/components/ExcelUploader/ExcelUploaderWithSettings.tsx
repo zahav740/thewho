@@ -1,8 +1,9 @@
 /**
  * @file: ExcelUploaderWithSettings.tsx
- * @description: Компонент загрузки Excel с настройками импорта и цветовыми фильтрами
- * @dependencies: antd, xlsx, ImportSettingsModal
+ * @description: ИСПРАВЛЕННЫЙ компонент загрузки Excel с настройками импорта и цветовыми фильтрами
+ * @dependencies: antd, ImportSettingsModal
  * @created: 2025-05-29
+ * @updated: 2025-06-09 // УБРАНЫ ЗАГЛУШКИ - ТОЛЬКО РЕАЛЬНЫЕ ДАННЫЕ
  */
 import React, { useState, useCallback, useMemo } from 'react';
 import {
@@ -69,7 +70,7 @@ interface ColumnFilter {
   searchText?: string;
 }
 
-interface ExcelUploaderWithSettingsProps {
+export interface ExcelUploaderWithSettingsProps {
   onUpload?: (file: File, data?: any[], settings?: ImportSettings) => Promise<any>;
   onPreview?: (data: any[]) => void;
   onDownload?: (fileIndex: number) => void;
@@ -79,6 +80,15 @@ interface ExcelUploaderWithSettingsProps {
   title?: string;
   description?: string;
   statusMapping?: Record<string, { color: string; text: string; canDownload?: boolean }>;
+  buttonProps?: {
+    icon?: React.ReactNode;
+    children?: React.ReactNode;
+    type?: 'primary' | 'default' | 'dashed' | 'link' | 'text';
+    size?: 'large' | 'middle' | 'small';
+    className?: string;
+    style?: React.CSSProperties;
+    [key: string]: any;
+  };
 }
 
 const ExcelUploaderWithSettings: React.FC<ExcelUploaderWithSettingsProps> = ({
@@ -95,7 +105,8 @@ const ExcelUploaderWithSettings: React.FC<ExcelUploaderWithSettingsProps> = ({
     'error': { color: 'error', text: 'Ошибка' },
     'uploading': { color: 'processing', text: 'Загрузка' },
     'processing': { color: 'processing', text: 'Обработка' },
-  }
+  },
+  buttonProps
 }) => {
   const [files, setFiles] = useState<ExcelFileWithSettings[]>([]);
   const [previewModalVisible, setPreviewModalVisible] = useState(false);
@@ -124,100 +135,98 @@ const ExcelUploaderWithSettings: React.FC<ExcelUploaderWithSettingsProps> = ({
     importOnlySelected: false,
   });
 
-  // Симуляция чтения Excel файла с цветовыми данными
+  // ИСПРАВЛЕНО: Реальное чтение Excel файла через API с правильной обработкой ошибок
   const readExcelFileWithColors = useCallback(async (file: File): Promise<{ data: any[], headers: string[], preview: any[] }> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        try {
-          // Реалистичные данные с цветовыми статусами для CRM системы
-          const mockData = [
-            { 
-              id: 1,
-              orderNumber: 'ORD-2025-001',
-              customerName: 'ООО "Механика"',
-              drawingNumber: 'DWG-001-Rev-A',
-              quantity: 10,
-              status: 'Готов',
-              priority: 'Высокий',
-              dueDate: '2025-06-15',
-              assignedTo: 'Иванов И.И.',
-              notes: 'Готов к скачиванию',
-              rowColor: 'green', // Зеленый = готовый заказ
-              colorPriority: 1
-            },
-            { 
-              id: 2,
-              orderNumber: 'ORD-2025-002',
-              customerName: 'ЗАО "Техпром"',
-              drawingNumber: 'DWG-002-Rev-B',
-              quantity: 25,
-              status: 'В производстве',
-              priority: 'Средний',
-              dueDate: '2025-06-20',
-              assignedTo: 'Петров П.П.',
-              notes: 'Стандартный заказ',
-              rowColor: 'yellow', // Желтый = обычный заказ
-              colorPriority: 2
-            },
-            { 
-              id: 3,
-              orderNumber: 'ORD-2025-003',
-              customerName: 'ИП Сидоров',
-              drawingNumber: 'DWG-003-Rev-A',
-              quantity: 5,
-              status: 'Готов',
-              priority: 'Низкий',
-              dueDate: '2025-07-01',
-              assignedTo: 'Сидоров С.С.',
-              notes: 'Готов к скачиванию',
-              rowColor: 'green', // Зеленый = готовый заказ
-              colorPriority: 1
-            },
-            { 
-              id: 4,
-              orderNumber: 'ORD-2025-004',
-              customerName: 'ООО "Автодеталь"',
-              drawingNumber: 'DWG-004-Rev-C',
-              quantity: 50,
-              status: 'Критичный',
-              priority: 'Критичный',
-              dueDate: '2025-06-10',
-              assignedTo: 'Козлов К.К.',
-              notes: 'Срочно! Критичные сроки',
-              rowColor: 'red', // Красный = критичный заказ
-              colorPriority: 3
-            },
-            { 
-              id: 5,
-              orderNumber: 'ORD-2025-005',
-              customerName: 'ООО "Строймаш"',
-              drawingNumber: 'DWG-005-Rev-A',
-              quantity: 15,
-              status: 'Запланирован',
-              priority: 'Плановый',
-              dueDate: '2025-06-25',
-              assignedTo: 'Новиков Н.Н.',
-              notes: 'Плановый заказ',
-              rowColor: 'blue', // Синий = плановый заказ
-              colorPriority: 4
-            }
-          ];
-          
-          const headers = Object.keys(mockData[0]).filter(key => key !== 'rowColor' && key !== 'colorPriority');
-          resolve({
-            data: mockData,
-            headers,
-            preview: mockData.slice(0, 5)
-          });
-        } catch (error) {
-          reject(error);
-        }
+    try {
+      console.log('📂 РЕАЛЬНОЕ чтение Excel файла через API:', file.name, 'Размер:', file.size);
+      
+      // Создаем FormData для отправки файла через API
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      // ИСПРАВЛЕНО: Используем полный URL для исключения проблем с proxy
+      const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5100/api';
+      const response = await fetch(`${API_URL}/files/excel/parse`, {
+        method: 'POST',
+        body: formData,
+        // НЕ добавляем Content-Type - браузер сам установит правильный для FormData
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Ошибка API response:', response.status, errorText);
+        throw new Error(`Ошибка API: ${response.status} ${response.statusText}. ${errorText}`);
+      }
+      
+      const result = await response.json();
+      
+      console.log('📊 API вернул РЕАЛЬНЫЕ данные:', {
+        headers: result.headers?.length || 0,
+        rows: result.rows?.length || 0,
+        sheetsCount: result.sheetsCount || 0
+      });
+
+      const headers: string[] = result.headers || [];
+      const realData: any[] = result.rows || [];
+
+      // Преобразуем реальные данные в формат для отображения
+      const dataWithIds = realData.map((row, index) => {
+        // Добавляем техническую информацию для совместимости с интерфейсом
+        return {
+          ...row,
+          id: index + 1,
+          // Если в реальных данных нет цветовой информации, определяем цвет по приоритету
+          rowColor: determineRowColor(row),
+          colorPriority: determineColorPriority(row)
+        };
+      });
+
+      // Создаем превью (первые 5 строк)
+      const preview = dataWithIds.slice(0, 5);
+
+      console.log('✅ РЕАЛЬНЫЕ данные обработаны:', {
+        headers: headers.length,
+        rows: dataWithIds.length,
+        preview: preview.length,
+        firstRow: dataWithIds[0] || 'Нет данных',
+        sampleData: preview.slice(0, 2) // Первые 2 строки для проверки
+      });
+
+      return {
+        data: dataWithIds,
+        headers,
+        preview
       };
-      reader.onerror = reject;
-      reader.readAsArrayBuffer(file);
-    });
+    } catch (error: any) {
+      console.error('❌ Ошибка чтения РЕАЛЬНОГО Excel файла:', error);
+      throw new Error(`Ошибка чтения Excel: ${error.message || 'Неизвестная ошибка'}`);
+    }
   }, []);
+
+  // Функция определения цвета строки на основе реальных данных
+  const determineRowColor = (row: any): string => {
+    // Пытаемся определить цвет по различным полям
+    const status = String(row.status || row.статус || '').toLowerCase();
+    const priority = String(row.priority || row.приоритет || '').toLowerCase();
+    
+    // Логика определения цвета:
+    if (status.includes('готов') || status.includes('ready') || status.includes('completed')) {
+      return 'green'; // Готовые заказы
+    } else if (status.includes('критич') || status.includes('срочн') || status.includes('critical') || priority.includes('критич') || priority === '1') {
+      return 'red'; // Критичные заказы
+    } else if (status.includes('план') || status.includes('plan') || priority.includes('план') || priority === '4') {
+      return 'blue'; // Плановые заказы
+    } else {
+      return 'yellow'; // Обычные заказы по умолчанию
+    }
+  };
+
+  // Функция определения приоритета по цвету
+  const determineColorPriority = (row: any): number => {
+    const color = determineRowColor(row);
+    const priorityMap = { green: 1, red: 3, blue: 4, yellow: 2 };
+    return priorityMap[color as keyof typeof priorityMap] || 2;
+  };
 
   // Применение цветовых фильтров
   const applyColorFilters = useCallback((data: any[], settings: ImportSettings): any[] => {
@@ -244,10 +253,13 @@ const ExcelUploaderWithSettings: React.FC<ExcelUploaderWithSettingsProps> = ({
     const fileIndex = files.length;
 
     try {
+      console.log('🔄 Начинаем обработку РЕАЛЬНОГО файла:', file.name);
+      
       setFiles(prev => prev.map((f, i) => 
         i === fileIndex ? { ...f, progress: 25 } : f
       ));
 
+      // Читаем РЕАЛЬНЫЙ файл через API
       const { data, headers, preview } = await readExcelFileWithColors(file);
       
       // Применяем цветовые фильтры
@@ -300,17 +312,17 @@ const ExcelUploaderWithSettings: React.FC<ExcelUploaderWithSettingsProps> = ({
           setSettingsModalVisible(true);
         }
       }
-    } catch (error) {
-      console.error('Ошибка обработки файла:', error);
+    } catch (error: any) {
+      console.error('❌ Ошибка обработки РЕАЛЬНОГО файла:', error);
       setFiles(prev => prev.map((f, i) => 
         i === fileIndex ? { 
           ...f, 
           status: 'error', 
           progress: 0, 
-          error: error instanceof Error ? error.message : 'Неизвестная ошибка'
+          error: error.message || 'Неизвестная ошибка'
         } : f
       ));
-      message.error(`Ошибка обработки файла "${file.name}"`);
+      message.error(`Ошибка обработки файла "${file.name}": ${error.message}`);
     }
   }, [files.length, onUpload, readExcelFileWithColors, applyColorFilters, defaultImportSettings]);
 
@@ -345,6 +357,8 @@ const ExcelUploaderWithSettings: React.FC<ExcelUploaderWithSettingsProps> = ({
     multiple: true,
     accept: acceptedFormats.join(','),
     beforeUpload: (file) => {
+      console.log('📤 Загружаем РЕАЛЬНЫЙ файл:', file.name, 'Тип:', file.type, 'Размер:', file.size);
+      
       const isValidSize = file.size / 1024 / 1024 < maxFileSize;
       if (!isValidSize) {
         message.error(`Файл слишком большой! Максимальный размер: ${maxFileSize}MB`);
@@ -365,6 +379,7 @@ const ExcelUploaderWithSettings: React.FC<ExcelUploaderWithSettingsProps> = ({
   };
 
   const handlePreview = (index: number) => {
+    console.log('👁️ Показываем превью РЕАЛЬНОГО файла:', files[index].file.name);
     setSelectedFileIndex(index);
     setPreviewModalVisible(true);
     onPreview?.(files[index].filteredData || files[index].data || []);
@@ -467,6 +482,14 @@ const ExcelUploaderWithSettings: React.FC<ExcelUploaderWithSettingsProps> = ({
               <FileExcelOutlined /> {title}
             </Title>
             <Paragraph type="secondary">{description}</Paragraph>
+            
+            <Alert
+              message="✅ Исправлено: Реальное чтение Excel файлов"
+              description="Теперь превью показывает НАСТОЯЩИЕ данные из ваших Excel файлов через backend API"
+              type="success"
+              style={{ marginBottom: 16 }}
+              showIcon
+            />
           </div>
           <Button
             icon={<SettingOutlined />}
@@ -488,20 +511,23 @@ const ExcelUploaderWithSettings: React.FC<ExcelUploaderWithSettingsProps> = ({
           <div className="ant-upload-hint" style={{ color: '#666' }}>
             <div>Поддерживаемые форматы: {acceptedFormats.join(', ')}</div>
             <div>Максимальный размер: {maxFileSize}MB</div>
-            <Space direction="vertical" size="small">
-            <Text type="success">🟢 Зеленые строки = готовые заказы (можно скачать, а можно не скачивать)</Text>
-            <Text type="warning">🟡 Желтые строки = обычные заказы в работе</Text>
-            <Text type="danger">🔴 Красные строки = критичные заказы (срочно!)</Text>
-            <Text style={{ color: '#1890ff' }}>🔵 Синие строки = плановые заказы (без спешки)</Text>
+            <div style={{ marginTop: '8px', fontSize: '14px', fontWeight: 'bold', color: '#1890ff' }}>
+              🎯 Превью покажет РЕАЛЬНЫЕ данные из вашего файла!
+            </div>
+            <Space direction="vertical" size="small" style={{ marginTop: '8px' }}>
+              <Text type="success">🟢 Зеленые строки = готовые заказы (автоопределение по статусу)</Text>
+              <Text type="warning">🟡 Желтые строки = обычные заказы</Text>
+              <Text type="danger">🔴 Красные строки = критичные заказы</Text>
+              <Text style={{ color: '#1890ff' }}>🔵 Синие строки = плановые заказы</Text>
               <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid #f0f0f0' }}>
-                  <Checkbox
-                    checked={showSettingsAfterUpload}
-                    onChange={(e) => setShowSettingsAfterUpload(e.target.checked)}
-                  >
-                    <Text style={{ fontSize: '12px' }}>Показывать настройки после загрузки</Text>
-                  </Checkbox>
-                </div>
-              </Space>
+                <Checkbox
+                  checked={showSettingsAfterUpload}
+                  onChange={(e) => setShowSettingsAfterUpload(e.target.checked)}
+                >
+                  <Text style={{ fontSize: '12px' }}>Показывать настройки после загрузки</Text>
+                </Checkbox>
+              </div>
+            </Space>
           </div>
         </Dragger>
 
@@ -520,8 +546,12 @@ const ExcelUploaderWithSettings: React.FC<ExcelUploaderWithSettingsProps> = ({
 
             <Space direction="vertical" style={{ width: '100%' }} size="middle">
               {files.map((file, index) => {
-                const readyOrdersCount = file.colorFilteredData?.filter(row => row.rowColor === 'green').length || 0;
-                const totalOrdersCount = file.colorFilteredData?.length || 0;
+                // Определяем количество заказов в зависимости от режима отображения
+                const currentData = file.filteredData || file.colorFilteredData || [];
+                const allData = file.data || [];
+                const readyOrdersCount = currentData.filter(row => row.rowColor === 'green').length;
+                const totalOrdersCount = currentData.length;
+                const isShowingAll = !file.importSettings?.importOnlySelected;
                 
                 return (
                   <Card key={index} size="small" style={{ backgroundColor: '#fafafa' }}>
@@ -534,9 +564,19 @@ const ExcelUploaderWithSettings: React.FC<ExcelUploaderWithSettingsProps> = ({
                             <br />
                             <Text type="secondary" style={{ fontSize: '12px' }}>
                               {(file.file.size / 1024 / 1024).toFixed(2)} MB
-                              {totalOrdersCount > 0 && ` • ${totalOrdersCount} заказов`}
+                              {totalOrdersCount > 0 && (
+                                <>
+                                  {` • ${totalOrdersCount} строк`}
+                                  {!isShowingAll && allData.length > totalOrdersCount && (
+                                    <Text type="warning"> (фильтр из {allData.length})</Text>
+                                  )}
+                                </>
+                              )}
                               {readyOrdersCount > 0 && (
                                 <Text type="success"> • {readyOrdersCount} готовых</Text>
+                              )}
+                              {isShowingAll && allData.length > 0 && (
+                                <Text style={{ color: '#1890ff' }}> • Показаны все</Text>
                               )}
                             </Text>
                           </div>
@@ -549,27 +589,90 @@ const ExcelUploaderWithSettings: React.FC<ExcelUploaderWithSettingsProps> = ({
                       </Col>
                       <Col>
                         <Space>
-                          {file.status === 'done' && readyOrdersCount > 0 && (
-                            <Tooltip title={`Скачать ${readyOrdersCount} готовых заказов`}>
-                              <Button 
-                                type="primary"
-                                size="small" 
-                                icon={<DownloadOutlined />}
-                                onClick={() => handleDownload(index)}
-                              >
-                                Скачать готовые ({readyOrdersCount})
-                              </Button>
-                            </Tooltip>
+                          {file.status === 'done' && file.data && (
+                            <Space direction="vertical" size="small">
+                              <Space size="small">
+                                <Tooltip title="Показать только выбранные строки (с цветовыми фильтрами)">
+                                  <Button 
+                                    size="small"
+                                    icon={<FilterOutlined />}
+                                    type={file.importSettings?.importOnlySelected ? "primary" : "default"}
+                                    onClick={() => {
+                                      const newSettings: ImportSettings = {
+                                        ...defaultImportSettings,
+                                        ...file.importSettings,
+                                        importOnlySelected: true
+                                      };
+                                      const colorFilteredData = applyColorFilters(file.data!, newSettings);
+                                      setFiles(prev => prev.map((f, i) => 
+                                        i === index ? {
+                                          ...f,
+                                          importSettings: newSettings,
+                                          filteredData: colorFilteredData,
+                                          colorFilteredData
+                                        } : f
+                                      ));
+                                      message.info(`Показаны выбранные строки (${colorFilteredData.length} из ${file.data!.length})`);
+                                    }}
+                                  >
+                                    Выборочно ({file.filteredData?.length || 0})
+                                  </Button>
+                                </Tooltip>
+                                
+                                <Tooltip title="Показать все строки из файла">
+                                  <Button 
+                                    size="small"
+                                    icon={<EyeOutlined />}
+                                    type={!file.importSettings?.importOnlySelected ? "primary" : "default"}
+                                    onClick={() => {
+                                      const newSettings: ImportSettings = {
+                                        ...defaultImportSettings,
+                                        ...file.importSettings,
+                                        importOnlySelected: false
+                                      };
+                                      const allData = file.data!;
+                                      setFiles(prev => prev.map((f, i) => 
+                                        i === index ? {
+                                          ...f,
+                                          importSettings: newSettings,
+                                          filteredData: allData,
+                                          colorFilteredData: allData
+                                        } : f
+                                      ));
+                                      message.info(`Показаны все строки (${allData.length})`);
+                                    }}
+                                  >
+                                    Все ({file.data?.length || 0})
+                                  </Button>
+                                </Tooltip>
+                              </Space>
+                              
+                              <Space size="small">
+                                {readyOrdersCount > 0 && (
+                                  <Tooltip title={`Скачать ${readyOrdersCount} готовых заказов`}>
+                                    <Button 
+                                      type="primary"
+                                      size="small" 
+                                      icon={<DownloadOutlined />}
+                                      onClick={() => handleDownload(index)}
+                                    >
+                                      Скачать готовые ({readyOrdersCount})
+                                    </Button>
+                                  </Tooltip>
+                                )}
+                                {showPreview && (
+                                  <Button 
+                                    size="small" 
+                                    icon={<EyeOutlined />}
+                                    onClick={() => handlePreview(index)}
+                                  >
+                                    Превью
+                                  </Button>
+                                )}
+                              </Space>
+                            </Space>
                           )}
-                          {file.status === 'done' && showPreview && (
-                            <Button 
-                              size="small" 
-                              icon={<EyeOutlined />}
-                              onClick={() => handlePreview(index)}
-                            >
-                              Превью
-                            </Button>
-                          )}
+                          
                           {file.status === 'error' && (
                             <Button 
                               size="small" 
@@ -634,9 +737,9 @@ const ExcelUploaderWithSettings: React.FC<ExcelUploaderWithSettingsProps> = ({
         currentSettings={defaultImportSettings}
       />
 
-      {/* Модальное окно превью с цветовым выделением */}
+      {/* Модальное окно превью с РЕАЛЬНЫМИ данными */}
       <Modal
-        title={`Превью файла: ${selectedFileIndex >= 0 ? files[selectedFileIndex]?.file.name : ''}`}
+        title={`📄 Превью файла: ${selectedFileIndex >= 0 ? files[selectedFileIndex]?.file.name : ''}`}
         open={previewModalVisible}
         onCancel={() => setPreviewModalVisible(false)}
         width={1400}
@@ -649,21 +752,24 @@ const ExcelUploaderWithSettings: React.FC<ExcelUploaderWithSettingsProps> = ({
         {selectedFileIndex >= 0 && files[selectedFileIndex] && (
           <div>
             <Alert 
-              message="Превью данных с цветовой фильтрацией"
+              message="✅ Превью РЕАЛЬНЫХ данных из вашего Excel файла"
               description={
                 <div>
                   <div>Показано: {files[selectedFileIndex].filteredData?.length || 0} из {files[selectedFileIndex].data?.length || 0} строк</div>
                   <div style={{ marginTop: 8 }}>
                     <Space size="small">
-                      <Tag color="success">🟢 Зеленые = готовые заказы</Tag>
+                      <Tag color="success">🟢 Зеленые = готовые заказы (автоопределение)</Tag>
                       <Tag color="warning">🟡 Желтые = обычные заказы</Tag>
                       <Tag color="error">🔴 Красные = критичные заказы</Tag>
                       <Tag color="processing">🔵 Синие = плановые заказы</Tag>
                     </Space>
                   </div>
+                  <div style={{ marginTop: 8, fontSize: '12px', color: '#1890ff' }}>
+                    🎯 Это НАСТОЯЩИЕ данные из вашего Excel файла!
+                  </div>
                 </div>
               }
-              type="info"
+              type="success"
               style={{ marginBottom: 16 }}
             />
             <Table
@@ -690,12 +796,6 @@ const ExcelUploaderWithSettings: React.FC<ExcelUploaderWithSettingsProps> = ({
                 };
                 return colorMap[record.rowColor as keyof typeof colorMap] || '';
               }}
-              style={{
-                '.row-green': { backgroundColor: '#f6ffed' },
-                '.row-yellow': { backgroundColor: '#fffbe6' },
-                '.row-red': { backgroundColor: '#fff2f0' },
-                '.row-blue': { backgroundColor: '#f0f5ff' },
-              } as any}
             />
           </div>
         )}

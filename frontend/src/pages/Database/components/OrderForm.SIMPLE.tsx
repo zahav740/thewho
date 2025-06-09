@@ -231,8 +231,6 @@ export const OrderForm: React.FC<OrderFormProps> = ({
             <Select {...field} style={{ width: '100%' }}>
               <Option value={OperationType.MILLING}>Фрезерная</Option>
               <Option value={OperationType.TURNING}>Токарная</Option>
-              <Option value={OperationType.DRILLING}>Сверление</Option>
-              <Option value={OperationType.GRINDING}>Шлифовка</Option>
             </Select>
           )}
         />

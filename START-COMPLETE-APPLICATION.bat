@@ -1,63 +1,70 @@
-@echo off
-echo ============================================
-echo  STARTING PRODUCTION CRM APPLICATION
-echo ============================================
-echo.
-echo This script will:
-echo 1. Stop any running instances
-echo 2. Start the backend server
-echo 3. Wait for backend to initialize
-echo 4. Start the frontend application
-echo.
-echo ============================================
-echo.
-echo Stopping all running services...
+-- 🚨 СКРИПТ ОЧИСТКИ ДЛЯ ПРОДАКШЕН СИСТЕМЫ 🚨
+-- Удаляет все автоматически созданные данные, оставляя только реальные
 
-echo Stopping services on ports 3000, 3001, 8080...
-for /f "tokens=5" %%a in ('netstat -ano ^| find ":3000"') do (
-    taskkill /F /PID %%a 2>nul
-)
-for /f "tokens=5" %%a in ('netstat -ano ^| find ":3001"') do (
-    taskkill /F /PID %%a 2>nul
-)
-for /f "tokens=5" %%a in ('netstat -ano ^| find ":8080"') do (
-    taskkill /F /PID %%a 2>nul
-)
+-- ВАЖНО: Этот скрипт удалит все данные, созданные при сегодняшнем исправлении
+-- и вернет систему к состоянию с чистыми реальными данными
 
-echo Killing all node processes...
-taskkill /F /IM node.exe 2>nul
+BEGIN;
 
-timeout /t 2 /nobreak > nul
-echo.
-echo Starting backend server...
-echo.
-echo Please be patient while the backend initializes...
+-- 1. Удаляем всю историю операций (созданную при конвертации смен)
+DELETE FROM operation_history;
 
-start cmd /k "cd backend && npm start"
+-- 2. Удаляем всю статистику операторов (созданную при конвертации)
+DELETE FROM operator_efficiency_stats;
 
-echo Waiting for backend to initialize (15 seconds)...
-timeout /t 15 /nobreak > nul
+-- 3. Сбрасываем статусы операций обратно на первоначальные
+UPDATE operations 
+SET status = 'PENDING', "updatedAt" = NOW() 
+WHERE status = 'in_progress';
 
-echo.
-echo Starting frontend application...
-echo.
-echo Frontend will open automatically in your browser.
-echo.
+-- Восстанавливаем статус "assigned" для операций с назначенными станками
+UPDATE operations
+SET status = 'assigned', "updatedAt" = NOW()
+WHERE "assignedMachine" IS NOT NULL AND status = 'PENDING';
 
-start cmd /k "cd frontend && npm start"
+-- 4. Проверяем результат очистки
+SELECT 'РЕЗУЛЬТАТ ОЧИСТКИ' as status;
 
-echo.
-echo ============================================
-echo Both servers should now be starting!
-echo.
-echo Backend: http://localhost:3001
-echo Frontend: http://localhost:3000
-echo.
-echo IMPORTANT:
-echo - Keep both command windows open
-echo - Check the windows for any error messages
-echo - If you see connection errors in the browser,
-echo   wait a few more seconds for the backend to
-echo   fully initialize
-echo ============================================
-pause
+SELECT 'shift_records' as table_name, COUNT(*) as count FROM shift_records
+UNION ALL
+SELECT 'operation_history', COUNT(*) FROM operation_history  
+UNION ALL
+SELECT 'operator_efficiency_stats', COUNT(*) FROM operator_efficiency_stats
+UNION ALL
+SELECT 'operations_pending', COUNT(*) FROM operations WHERE status = 'PENDING'
+UNION ALL
+SELECT 'operations_assigned', COUNT(*) FROM operations WHERE status = 'assigned'
+UNION ALL
+SELECT 'orders', COUNT(*) FROM orders
+UNION ALL
+SELECT 'machines', COUNT(*) FROM machines;
+
+COMMIT;
+
+-- Проверяем оставшиеся реальные данные
+SELECT 'ОСТАВШИЕСЯ РЕАЛЬНЫЕ ДАННЫЕ' as info;
+
+-- Смены (реальные данные производства)
+SELECT 'СМЕНЫ:' as type, sr.date, sr."shiftType", sr.drawingnumber, 
+       sr."dayShiftOperator", sr."nightShiftOperator",
+       COALESCE(sr."dayShiftQuantity", 0) + COALESCE(sr."nightShiftQuantity", 0) as total_produced
+FROM shift_records sr
+ORDER BY sr.date DESC;
+
+-- Заказы (реальные чертежи)
+SELECT 'ЗАКАЗЫ:' as type, ord.drawing_number, ord.quantity, ord.deadline, ord.priority, ''::text, 0::int
+FROM orders ord
+ORDER BY ord.drawing_number;
+
+-- Операции (связанные с реальными заказами)
+SELECT 'ОПЕРАЦИИ:' as type, op."operationNumber"::text, op.operationtype, op.status, ord.drawing_number, op."estimatedTime"
+FROM operations op
+LEFT JOIN orders ord ON op."orderId" = ord.id
+ORDER BY ord.drawing_number, op."operationNumber";
+
+-- Станки (реальное оборудование)
+SELECT 'СТАНКИ:' as type, m.code, m.type, 
+       CASE WHEN m."isOccupied" THEN 'ЗАНЯТ' ELSE 'СВОБОДЕН' END, '', 0
+FROM machines m
+WHERE m."isActive" = true
+ORDER BY m.code;

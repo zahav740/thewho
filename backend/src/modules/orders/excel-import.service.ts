@@ -47,16 +47,63 @@ export class ExcelImportService {
     file: Express.Multer.File,
     colorFilters: string[] = [],
   ): Promise<ImportResult> {
+    console.log('🔍 EXCEL IMPORT SERVICE: Начало импорта реального файла:', {
+      originalname: file.originalname,
+      size: file.size,
+      mimetype: file.mimetype,
+      hasBuffer: !!file.buffer,
+      bufferSize: file.buffer?.length,
+      colorFiltersCount: colorFilters.length
+    });
+    
     if (!file) {
       throw new BadRequestException('Файл не предоставлен');
     }
 
+    if (!file.buffer) {
+      console.error('❌ EXCEL IMPORT SERVICE: Отсутствует file.buffer!');
+      throw new BadRequestException('Ошибка чтения файла: отсутствует buffer');
+    }
+
+    console.log('✅ Файл прошел проверку, начинаем парсинг...');
+
     const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(file.buffer);
+    
+    try {
+      // Загружаем реальные данные из buffer
+      console.log('📂 Загружаем Excel из buffer...');
+      await workbook.xlsx.load(file.buffer);
+      console.log('✅ Excel успешно загружен!');
+    } catch (error) {
+      console.error('❌ Ошибка загрузки Excel:', error);
+      throw new BadRequestException(`Ошибка чтения Excel файла: ${error.message}`);
+    }
 
     const worksheet = workbook.getWorksheet(1);
     if (!worksheet) {
       throw new BadRequestException('Рабочий лист не найден');
+    }
+
+    console.log('📄 Найден рабочий лист:', {
+      name: worksheet.name,
+      rowCount: worksheet.rowCount,
+      columnCount: worksheet.columnCount
+    });
+
+    // 🔍 Диагностика: показываем первые 3 строки
+    console.log('🔍 Превью структуры данных:');
+    for (let rowNum = 1; rowNum <= Math.min(3, worksheet.rowCount); rowNum++) {
+      const row = worksheet.getRow(rowNum);
+      const rowData: any = {};
+      
+      // Получаем значения первых 10 колонок
+      for (let colNum = 1; colNum <= Math.min(10, worksheet.columnCount); colNum++) {
+        const cell = row.getCell(colNum);
+        const columnLetter = String.fromCharCode(64 + colNum); // A, B, C, etc.
+        rowData[columnLetter] = cell.value || 'пусто';
+      }
+      
+      console.log(`  Строка ${rowNum}:`, rowData);
     }
 
     const orders: ParsedOrder[] = [];
@@ -65,22 +112,39 @@ export class ExcelImportService {
     // Предполагаемая структура Excel:
     // A: Номер чертежа, B: Количество, C: Срок, D: Приоритет, E: Тип работы
     // F-K: Операции (номер, тип, оси, время)
+    let processedRows = 0;
     worksheet.eachRow((row, rowNumber) => {
-      if (rowNumber === 1) return; // Пропускаем заголовок
+      if (rowNumber === 1) {
+        console.log('🗺 Пропускаем заголовок в строке', rowNumber);
+        return; // Пропускаем заголовок
+      }
 
       try {
         if (this.shouldProcessRow(row, colorFilters)) {
           const order = this.parseRowToOrder(row);
           if (order) {
             orders.push(order);
+            console.log(`✅ Обработана строка ${rowNumber}: ${order.drawingNumber}`);
+          } else {
+            console.log(`⚠️ Пустая строка ${rowNumber}`);
           }
+        } else {
+          console.log(`🎨 Пропускаем строку ${rowNumber} (не проходит цветовой фильтр)`);
         }
+        processedRows++;
       } catch (error) {
+        console.error(`❌ Ошибка в строке ${rowNumber}:`, error.message);
         errors.push({
           order: `Строка ${rowNumber}`,
           error: error.message,
         });
       }
+    });
+
+    console.log('📊 Обработка завершена:', {
+      totalRows: processedRows,
+      parsedOrders: orders.length,
+      errors: errors.length
     });
 
     return this.processImportedOrders(orders, errors);

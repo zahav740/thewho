@@ -9,8 +9,6 @@
 export enum OperationType {
   MILLING = 'MILLING',
   TURNING = 'TURNING',
-  DRILLING = 'DRILLING',
-  GRINDING = 'GRINDING',
 }
 
 export enum OperationStatus {
