@@ -15,6 +15,7 @@ import {
   SettingOutlined,
   PlayCircleOutlined,
   HistoryOutlined,
+  UserOutlined, // 🆕 Иконка для операторов
 } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
 
@@ -56,6 +57,12 @@ export const Layout: React.FC = () => {
       icon: <ScheduleOutlined />,
       label: 'Смены',
       onClick: () => navigate('/shifts'),
+    },
+    {
+      key: '/operators', // 🆕 Новый пункт меню
+      icon: <UserOutlined />,
+      label: 'Операторы',
+      onClick: () => navigate('/operators'),
     },
     {
       key: '/planning',
@@ -129,6 +136,8 @@ function getPageTitle(pathname: string): string {
       return 'База данных заказов';
     case '/shifts':
       return 'Учет смен';
+    case '/operators': // 🆕 Заголовок для страницы операторов
+      return 'Управление операторами';
     case '/planning':
       return 'Планирование производства';
     case '/calendar':

@@ -8,7 +8,7 @@
 import axios from 'axios';
 import { formatOrderData } from '../utils/operation-formatter';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5100/api';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5100/api'; // 🔄 Исправлено на порт 5100
 
 export const api = axios.create({
   baseURL: API_BASE_URL,

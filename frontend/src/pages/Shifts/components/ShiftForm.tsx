@@ -25,6 +25,7 @@ import dayjs from 'dayjs';
 import { shiftsApi } from '../../../services/shiftsApi';
 import { machinesApi } from '../../../services/machinesApi';
 import { operationsApi } from '../../../services/operationsApi';
+import { operatorsApi } from '../../../services/operatorsApi'; // 🆕 Добавляем API операторов
 import { CreateShiftRecordDto, ShiftType } from '../../../types/shift.types';
 import { OperationStatus } from '../../../types/operation.types';
 
@@ -64,6 +65,17 @@ export const ShiftForm: React.FC<ShiftFormProps> = ({
   const { data: machines } = useQuery({
     queryKey: ['machines'],
     queryFn: machinesApi.getAll,
+  });
+
+  // 🆕 Загрузка операторов для выпадающих меню
+  const { data: setupOperators } = useQuery({
+    queryKey: ['operators', 'setup'],
+    queryFn: () => operatorsApi.getAll('SETUP', true),
+  });
+
+  const { data: productionOperators } = useQuery({
+    queryKey: ['operators', 'production'],
+    queryFn: () => operatorsApi.getAll('PRODUCTION', true),
   });
 
   // Преобразуем данные для обратной совместимости
@@ -494,7 +506,21 @@ export const ShiftForm: React.FC<ShiftFormProps> = ({
               <Controller
                 name="setupOperator"
                 control={control}
-                render={({ field }) => <Input {...field} placeholder="Имя оператора" />}
+                render={({ field }) => (
+                  <Select 
+                    {...field} 
+                    placeholder="Выберите оператора"
+                    showSearch
+                    optionFilterProp="children"
+                    allowClear
+                  >
+                    {setupOperators?.map((operator) => (
+                      <Option key={operator.id} value={operator.name}>
+                        {operator.name}
+                      </Option>
+                    ))}
+                  </Select>
+                )}
               />
             </Form.Item>
           </Space>
@@ -516,7 +542,21 @@ export const ShiftForm: React.FC<ShiftFormProps> = ({
               <Controller
                 name="dayShiftOperator"
                 control={control}
-                render={({ field }) => <Input {...field} placeholder="Имя оператора" />}
+                render={({ field }) => (
+                  <Select 
+                    {...field} 
+                    placeholder="Выберите оператора"
+                    showSearch
+                    optionFilterProp="children"
+                    allowClear
+                  >
+                    {productionOperators?.map((operator) => (
+                      <Option key={operator.id} value={operator.name}>
+                        {operator.name}
+                      </Option>
+                    ))}
+                  </Select>
+                )}
               />
             </Form.Item>
 
@@ -549,7 +589,19 @@ export const ShiftForm: React.FC<ShiftFormProps> = ({
                 name="nightShiftOperator"
                 control={control}
                 render={({ field }) => (
-                  <Input {...field} placeholder="Имя оператора" />
+                  <Select 
+                    {...field} 
+                    placeholder="Выберите оператора"
+                    showSearch
+                    optionFilterProp="children"
+                    allowClear
+                  >
+                    {productionOperators?.map((operator) => (
+                      <Option key={operator.id} value={operator.name}>
+                        {operator.name}
+                      </Option>
+                    ))}
+                  </Select>
                 )}
               />
             </Form.Item>

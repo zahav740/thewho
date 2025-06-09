@@ -8,6 +8,7 @@ import { CalendarPage } from './pages/Calendar/CalendarPage';
 import { ProductionPlanningPage } from './pages/Planning';
 import { ActiveOperationsPage } from './pages/ActiveOperations';
 import { OperationHistory } from './pages/OperationHistory';
+import { OperatorsPage } from './pages/Operators'; // 🆕 Страница операторов
 
 const App: React.FC = () => {
   return (
@@ -23,6 +24,7 @@ const App: React.FC = () => {
           <Route path="production" element={<ProductionPage />} />
           <Route path="database" element={<DatabasePage />} />
           <Route path="shifts" element={<ShiftsPage />} />
+          <Route path="operators" element={<OperatorsPage />} /> {/* 🆕 Маршрут для операторов */}
           <Route path="planning" element={<ProductionPlanningPage />} />
           <Route path="operations" element={<ActiveOperationsPage />} />
           <Route path="operation-history" element={<OperationHistory />} />

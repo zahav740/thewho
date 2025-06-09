@@ -12,6 +12,7 @@ import { MulterModule } from '@nestjs/platform-express';
 import { MachinesModule } from './modules/machines/machines.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { OperationsModule } from './modules/operations/operations.module';
+import { OperatorsModule } from './modules/operators/operators.module';
 import { ShiftsModule } from './modules/shifts/shifts.module';
 import { CalendarModule } from './modules/calendar/calendar.module';
 import { FilesModule } from './modules/files/files.module';
@@ -53,6 +54,7 @@ import { OrdersDataMiddleware } from './modules/orders/orders.middleware';
     MachinesModule,
     OrdersModule,
     OperationsModule,
+    OperatorsModule, // 🆕 Модуль операторов
     ShiftsModule,
     CalendarModule,
     FilesModule,
