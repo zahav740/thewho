@@ -13,6 +13,7 @@ import { useTranslation, Language } from '../../i18n';
 export const LanguageSwitcher: React.FC = () => {
   const { t, currentLanguage, setLanguage } = useTranslation();
 
+  console.log('LanguageSwitcher render:', { currentLanguage, t, setLanguage });
   console.log('Current language in LanguageSwitcher:', currentLanguage);
 
   const handleLanguageChange = (language: Language) => {
@@ -60,7 +61,7 @@ export const LanguageSwitcher: React.FC = () => {
       <Button 
         type="text" 
         icon={<GlobalOutlined />}
-        style={{ color: '#fff' }}
+        style={{ color: '#1890ff' }}
       >
         <Space>
           {getCurrentLanguageFlag()}

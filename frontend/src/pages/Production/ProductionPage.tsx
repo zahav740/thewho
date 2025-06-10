@@ -51,7 +51,7 @@ export const ProductionPage: React.FC = () => {
       <div className="loading-container">
         <Spin size="large">
           <div style={{ minHeight: '200px', padding: '50px' }}>
-            <div>Загрузка станков...</div>
+            <div>{t('message.loading')}</div>
           </div>
         </Spin>
       </div>
@@ -61,8 +61,8 @@ export const ProductionPage: React.FC = () => {
   if (error) {
     return (
       <Alert
-        message="Ошибка загрузки"
-        description="Не удалось загрузить список станков"
+        message={t('message.error.load')}
+        description={t('message.error.load')}
         type="error"
         showIcon
       />
@@ -116,11 +116,11 @@ export const ProductionPage: React.FC = () => {
                   <BugOutlined style={{ color: '#52c41a', fontSize: '20px' }} />
                 )}
                 <span style={{ fontWeight: 'bold', fontSize: '16px' }}>
-                  {useImprovedPlanning ? '🆕 Улучшенное планирование включено' : '🐛 Стандартное планирование'}
+                  {useImprovedPlanning ? t('planning.improved_enabled') : t('planning.standard_enabled')}
                 </span>
               </Space>
               <Space>
-                <span>Стандартное</span>
+                <span>{t('planning.standard')}</span>
                 <Switch 
                   checked={useImprovedPlanning}
                   onChange={setUseImprovedPlanning}
@@ -128,13 +128,13 @@ export const ProductionPage: React.FC = () => {
                     backgroundColor: useImprovedPlanning ? '#faad14' : undefined
                   }}
                 />
-                <span>🆕 Улучшенное</span>
+                <span>{t('planning.improved')}</span>
               </Space>
             </Space>
             
             {useImprovedPlanning && (
               <div style={{ marginTop: 12, color: '#8c5700', fontSize: '14px' }}>
-                ✅ Проверка операций в работе • ✅ Проверка доступности станков • ✅ Детальный анализ
+                {t('planning.features_enabled')}
               </div>
             )}
           </Card>
@@ -143,7 +143,7 @@ export const ProductionPage: React.FC = () => {
 
       <Row gutter={[16, 16]}>
         <Col span={24}>
-          <h2>Станки</h2>
+          <h2>{t('production.machines')}</h2>
           
           {/* Тестовая кнопка */}
           <Button 
@@ -161,7 +161,7 @@ export const ProductionPage: React.FC = () => {
             }}
             icon={useImprovedPlanning ? <ThunderboltOutlined /> : <BugOutlined />}
           >
-            {useImprovedPlanning ? '🆕 Тест улучшенного планирования' : '🧪 Тест стандартного планирования'} (первый станок)
+            {useImprovedPlanning ? t('planning.test_improved') : t('planning.test_standard')}
           </Button>
           
           <div className="machines-grid">

@@ -17,6 +17,7 @@ import {
   ExclamationCircleOutlined
 } from '@ant-design/icons';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from '../../../i18n';
 import { 
   MachineAvailability, 
   getMachineTypeLabel, 
@@ -43,6 +44,7 @@ export const MachineCard: React.FC<MachineCardProps> = ({
   onSelect,
   onOpenPlanningModal,
 }) => {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
 
   const updateAvailabilityMutation = useMutation({
@@ -54,8 +56,8 @@ export const MachineCard: React.FC<MachineCardProps> = ({
     },
     onSuccess: (updatedMachine) => {
       queryClient.invalidateQueries({ queryKey: ['machines'] });
-      const status = updatedMachine.isAvailable ? 'освобожден' : 'отмечен как занятый';
-      message.success(`Станок "${machine.machineName}" успешно ${status}`);
+      const status = updatedMachine.isAvailable ? t('machine.message.freed') : t('machine.message.marked_busy');
+      message.success(`${t('machine.message.machine')} "${machine.machineName}" ${status}`);
       
       // Если станок освободился, открываем модальное окно планирования
       if (!machine.isAvailable && updatedMachine.isAvailable && onOpenPlanningModal) {
@@ -73,7 +75,7 @@ export const MachineCard: React.FC<MachineCardProps> = ({
     },
     onError: (error) => {
       console.error('Ошибка обновления доступности станка:', error);
-      message.error('Не удалось изменить статус станка. Попробуйте еще раз.');
+      message.error(t('machine.message.update_error'));
     },
   });
 
@@ -81,11 +83,11 @@ export const MachineCard: React.FC<MachineCardProps> = ({
     mutationFn: () => machinesApi.unassignOperation(machine.machineName),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['machines'] });
-      message.success('Операция успешно отменена со станка');
+      message.success(t('machine.message.operation_cancelled'));
     },
     onError: (error) => {
       console.error('Ошибка отмены операции:', error);
-      message.error('Ошибка при отмене операции');
+      message.error(t('message.error.delete'));
     },
   });
 
@@ -100,15 +102,15 @@ export const MachineCard: React.FC<MachineCardProps> = ({
       console.log('🎯 Opening planning modal');
     } else {
       // Для изменения доступности станка показываем подтверждение
-      const action = checked ? 'освободить' : 'отметить как занятый';
-      const title = checked ? 'Освобождение станка' : 'Отметка станка как занятого';
+      const action = checked ? t('machine.dialog.free') : t('machine.dialog.mark_busy');
+      const title = checked ? t('machine.dialog.free_title') : t('machine.dialog.mark_busy_title');
       
       confirm({
         title,
         icon: <ExclamationCircleOutlined />,
-        content: `Вы уверены, что хотите ${action} станок "${machine.machineName}"?`,
-        okText: 'Да, подтверждаю',
-        cancelText: 'Отмена',
+        content: `${t('machine.dialog.confirm')} ${action} ${t('machine.dialog.machine')} "${machine.machineName}"?`,
+        okText: t('button.confirm'),
+        cancelText: t('button.cancel'),
         onOk() {
           console.log(checked ? '✅ Making machine available' : '❌ Making machine unavailable');
           updateAvailabilityMutation.mutate(checked);
@@ -139,9 +141,9 @@ export const MachineCard: React.FC<MachineCardProps> = ({
 
   const getStatusBadge = () => {
     if (machine.isAvailable) {
-      return <Badge status="success" text="Свободен" />;
+      return <Badge status="success" text={t('machine.status.available')} />;
     }
-    return <Badge status="processing" text="Занят" />;
+    return <Badge status="processing" text={t('machine.status.busy')} />;
   };
 
   const getMachineTypeColor = (type: string) => {
@@ -237,7 +239,7 @@ export const MachineCard: React.FC<MachineCardProps> = ({
               // Для свободных станков - кнопка планирования с типом станка
               <>
                 <div style={{ marginBottom: '12px', textAlign: 'center' }}>
-                  <Badge status="success" text="Станок свободен" />
+                  <Badge status="success" text={t('machine.status.available')} />
                 </div>
                 
                 {onOpenPlanningModal && (
@@ -292,14 +294,14 @@ export const MachineCard: React.FC<MachineCardProps> = ({
                     padding: '4px 0'
                   }}
                 >
-                  ❌ Отметить как занятый
+                  ❌ {t('machine.action.mark_busy')}
                 </Button>
               </>
             ) : (
               // Для занятых станков - кнопка освобождения
               <>
                 <div style={{ marginBottom: '12px', textAlign: 'center' }}>
-                  <Badge status="processing" text="Станок занят" />
+                  <Badge status="processing" text={t('machine.status.busy')} />
                 </div>
                 
                 <Button
@@ -317,7 +319,7 @@ export const MachineCard: React.FC<MachineCardProps> = ({
                     fontWeight: '500'
                   }}
                 >
-                  ✅ Освободить станок
+                  ✅ {t('machine.action.free')}
                 </Button>
               </>
             )}
@@ -337,7 +339,7 @@ export const MachineCard: React.FC<MachineCardProps> = ({
               <div style={{ marginBottom: '8px' }}>
                 <Space>
                   <Tag color="orange" style={{ borderRadius: '12px', marginBottom: '4px' }}>
-                    📋 Операция #{machine.currentOperationDetails.operationNumber}
+                    📋 {t('machine.operation')} #{machine.currentOperationDetails.operationNumber}
                   </Tag>
                   <Tag color="blue" style={{ borderRadius: '12px', marginBottom: '4px' }}>
                     {machine.currentOperationDetails.operationType}
@@ -351,7 +353,7 @@ export const MachineCard: React.FC<MachineCardProps> = ({
               </div>
               <div style={{ marginBottom: '12px' }}>
                 <Text type="secondary" style={{ fontSize: '12px' }}>
-                  ⏱️ Время: {formatEstimatedTime(machine.currentOperationDetails.estimatedTime)}
+                  ⏱️ {t('machine.time')}: {formatEstimatedTime(machine.currentOperationDetails.estimatedTime)}
                 </Text>
               </div>
               
@@ -369,7 +371,7 @@ export const MachineCard: React.FC<MachineCardProps> = ({
                   fontSize: '12px'
                 }}
               >
-                {unassignOperationMutation.isPending ? 'Отменяем...' : 'Отменить планирование'}
+                {unassignOperationMutation.isPending ? t('machine.action.cancelling') : t('machine.action.cancel_planning')}
               </Button>
             </Card>
           </Col>
@@ -381,7 +383,7 @@ export const MachineCard: React.FC<MachineCardProps> = ({
               <div style={{ marginBottom: '8px' }}>
                 <Space>
                   <Tag color="orange" style={{ borderRadius: '12px' }}>
-                    Операция
+                    {t('machine.operation')}
                   </Tag>
                   <Text code style={{ fontSize: '12px' }}>
                     {machine.currentOperationId.slice(0, 12)}...
@@ -403,7 +405,7 @@ export const MachineCard: React.FC<MachineCardProps> = ({
                   fontSize: '12px'
                 }}
               >
-                {unassignOperationMutation.isPending ? 'Отменяем...' : 'Отменить планирование'}
+                {unassignOperationMutation.isPending ? t('machine.action.cancelling') : t('machine.action.cancel_planning')}
               </Button>
             </Card>
           </Col>
@@ -416,7 +418,7 @@ export const MachineCard: React.FC<MachineCardProps> = ({
                 <ClockCircleOutlined style={{ color: '#666' }} />
                 <div>
                   <Text type="secondary" style={{ fontSize: '12px', display: 'block' }}>
-                    Последнее освобождение:
+                    {t('machine.last_freed')}:
                   </Text>
                   <Text style={{ fontSize: '13px', fontWeight: '500' }}>
                     {new Date(machine.lastFreedAt).toLocaleString('ru-RU')}
@@ -443,7 +445,7 @@ export const MachineCard: React.FC<MachineCardProps> = ({
               borderColor: isSelected ? machineTypeColor : undefined,
             }}
           >
-            {isSelected ? 'Выбран для планирования' : 'Выбрать станок'}
+            {isSelected ? t('machine.action.selected') : t('machine.action.select')}
           </Button>
         </Col>
       </Row>

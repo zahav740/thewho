@@ -1,5 +1,5 @@
 // Import browser mode 
-import './utils/browserMode'; 
+import './utils/browserMode.js'; 
 /**
  * @file: index.tsx
  * @description: Точка входа React приложения
@@ -27,7 +27,7 @@ dayjs.locale('ru');
     const message = args.join(' ');
     // Подавляем SVG path ошибки от recharts/jQuery
     if (message.includes('attribute d: Expected number') || 
-        message.includes('path') && message.includes('Expected number')) {
+        (message.includes('path') && message.includes('Expected number'))) {
       return; // Не выводим эту ошибку
     }
     originalConsoleError.apply(console, args);

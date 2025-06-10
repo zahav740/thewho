@@ -28,6 +28,7 @@ import { operationsApi } from '../../../services/operationsApi';
 import { operatorsApi } from '../../../services/operatorsApi'; // 🆕 Добавляем API операторов
 import { CreateShiftRecordDto, ShiftType } from '../../../types/shift.types';
 import { OperationStatus } from '../../../types/operation.types';
+import { useTranslation } from '../../../i18n';
 
 const { Option } = Select;
 
@@ -46,6 +47,7 @@ export const ShiftForm: React.FC<ShiftFormProps> = ({
   onClose,
   onSuccess,
 }) => {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const isEdit = !!shiftId;
 
@@ -213,11 +215,11 @@ export const ShiftForm: React.FC<ShiftFormProps> = ({
   const createMutation = useMutation({
     mutationFn: shiftsApi.create,
     onSuccess: () => {
-      message.success('Запись смены создана');
+      message.success(t('shifts.record_created'));
       onSuccess();
     },
     onError: () => {
-      message.error('Ошибка при создании записи');
+      message.error(t('shifts.error_creating'));
     },
   });
 
@@ -225,24 +227,24 @@ export const ShiftForm: React.FC<ShiftFormProps> = ({
     mutationFn: ({ id, data }: { id: number; data: any }) =>
       shiftsApi.update(id, data),
     onSuccess: () => {
-      message.success('Запись смены обновлена');
+      message.success(t('shifts.record_updated'));
       onSuccess();
     },
     onError: () => {
-      message.error('Ошибка при обновлении записи');
+      message.error(t('shifts.error_updating'));
     },
   });
 
   const onSubmit = async (data: CreateShiftRecordDto) => {
     // Для новых записей проверяем наличие станка
     if (!data.machineId && !isEdit) {
-      message.error('Пожалуйста, выберите станок');
+      message.error(t('shifts.select_machine'));
       return;
     }
 
     // Проверяем наличие данных смены (дневной или ночной)
     if (!data.dayShiftQuantity && !data.nightShiftQuantity) {
-      message.error('Заполните данные хотя бы для одной смены');
+      message.error(t('shifts.fill_shift_data'));
       return;
     }
 
@@ -262,23 +264,23 @@ export const ShiftForm: React.FC<ShiftFormProps> = ({
 
   return (
     <Modal
-      title={isEdit ? 'Редактировать запись смены' : 'Новая запись смены'}
+      title={isEdit ? t('shifts.edit_record') : t('shifts.create_record')}
       open={visible}
       onCancel={onClose}
       onOk={handleSubmit(onSubmit)}
       width={700}
       confirmLoading={loading}
-      okText={isEdit ? 'Сохранить' : 'Создать'}
-      cancelText="Отмена"
+      okText={isEdit ? t('button.save') : t('button.create')}
+      cancelText={t('button.cancel')}
     >
       <Spin spinning={loading}>
         <Form layout="vertical">
           <Space size="large" style={{ width: '100%' }}>
-            <Form.Item label="Дата" required>
+            <Form.Item label={t('form.date')} required>
               <Controller
                 name="date"
                 control={control}
-                rules={{ required: 'Обязательное поле' }}
+                rules={{ required: t('shifts.required_field') }}
                 render={({ field }) => (
                   <DatePicker
                     {...field}
@@ -290,14 +292,14 @@ export const ShiftForm: React.FC<ShiftFormProps> = ({
               />
             </Form.Item>
 
-            <Form.Item label="Тип смены" required>
+            <Form.Item label={t('shifts.shift_type')} required>
               <Controller
                 name="shiftType"
                 control={control}
                 render={({ field }) => (
                   <Radio.Group {...field}>
-                    <Radio value={ShiftType.DAY}>Дневная</Radio>
-                    <Radio value={ShiftType.NIGHT}>Ночная</Radio>
+                    <Radio value={ShiftType.DAY}>{t('shifts.day_shift')}</Radio>
+                    <Radio value={ShiftType.NIGHT}>{t('shifts.night_shift')}</Radio>
                   </Radio.Group>
                 )}
               />
@@ -305,19 +307,19 @@ export const ShiftForm: React.FC<ShiftFormProps> = ({
           </Space>
 
           <Space size="large" style={{ width: '100%' }}>
-            <Form.Item label="Станок" required style={{ width: 250 }}>
+            <Form.Item label={t('form.machine')} required style={{ width: 250 }}>
               <Controller
                 name="machineId"
                 control={control}
-                rules={{ required: 'Обязательное поле' }}
+                rules={{ required: t('shifts.required_field') }}
                 render={({ field }) => (
-                  <Select {...field} placeholder="Выберите станок" showSearch optionFilterProp="children">
+                  <Select {...field} placeholder={t('shifts.select_machine')} showSearch optionFilterProp="children">
                     {machinesList?.map((machine) => {
                       const machineTypeLabel = machine.machineType === 'MILLING' || machine.machineType?.includes('milling') 
-                        ? 'Фрезерный' 
+                        ? t('shifts.milling')
                         : machine.machineType === 'TURNING' || machine.machineType?.includes('turning')
-                        ? 'Токарный'
-                        : 'Станок';
+                        ? t('shifts.turning')
+                        : t('shifts.machine_generic');
                       return (
                         <Option key={machine.id} value={machine.id}>
                           {machine.machineName} - {machineTypeLabel}
@@ -346,11 +348,11 @@ export const ShiftForm: React.FC<ShiftFormProps> = ({
         alignItems: 'center',
         gap: '8px'
       }}>
-        {assignedOperation ? '✅' : '⚠️'} Информация об операции:
+        {assignedOperation ? '✅' : '⚠️'} {t('shifts.operation_info')}:
       </h4>
               {operationLoading ? (
                 <div style={{ textAlign: 'center', padding: '12px' }}>
-                  <Spin size="small" /> Поиск операции...
+                  <Spin size="small" /> {t('message.loading')}...
                 </div>
               ) : assignedOperation ? (
                 <div style={{ 
@@ -371,7 +373,7 @@ export const ShiftForm: React.FC<ShiftFormProps> = ({
                       fontSize: '16px',
                       fontWeight: '500'
                     }}>
-                      <span style={{ color: '#1890ff' }}>Операция №:</span> 
+                      <span style={{ color: '#1890ff' }}>{t('form.operation')} №:</span> 
                       <span style={{ color: '#262626', fontWeight: 'bold' }}>{assignedOperation.operationNumber}</span>
                     </div>
                     <div style={{ 
@@ -381,8 +383,8 @@ export const ShiftForm: React.FC<ShiftFormProps> = ({
                       fontSize: '16px',
                       fontWeight: '500'
                     }}>
-                      <span style={{ color: '#1890ff' }}>Чертёж:</span> 
-                      <span style={{ color: '#262626', fontWeight: 'bold' }}>{assignedOperation.orderDrawingNumber || 'Не указан'}</span>
+                      <span style={{ color: '#1890ff' }}>{t('order_info.drawing')}:</span> 
+                      <span style={{ color: '#262626', fontWeight: 'bold' }}>{assignedOperation.orderDrawingNumber || t('shifts.machine_not_specified')}</span>
                     </div>
                   </div>
                   
@@ -400,7 +402,7 @@ export const ShiftForm: React.FC<ShiftFormProps> = ({
                         color: '#0050b3',
                         marginBottom: '8px'
                       }}>
-                        📋 Информация о заказе:
+                        📋 {t('shifts.order_info')}:
                       </div>
                       <div style={{ 
                         display: 'grid',
@@ -410,15 +412,15 @@ export const ShiftForm: React.FC<ShiftFormProps> = ({
                       }}>
                         {assignedOperation.orderQuantity && (
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <span style={{ color: '#1890ff', fontWeight: '500' }}>📦 Количество:</span>
+                            <span style={{ color: '#1890ff', fontWeight: '500' }}>📦 {t('form.quantity')}:</span>
                             <span style={{ color: '#262626', fontWeight: 'bold', fontSize: '14px' }}>
-                              {assignedOperation.orderQuantity} шт.
+                              {assignedOperation.orderQuantity} {t('shifts.pieces')}.
                             </span>
                           </div>
                         )}
                         {assignedOperation.orderPriority && (
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <span style={{ color: '#1890ff', fontWeight: '500' }}>🎯 Приоритет:</span>
+                            <span style={{ color: '#1890ff', fontWeight: '500' }}>🎯 {t('form.priority')}:</span>
                             <span style={{ 
                               color: assignedOperation.orderPriority === 1 ? '#ff4d4f' : 
                                      assignedOperation.orderPriority === 2 ? '#fa8c16' : '#52c41a',
@@ -430,7 +432,7 @@ export const ShiftForm: React.FC<ShiftFormProps> = ({
                         )}
                         {assignedOperation.orderDeadline && (
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <span style={{ color: '#1890ff', fontWeight: '500' }}>📅 Дедлайн:</span>
+                            <span style={{ color: '#1890ff', fontWeight: '500' }}>📅 {t('order_info.deadline')}:</span>
                             <span style={{ color: '#262626' }}>
                               {new Date(assignedOperation.orderDeadline).toLocaleDateString('ru-RU')}
                             </span>
@@ -438,7 +440,7 @@ export const ShiftForm: React.FC<ShiftFormProps> = ({
                         )}
                         {assignedOperation.orderWorkType && assignedOperation.orderWorkType !== '' && (
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <span style={{ color: '#1890ff', fontWeight: '500' }}>🔧 Тип работы:</span>
+                            <span style={{ color: '#1890ff', fontWeight: '500' }}>🔧 {t('form.type')}:</span>
                             <span style={{ color: '#262626' }}>
                               {assignedOperation.orderWorkType}
                             </span>
@@ -455,9 +457,9 @@ export const ShiftForm: React.FC<ShiftFormProps> = ({
                     color: '#8c8c8c',
                     marginTop: '4px'
                   }}>
-                    <span>Тип: {assignedOperation.operationType || 'Не указан'}</span>
-                    <span>Время: {assignedOperation.estimatedTime || 0} мин</span>
-                    <span>Статус: {assignedOperation.status}</span>
+                    <span>{t('form.type')}: {assignedOperation.operationType || t('shifts.machine_not_specified')}</span>
+                    <span>{t('form.time')}: {assignedOperation.estimatedTime || 0} {t('shifts.minutes')}</span>
+                    <span>{t('form.status')}: {assignedOperation.status}</span>
                   </div>
                 </div>
               ) : (
@@ -466,8 +468,8 @@ export const ShiftForm: React.FC<ShiftFormProps> = ({
                   padding: '12px',
                   color: '#ff4d4f'
                 }}>
-                  <div style={{ fontSize: '16px', marginBottom: '4px' }}>⚠️ На данный станок не назначено операций</div>
-                  <div style={{ fontSize: '12px', color: '#8c8c8c' }}>Запись смены все равно можно создать</div>
+                  <div style={{ fontSize: '16px', marginBottom: '4px' }}>⚠️ {t('shifts.operation_not_found')}</div>
+                  <div style={{ fontSize: '12px', color: '#8c8c8c' }}>{t('shifts.can_create_anyway')}</div>
                 </div>
               )}
             </div>
@@ -489,10 +491,10 @@ export const ShiftForm: React.FC<ShiftFormProps> = ({
             </>
           )}
 
-          <Divider orientation="left">Наладка</Divider>
+          <Divider orientation="left">{t('shifts.setup')}</Divider>
 
           <Space size="large" style={{ width: '100%' }}>
-            <Form.Item label="Время наладки (мин)">
+            <Form.Item label={t('shifts.setup_time_minutes')}>
               <Controller
                 name="setupTime"
                 control={control}
@@ -502,14 +504,14 @@ export const ShiftForm: React.FC<ShiftFormProps> = ({
               />
             </Form.Item>
 
-            <Form.Item label="Оператор наладки">
+            <Form.Item label={t('shifts.setup_operator')}>
               <Controller
                 name="setupOperator"
                 control={control}
                 render={({ field }) => (
                   <Select 
                     {...field} 
-                    placeholder="Выберите оператора"
+                    placeholder={t('shifts.select_operator')}
                     showSearch
                     optionFilterProp="children"
                     allowClear
@@ -525,10 +527,10 @@ export const ShiftForm: React.FC<ShiftFormProps> = ({
             </Form.Item>
           </Space>
 
-          <Divider orientation="left">Дневная смена</Divider>
+          <Divider orientation="left">{t('shifts.day_shift')}</Divider>
 
           <Space size="large" style={{ width: '100%' }}>
-            <Form.Item label="Количество деталей">
+            <Form.Item label={t('shifts.part_count')}>
               <Controller
                 name="dayShiftQuantity"
                 control={control}
@@ -538,14 +540,14 @@ export const ShiftForm: React.FC<ShiftFormProps> = ({
               />
             </Form.Item>
 
-            <Form.Item label="Оператор">
+            <Form.Item label={t('form.operator')}>
               <Controller
                 name="dayShiftOperator"
                 control={control}
                 render={({ field }) => (
                   <Select 
                     {...field} 
-                    placeholder="Выберите оператора"
+                    placeholder={t('shifts.select_operator')}
                     showSearch
                     optionFilterProp="children"
                     allowClear
@@ -560,7 +562,7 @@ export const ShiftForm: React.FC<ShiftFormProps> = ({
               />
             </Form.Item>
 
-            <Form.Item label="Время на деталь (мин)">
+            <Form.Item label={t('shifts.time_per_part')}>
               <Controller
                 name="dayShiftTimePerUnit"
                 control={control}
@@ -571,10 +573,10 @@ export const ShiftForm: React.FC<ShiftFormProps> = ({
             </Form.Item>
           </Space>
 
-          <Divider orientation="left">Ночная смена</Divider>
+          <Divider orientation="left">{t('shifts.night_shift')}</Divider>
 
           <Space size="large" style={{ width: '100%' }}>
-            <Form.Item label="Количество деталей">
+            <Form.Item label={t('shifts.part_count')}>
               <Controller
                 name="nightShiftQuantity"
                 control={control}
@@ -584,14 +586,14 @@ export const ShiftForm: React.FC<ShiftFormProps> = ({
               />
             </Form.Item>
 
-            <Form.Item label="Оператор">
+            <Form.Item label={t('form.operator')}>
               <Controller
                 name="nightShiftOperator"
                 control={control}
                 render={({ field }) => (
                   <Select 
                     {...field} 
-                    placeholder="Выберите оператора"
+                    placeholder={t('shifts.select_operator')}
                     showSearch
                     optionFilterProp="children"
                     allowClear
@@ -606,7 +608,7 @@ export const ShiftForm: React.FC<ShiftFormProps> = ({
               />
             </Form.Item>
 
-            <Form.Item label="Время на деталь (мин)">
+            <Form.Item label={t('shifts.time_per_part')}>
               <Controller
                 name="nightShiftTimePerUnit"
                 control={control}

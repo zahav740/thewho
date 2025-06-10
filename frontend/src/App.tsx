@@ -11,6 +11,7 @@ import { ActiveOperationsPage } from './pages/ActiveOperations';
 import { OperationHistory } from './pages/OperationHistory';
 import { OperatorsPage } from './pages/Operators';
 import { TranslationsPage } from './pages/Translations';
+import { TranslationTestPage } from './pages/TranslationTest/TranslationTestPage';
 
 const App: React.FC = () => {
   return (
@@ -33,6 +34,7 @@ const App: React.FC = () => {
             <Route path="operation-history" element={<OperationHistory />} />
             <Route path="calendar" element={<CalendarPage />} />
             <Route path="translations" element={<TranslationsPage />} />
+            <Route path="translation-test" element={<TranslationTestPage />} />
           </Route>
         </Routes>
       </Router>

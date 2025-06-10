@@ -16,11 +16,13 @@ import { ShiftsList } from './components/ShiftsList';
 import { ShiftForm } from './components/ShiftForm';
 import { ShiftStatistics } from './components/ShiftStatistics';
 import { ActiveMachinesMonitor } from './components/ActiveMachinesMonitor';
+import { useTranslation } from '../../i18n';
 
 const { RangePicker } = DatePicker;
 const { TabPane } = Tabs;
 
 export const ShiftsPage: React.FC = () => {
+  const { t } = useTranslation();
   const [showForm, setShowForm] = useState(false);
   const [editingShiftId, setEditingShiftId] = useState<number | undefined>();
   const [showStatistics, setShowStatistics] = useState(false);
@@ -88,13 +90,13 @@ export const ShiftsPage: React.FC = () => {
                 icon={<PlusOutlined />}
                 onClick={handleCreateShift}
               >
-                Новая запись
+                {t('shifts.new_record')}
               </Button>
               <Button
                 icon={<BarChartOutlined />}
                 onClick={() => setShowStatistics(!showStatistics)}
               >
-                {showStatistics ? 'Скрыть статистику' : 'Показать статистику'}
+                {showStatistics ? t('shifts.hide_statistics') : t('shifts.show_statistics')}
               </Button>
             </Space>
           ) : null
@@ -104,7 +106,7 @@ export const ShiftsPage: React.FC = () => {
           tab={
             <span>
               <MonitorOutlined />
-              Мониторинг производства
+              {t('shifts.monitoring')}
             </span>
           } 
           key="monitor"
@@ -116,7 +118,7 @@ export const ShiftsPage: React.FC = () => {
           tab={
             <span>
               <UnorderedListOutlined />
-              История смен
+              {t('shifts.shift_history')}
             </span>
           } 
           key="history"

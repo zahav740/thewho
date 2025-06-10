@@ -11,12 +11,14 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import { useQuery } from '@tanstack/react-query';
 import { shiftsApi } from '../../../services/shiftsApi';
 import { ShiftsFilter } from '../../../types/shift.types';
+import { useTranslation } from '../../../i18n';
 
 interface ShiftStatisticsProps {
   filter: ShiftsFilter;
 }
 
 export const ShiftStatistics: React.FC<ShiftStatisticsProps> = ({ filter }) => {
+  const { t } = useTranslation();
   const { data: statistics, isLoading, error } = useQuery({
     queryKey: ['shift-statistics', filter],
     queryFn: () => shiftsApi.getStatistics(filter),
@@ -26,7 +28,7 @@ export const ShiftStatistics: React.FC<ShiftStatisticsProps> = ({ filter }) => {
     return (
       <Card>
         <div className="loading-container">
-          <Spin tip="Загрузка статистики..." />
+          <Spin tip={t('shifts.loading_statistics')} />
         </div>
       </Card>
     );
@@ -36,8 +38,8 @@ export const ShiftStatistics: React.FC<ShiftStatisticsProps> = ({ filter }) => {
     return (
       <Card>
         <Alert
-          message="Ошибка загрузки"
-          description="Не удалось загрузить статистику"
+          message={t('shifts.loading_error')}
+          description={t('shifts.statistics_error')}
           type="error"
           showIcon
         />

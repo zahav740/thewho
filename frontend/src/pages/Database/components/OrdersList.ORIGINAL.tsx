@@ -1,9 +1,9 @@
 /**
  * @file: OrdersList.tsx
- * @description: Компонент списка заказов с поддержкой i18n
- * @dependencies: antd, order.types, ContextMenu, useTranslation
+ * @description: Компонент списка заказов с контекстным меню
+ * @dependencies: antd, order.types, ContextMenu
  * @created: 2025-01-28
- * @updated: 2025-06-10 // Добавлена поддержка переводов
+ * @updated: 2025-06-01 // Обновлена логика приоритетов
  */
 import React, { useState } from 'react';
 import { Table, Tag, Button, Space, Popconfirm, Input, Select, Alert, message, Spin } from 'antd';
@@ -13,7 +13,6 @@ import { Order, OrdersFilter, OrdersResponse, Priority } from '../../../types/or
 import { ordersApi } from '../../../services/ordersApi';
 import ContextMenu from '../../../components/ContextMenu';
 import { BulkDeleteModal } from '../../../components/BulkDeleteModal';
-import { useTranslation } from '../../../i18n';
 import dayjs from 'dayjs';
 
 const { Search } = Input;
@@ -40,7 +39,6 @@ export const OrdersList: React.FC<OrdersListProps> = ({
   onDelete,
   onRefresh,
 }) => {
-  const { t, tWithParams } = useTranslation();
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
   const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
   const [allOrders, setAllOrders] = useState<Order[]>([]);
@@ -50,73 +48,82 @@ export const OrdersList: React.FC<OrdersListProps> = ({
     try {
       const ids = selectedRowKeys.map(key => String(key));
       const result = await ordersApi.deleteBatch(ids);
-      message.success(tWithParams('message.success.deleted_count', { count: result.deleted }));
+      message.success(`Удалено ${result.deleted} заказов`);
       setSelectedRowKeys([]);
       onRefresh?.();
     } catch (error) {
-      message.error(t('message.error.delete_selected'));
+      message.error('Ошибка при удалении выбранных заказов');
     }
   };
 
   const handleDeleteAll = async () => {
     try {
+      // При удалении всех заказов, удаляем все заказы в базе, а не только видимые
       const result = await ordersApi.deleteAll();
-      message.success(tWithParams('message.success.deleted_all', { count: result.deleted }));
+      message.success(`Удалено всех ${result.deleted} заказов`);
       setSelectedRowKeys([]);
       onRefresh?.();
     } catch (error) {
-      console.error('Error deleting all orders:', error);
-      message.error(t('message.error.delete_all'));
+      console.error('Ошибка при удалении всех заказов:', error);
+      message.error('Ошибка при удалении всех заказов');
     }
   };
 
+  // Новая функция для массового удаления с выбором
   const handleDeleteAllWithExclusions = async () => {
+    // При открытии модального окна, загружаем все заказы
     try {
       setLoadingAllOrders(true);
       
+      // Получаем общее количество заказов
       const totalCount = data?.total || 0;
+      
+      // Загружаем все заказы с большим лимитом
       const allOrdersResponse = await ordersApi.getAll({ 
-        limit: Math.max(totalCount, 1000),
+        limit: Math.max(totalCount, 1000), // Используем максимум между общим количеством и 1000
         page: 1 
       });
       
-      console.log(`Loaded ${allOrdersResponse.data.length} of ${allOrdersResponse.total} orders`);
+      console.log(`Загружено ${allOrdersResponse.data.length} из ${allOrdersResponse.total} заказов`);
       
       setAllOrders(allOrdersResponse.data);
       setShowBulkDeleteModal(true);
     } catch (error) {
-      console.error('Error loading all orders:', error);
-      message.error(t('message.error.load_orders'));
+      console.error('Ошибка загрузки всех заказов:', error);
+      message.error('Ошибка при загрузке списка заказов');
     } finally {
       setLoadingAllOrders(false);
     }
   };
 
+  // Обработчик массового удаления
   const handleBulkDelete = async (idsToDelete: string[]) => {
     try {
-      console.log(`Deleting ${idsToDelete.length} orders`);
+      // Если удаляем все заказы кроме нескольких, используем deleteBatch
+      console.log(`Удаление ${idsToDelete.length} заказов`);
       const result = await ordersApi.deleteBatch(idsToDelete);
       setSelectedRowKeys([]);
       onRefresh?.();
       return result;
     } catch (error) {
-      console.error('Bulk deletion error:', error);
+      console.error('Ошибка массового удаления:', error);
       throw error;
     }
   };
 
   const getPriorityConfig = (priority: Priority) => {
     const configs = {
-      [Priority.HIGH]: { color: 'orange', text: t('priority.high') },
-      [Priority.MEDIUM]: { color: 'blue', text: t('priority.medium') },
-      [Priority.LOW]: { color: 'green', text: t('priority.low') },
+      // Удалена ссылка на CRITICAL
+      [Priority.HIGH]: { color: 'orange', text: 'Высокий' },
+      [Priority.MEDIUM]: { color: 'blue', text: 'Средний' },
+      [Priority.LOW]: { color: 'green', text: 'Низкий' },
     };
-    return configs[priority] || { color: 'blue', text: t('priority.unknown') };
+    return configs[priority] || { color: 'blue', text: 'Неизвестный' };
   };
 
   const columns: ColumnsType<Order> = [
     {
-      title: t('database.drawing_number'),
+      title: 'Номер чертежа',
       dataIndex: 'drawingNumber',
       key: 'drawingNumber',
       render: (text: string, record: Order) => (
@@ -135,13 +142,13 @@ export const OrdersList: React.FC<OrdersListProps> = ({
       ),
     },
     {
-      title: t('database.quantity'),
+      title: 'Количество',
       dataIndex: 'quantity',
       key: 'quantity',
       width: 100,
     },
     {
-      title: t('database.priority'),
+      title: 'Приоритет',
       dataIndex: 'priority',
       key: 'priority',
       width: 120,
@@ -151,7 +158,7 @@ export const OrdersList: React.FC<OrdersListProps> = ({
       },
     },
     {
-      title: t('database.deadline'),
+      title: 'Срок',
       dataIndex: 'deadline',
       key: 'deadline',
       width: 120,
@@ -162,27 +169,27 @@ export const OrdersList: React.FC<OrdersListProps> = ({
           <Space direction="vertical" size={0}>
             <span>{deadline.format('DD.MM.YYYY')}</span>
             <Tag color={daysLeft <= 3 ? 'red' : daysLeft <= 7 ? 'orange' : 'green'}>
-              {tWithParams('database.days_left', { days: daysLeft })}
+              Осталось {daysLeft} дн.
             </Tag>
           </Space>
         );
       },
     },
     {
-      title: t('database.work_type'),
+      title: 'Тип работы',
       dataIndex: 'workType',
       key: 'workType',
       ellipsis: true,
     },
     {
-      title: t('database.operations'),
+      title: 'Операции',
       dataIndex: 'operations',
       key: 'operations',
       width: 100,
-      render: (operations: any[]) => tWithParams('database.operations_count', { count: operations?.length || 0 }),
+      render: (operations: any[]) => `${operations?.length || 0} оп.`,
     },
     {
-      title: t('database.actions'),
+      title: 'Действия',
       key: 'actions',
       width: 120,
       render: (_: any, record: Order) => (
@@ -193,11 +200,11 @@ export const OrdersList: React.FC<OrdersListProps> = ({
             onClick={() => onEdit(record.id)}
           />
           <Popconfirm
-            title={t('database.delete_order')}
-            description={t('database.delete_confirm')}
+            title="Удалить заказ?"
+            description="Это действие нельзя отменить"
             onConfirm={() => onDelete(record.id)}
-            okText={t('database.delete_button')}
-            cancelText={t('database.cancel_button')}
+            okText="Удалить"
+            cancelText="Отмена"
           >
             <Button type="link" danger icon={<DeleteOutlined />} />
           </Popconfirm>
@@ -232,8 +239,8 @@ export const OrdersList: React.FC<OrdersListProps> = ({
   if (error) {
     return (
       <Alert
-        message={t('database.loading_error')}
-        description={t('database.loading_error_desc')}
+        message="Ошибка загрузки"
+        description="Не удалось загрузить список заказов"
         type="error"
         showIcon
       />
@@ -241,38 +248,39 @@ export const OrdersList: React.FC<OrdersListProps> = ({
   }
 
   return (
-    <Spin spinning={loadingAllOrders} tip={t('message.loading_all_orders')}>
+    <Spin spinning={loadingAllOrders} tip="Загрузка всех заказов...">
       <ContextMenu
         onDeleteSelected={selectedRowKeys.length > 0 ? handleDeleteSelected : undefined}
         onDeleteAll={data?.total && data.total > 0 ? handleDeleteAll : undefined}
         onDeleteAllWithExclusions={data?.total && data.total > 0 ? handleDeleteAllWithExclusions : undefined}
         selectedCount={selectedRowKeys.length}
         totalCount={data?.total || 0}
-        entityName={t('entity.orders')}
+        entityName="заказов"
       >
       <Space direction="vertical" style={{ width: '100%' }} size="middle">
         <Space style={{ marginBottom: 16 }} size="middle">
           <Search
-            placeholder={t('database.search_drawing')}
+            placeholder="Поиск по номеру чертежа"
             allowClear
             onSearch={handleSearch}
             style={{ width: 300 }}
             prefix={<SearchOutlined />}
           />
           <Select
-            placeholder={t('database.filter_priority')}
+            placeholder="Фильтр по приоритету"
             allowClear
             onChange={handlePriorityFilter}
             style={{ width: 200 }}
           >
-            <Option value={Priority.HIGH}>{t('priority.high')}</Option>
-            <Option value={Priority.MEDIUM}>{t('priority.medium')}</Option>
-            <Option value={Priority.LOW}>{t('priority.low')}</Option>
+            {/* Удалена опция CRITICAL */}
+            <Option value={Priority.HIGH}>Высокий</Option>
+            <Option value={Priority.MEDIUM}>Средний</Option>
+            <Option value={Priority.LOW}>Низкий</Option>
           </Select>
           
           {selectedRowKeys.length > 0 && (
             <Alert
-              message={tWithParams('database.selected_orders', { count: selectedRowKeys.length })}
+              message={`Выбрано ${selectedRowKeys.length} заказов`}
               type="info"
               showIcon
               closable
@@ -292,7 +300,7 @@ export const OrdersList: React.FC<OrdersListProps> = ({
             pageSize: filter.limit,
             total: data?.total,
             showSizeChanger: true,
-            showTotal: (total) => tWithParams('database.total_count', { total }),
+            showTotal: (total) => `Всего: ${total} заказов`,
           }}
           onChange={handleTableChange}
           style={{ 
@@ -303,7 +311,7 @@ export const OrdersList: React.FC<OrdersListProps> = ({
         />  
       </Space>
       
-      {/* Bulk delete modal */}
+      {/* Модальное окно массового удаления */}
       <BulkDeleteModal
         visible={showBulkDeleteModal}
         onClose={() => setShowBulkDeleteModal(false)}
@@ -311,7 +319,7 @@ export const OrdersList: React.FC<OrdersListProps> = ({
           setShowBulkDeleteModal(false);
           onRefresh?.();
         }}
-        orders={allOrders}
+        orders={allOrders} // Передаем все заказы
         onDeleteBatch={handleBulkDelete}
         totalOrdersCount={data?.total}
       />

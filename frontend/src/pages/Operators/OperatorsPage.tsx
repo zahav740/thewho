@@ -30,6 +30,7 @@ import {
   SettingOutlined,
 } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from '../../i18n';
 import { operatorsApi, Operator, CreateOperatorDto, UpdateOperatorDto } from '../../services/operatorsApi';
 import type { ColumnsType } from 'antd/es/table';
 
@@ -37,6 +38,7 @@ const { Title } = Typography;
 const { Option } = Select;
 
 export const OperatorsPage: React.FC = () => {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [modalVisible, setModalVisible] = useState(false);
   const [editingOperator, setEditingOperator] = useState<Operator | null>(null);
@@ -52,13 +54,13 @@ export const OperatorsPage: React.FC = () => {
   const createMutation = useMutation({
     mutationFn: operatorsApi.create,
     onSuccess: () => {
-      message.success('Оператор добавлен');
+      message.success(t('message.success.saved'));
       setModalVisible(false);
       form.resetFields();
       queryClient.invalidateQueries({ queryKey: ['operators'] });
     },
     onError: (error: any) => {
-      message.error(error.message || 'Ошибка при добавлении оператора');
+      message.error(error.message || t('message.error.save'));
     },
   });
 

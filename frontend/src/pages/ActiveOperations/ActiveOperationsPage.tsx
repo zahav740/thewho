@@ -1,9 +1,9 @@
 /**
  * @file: ActiveOperationsPage.tsx
- * @description: Обновленная страница мониторинга активных операций с полной аналитикой
- * @dependencies: antd, machine.types, EnhancedOperationAnalyticsModal
+ * @description: Обновленная страница мониторинга активных операций с поддержкой интернационализации
+ * @dependencies: antd, machine.types, EnhancedOperationAnalyticsModal, i18n
  * @created: 2025-06-07
- * @updated: 2025-06-09 - Интегрировано новое модальное окно аналитики
+ * @updated: 2025-06-10 - Добавлена полная поддержка интернационализации
  */
 import React, { useState } from 'react';
 import { 
@@ -45,10 +45,12 @@ import { machinesApi } from '../../services/machinesApi';
 import { shiftsApi } from '../../services/shiftsApi';
 import { formatEstimatedTime } from '../../types/machine.types';
 import { EnhancedOperationAnalyticsModal } from '../../components/OperationAnalyticsModal/EnhancedOperationAnalyticsModal';
+import { useTranslation } from '../../i18n';
 
 const { Title, Text } = Typography;
 
 export const ActiveOperationsPage: React.FC = () => {
+  const { t, tWithParams } = useTranslation();
   const [selectedMachine, setSelectedMachine] = useState<any>(null);
   const [analyticsModalVisible, setAnalyticsModalVisible] = useState(false);
   const queryClient = useQueryClient();
@@ -73,7 +75,7 @@ export const ActiveOperationsPage: React.FC = () => {
       
       if (!machine.currentOperationDetails && !machine.currentOperationId) {
         message.warning({
-          content: 'На данном станке нет активной операции для анализа',
+          content: t('active_operations.no_operation_warning'),
           duration: 3
         });
         return;
@@ -83,13 +85,13 @@ export const ActiveOperationsPage: React.FC = () => {
       setAnalyticsModalVisible(true);
       
       message.success({
-        content: 'Загружаем полную аналитику операции...',
+        content: t('active_operations.loading_analytics'),
         duration: 2
       });
       
     } catch (error) {
       console.error('❌ Ошибка при открытии аналитики операции:', error);
-      message.error('Ошибка при загрузке аналитики операции');
+      message.error(t('active_operations.error_analytics'));
     }
   };
 
@@ -102,7 +104,7 @@ export const ActiveOperationsPage: React.FC = () => {
   // Функция массового обновления всех данных
   const handleRefreshAll = async () => {
     try {
-      message.loading({ content: 'Обновление всех данных...', key: 'refresh-all' });
+      message.loading({ content: t('active_operations.refreshing_data'), key: 'refresh-all' });
       
       console.log('🔄 Массовое обновление всех данных...');
       
@@ -117,7 +119,7 @@ export const ActiveOperationsPage: React.FC = () => {
       await refetch();
       
       message.success({ 
-        content: 'Все данные обновлены успешно', 
+        content: t('active_operations.data_updated'), 
         key: 'refresh-all',
         duration: 2
       });
@@ -125,7 +127,7 @@ export const ActiveOperationsPage: React.FC = () => {
     } catch (error) {
       console.error('❌ Ошибка при массовом обновлении:', error);
       message.error({ 
-        content: 'Ошибка при обновлении данных', 
+        content: t('active_operations.refresh_error'), 
         key: 'refresh-all',
         duration: 3
       });
@@ -145,10 +147,10 @@ export const ActiveOperationsPage: React.FC = () => {
   // Функция получения текста приоритета
   const getPriorityText = (priority: number) => {
     switch (priority) {
-      case 1: return '🚨 Критический';
-      case 2: return '🔥 Высокий';
-      case 3: return '⚡ Средний';
-      default: return '✅ Низкий';
+      case 1: return t('priority.critical_emoji');
+      case 2: return t('priority.high_emoji');
+      case 3: return t('priority.medium_emoji');
+      default: return t('priority.low_emoji');
     }
   };
 
@@ -160,13 +162,22 @@ export const ActiveOperationsPage: React.FC = () => {
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     
     if (diffDays < 0) {
-      return { text: `Просрочено на ${Math.abs(diffDays)} дн.`, color: '#ff4d4f' };
+      return { 
+        text: tWithParams('progress.deadline_overdue', { days: Math.abs(diffDays) }), 
+        color: '#ff4d4f' 
+      };
     } else if (diffDays === 0) {
-      return { text: 'Сегодня!', color: '#fa8c16' };
+      return { text: t('progress.deadline_today'), color: '#fa8c16' };
     } else if (diffDays <= 3) {
-      return { text: `${diffDays} дн.`, color: '#faad14' };
+      return { 
+        text: tWithParams('progress.deadline_days', { days: diffDays }), 
+        color: '#faad14' 
+      };
     } else {
-      return { text: `${diffDays} дн.`, color: '#52c41a' };
+      return { 
+        text: tWithParams('progress.deadline_days', { days: diffDays }), 
+        color: '#52c41a' 
+      };
     }
   };
 
@@ -174,7 +185,7 @@ export const ActiveOperationsPage: React.FC = () => {
     return (
       <div style={{ textAlign: 'center', padding: '50px' }}>
         <Spin size="large" />
-        <div style={{ marginTop: 16 }}>Загрузка активных операций...</div>
+        <div style={{ marginTop: 16 }}>{t('active_operations.loading')}</div>
       </div>
     );
   }
@@ -182,13 +193,13 @@ export const ActiveOperationsPage: React.FC = () => {
   if (error) {
     return (
       <Alert
-        message="Ошибка загрузки"
-        description="Не удалось загрузить информацию об активных операциях"
+        message={t('message.error.load')}
+        description={t('active_operations.error_loading')}
         type="error"
         showIcon
         action={
           <Button size="small" onClick={() => refetch()}>
-            Попробовать снова
+            {t('active_operations.try_again')}
           </Button>
         }
       />
@@ -218,10 +229,10 @@ export const ActiveOperationsPage: React.FC = () => {
         <Row align="middle" justify="space-between">
           <Col>
             <Title level={2} style={{ margin: 0, color: '#1890ff' }}>
-              <DashboardOutlined /> Мониторинг активных операций
+              <DashboardOutlined /> {t('active_operations.title')}
             </Title>
             <Text type="secondary" style={{ fontSize: '14px' }}>
-              Полная аналитика производственных процессов в реальном времени
+              {t('active_operations.subtitle')}
             </Text>
           </Col>
           <Col>
@@ -232,7 +243,7 @@ export const ActiveOperationsPage: React.FC = () => {
                 type="primary"
                 style={{ borderRadius: '8px' }}
               >
-                Обновить все
+                {t('active_operations.refresh_all')}
               </Button>
             </Space>
           </Col>
@@ -242,13 +253,13 @@ export const ActiveOperationsPage: React.FC = () => {
           <Col xs={24} sm={12} lg={6}>
             <Card size="small" style={{ textAlign: 'center', borderRadius: '8px' }}>
               <Statistic
-                title="Активных операций"
+                title={t('stats.active_operations')}
                 value={activeOperations.length}
                 prefix={<PlayCircleOutlined style={{ color: '#ff4d4f' }} />}
                 valueStyle={{ color: '#ff4d4f', fontSize: '24px' }}
               />
               <Text type="secondary" style={{ fontSize: '12px' }}>
-                операций в работе
+                {t('stats.operations_running')}
               </Text>
             </Card>
           </Col>
@@ -256,13 +267,13 @@ export const ActiveOperationsPage: React.FC = () => {
           <Col xs={24} sm={12} lg={6}>
             <Card size="small" style={{ textAlign: 'center', borderRadius: '8px' }}>
               <Statistic
-                title="Занятых станков"
+                title={t('stats.busy_machines')}
                 value={occupiedMachines.length}
                 prefix={<ToolOutlined style={{ color: '#faad14' }} />}
                 valueStyle={{ color: '#faad14', fontSize: '24px' }}
               />
               <Text type="secondary" style={{ fontSize: '12px' }}>
-                из {machines?.length || 0} станков
+                {tWithParams('stats.machines_total', { total: machines?.length || 0 })}
               </Text>
             </Card>
           </Col>
@@ -270,13 +281,13 @@ export const ActiveOperationsPage: React.FC = () => {
           <Col xs={24} sm={12} lg={6}>
             <Card size="small" style={{ textAlign: 'center', borderRadius: '8px' }}>
               <Statistic
-                title="Свободных станков"
+                title={t('stats.free_machines')}
                 value={availableMachines.length}
                 prefix={<CheckCircleOutlined style={{ color: '#52c41a' }} />}
                 valueStyle={{ color: '#52c41a', fontSize: '24px' }}
               />
               <Text type="secondary" style={{ fontSize: '12px' }}>
-                готовы к работе
+                {t('stats.ready_to_work')}
               </Text>
             </Card>
           </Col>
@@ -284,14 +295,14 @@ export const ActiveOperationsPage: React.FC = () => {
           <Col xs={24} sm={12} lg={6}>
             <Card size="small" style={{ textAlign: 'center', borderRadius: '8px' }}>
               <Statistic
-                title="Эффективность"
+                title={t('stats.efficiency')}
                 value={shiftsStats?.averageEfficiency || 0}
                 suffix="%"
                 prefix={<BarChartOutlined style={{ color: '#722ed1' }} />}
                 valueStyle={{ color: '#722ed1', fontSize: '24px' }}
               />
               <Text type="secondary" style={{ fontSize: '12px' }}>
-                средняя за период
+                {t('stats.average_period')}
               </Text>
             </Card>
           </Col>
@@ -312,13 +323,13 @@ export const ActiveOperationsPage: React.FC = () => {
                 <Space>
                   <FireOutlined style={{ color: getPriorityColor(priorityNum) }} />
                   <span style={{ color: getPriorityColor(priorityNum), fontWeight: 'bold' }}>
-                    {getPriorityText(priorityNum)} приоритет ({operations.length})
+                    {getPriorityText(priorityNum)} {t('recommendations.priority_suffix')} ({operations.length})
                   </span>
                 </Space>
               }
               extra={
                 <Text type="secondary" style={{ fontSize: '12px' }}>
-                  💡 Кликните на операцию для детальной аналитики
+                  💡 {t('active_operations.analytics_hint')}
                 </Text>
               }
               style={{ 
@@ -331,7 +342,7 @@ export const ActiveOperationsPage: React.FC = () => {
                 {operations.map((machine) => {
                   const deadline = (machine.currentOperationDetails as any)?.orderDeadline ? 
                     formatTimeToDeadline((machine.currentOperationDetails as any).orderDeadline) :
-                    { text: 'Не указан', color: '#d9d9d9' };
+                    { text: t('progress.deadline_not_set'), color: '#d9d9d9' };
                   
                   return (
                     <Col key={machine.id} xs={24} sm={12} lg={8} xl={6}>
@@ -364,7 +375,7 @@ export const ActiveOperationsPage: React.FC = () => {
                                 {machine.machineName}
                               </span>
                             </Space>
-                            <Tooltip title="Открыть детальную аналитику">
+                            <Tooltip title={t('active_operations.click_analytics')}>
                               <EyeOutlined style={{ color: '#1890ff', fontSize: '12px' }} />
                             </Tooltip>
                           </Space>
@@ -412,7 +423,10 @@ export const ActiveOperationsPage: React.FC = () => {
                               <div style={{ marginBottom: '12px' }}>
                                 <div style={{ marginBottom: '4px' }}>
                                   <Text style={{ fontSize: '11px' }}>
-                                    📦 Выполнено: {(machine.currentOperationDetails as any)?.producedQuantity || 0} / {(machine.currentOperationDetails as any)?.orderQuantity}
+                                    📦 {tWithParams('progress.produced', {
+                                      produced: (machine.currentOperationDetails as any)?.producedQuantity || 0,
+                                      total: (machine.currentOperationDetails as any)?.orderQuantity
+                                    })}
                                   </Text>
                                 </div>
                                 <Progress 
@@ -427,7 +441,9 @@ export const ActiveOperationsPage: React.FC = () => {
                             {machine.lastFreedAt && (
                               <div style={{ marginBottom: '12px' }}>
                                 <Text type="secondary" style={{ fontSize: '10px' }}>
-                                  🕒 Начато: {new Date(machine.lastFreedAt).toLocaleString('ru-RU')}
+                                  🕒 {tWithParams('progress.started', {
+                                    time: new Date(machine.lastFreedAt).toLocaleString('ru-RU')
+                                  })}
                                 </Text>
                               </div>
                             )}
@@ -441,18 +457,18 @@ export const ActiveOperationsPage: React.FC = () => {
                             }}>
                               <Text style={{ fontSize: '11px', color: '#1890ff', fontWeight: 'bold' }}>
                                 <BarChartOutlined style={{ marginRight: '4px' }} />
-                                Полная аналитика операции
+                                {t('active_operations.open_analytics')}
                               </Text>
                             </div>
                           </>
                         ) : (
                           <div>
                             <Tag color="orange" style={{ borderRadius: '12px' }}>
-                              Операция {machine.currentOperationId}
+                              {t('form.operation')} {machine.currentOperationId}
                             </Tag>
                             <div style={{ marginTop: '8px' }}>
                               <Text type="secondary" style={{ fontSize: '12px' }}>
-                                Загрузка деталей...
+                                {t('progress.loading_details')}
                               </Text>
                             </div>
                             
@@ -466,7 +482,7 @@ export const ActiveOperationsPage: React.FC = () => {
                             }}>
                               <Text style={{ fontSize: '11px', color: '#1890ff' }}>
                                 <BarChartOutlined style={{ marginRight: '4px' }} />
-                                Открыть аналитику
+                                {t('active_operations.click_analytics')}
                               </Text>
                             </div>
                           </div>
@@ -487,7 +503,7 @@ export const ActiveOperationsPage: React.FC = () => {
             <Space>
               <PlayCircleOutlined style={{ color: '#52c41a' }} />
               <span style={{ color: '#52c41a', fontWeight: 'bold' }}>
-                Активные операции
+                {t('operations.active')}
               </span>
             </Space>
           }
@@ -498,11 +514,11 @@ export const ActiveOperationsPage: React.FC = () => {
             description={
               <div>
                 <Text type="secondary" style={{ fontSize: '16px' }}>
-                  Нет активных операций
+                  {t('active_operations.no_operations')}
                 </Text>
                 <div style={{ marginTop: '8px' }}>
                   <Text type="secondary" style={{ fontSize: '14px' }}>
-                    Все станки свободны и готовы к работе
+                    {t('active_operations.all_machines_free')}
                   </Text>
                 </div>
               </div>
@@ -518,15 +534,15 @@ export const ActiveOperationsPage: React.FC = () => {
             <Space>
               <ToolOutlined style={{ color: '#faad14' }} />
               <span style={{ color: '#faad14', fontWeight: 'bold' }}>
-                Станки требующие внимания
+                {t('active_operations.machines_need_attention')}
               </span>
             </Space>
           }
           style={{ marginBottom: '24px', borderRadius: '12px' }}
         >
           <Alert
-            message="⚠️ Внимание"
-            description="Эти станки помечены как занятые, но не имеют назначенных операций. Требуется ручная проверка."
+            message={`⚠️ ${t('active_operations.attention_title')}`}
+            description={t('active_operations.attention_warning')}
             type="warning"
             showIcon
             style={{ marginBottom: '16px' }}
@@ -553,7 +569,7 @@ export const ActiveOperationsPage: React.FC = () => {
                         <Text strong>{machine.machineName}</Text>
                       </Space>
                       <Space>
-                        <Tag color="orange">Занят</Tag>
+                        <Tag color="orange">{t('machine.status.busy')}</Tag>
                         <EyeOutlined style={{ color: '#1890ff', fontSize: '12px' }} />
                       </Space>
                     </Space>

@@ -43,6 +43,7 @@ import { OperationStatus } from '../../../types/operation.types';
 import { MachineAvailability } from '../../../types/machine.types';
 import { ShiftForm } from './ShiftForm';
 import { OperationDetailModal } from './OperationDetailModal';
+import { useTranslation } from '../../../i18n';
 import dayjs from 'dayjs';
 
 const { Title, Text } = Typography;
@@ -103,24 +104,25 @@ interface ActiveMachine {
 }
 
 // Утилитарная функция для получения названия типа станка
-const getMachineTypeLabel = (type: string): string => {
-  if (!type) return 'Станок';
+const getMachineTypeLabel = (type: string, t: (key: string) => string): string => {
+  if (!type) return t('shifts.machine_generic');
   
   const upperType = type.toUpperCase();
   if (upperType.includes('MILLING')) {
-    return 'Фрезерный';
+    return t('shifts.milling');
   } else if (upperType.includes('TURNING')) {
-    return 'Токарный';
+    return t('shifts.turning');
   } else if (upperType.includes('DRILLING')) {
-    return 'Сверлильный';
+    return t('shifts.drilling');
   } else if (upperType.includes('GRINDING')) {
-    return 'Шлифовальный';
+    return t('shifts.grinding');
   }
   
-  return 'Станок';
+  return t('shifts.machine_generic');
 };
 
 export const ActiveMachinesMonitor: React.FC = () => {
+  const { t } = useTranslation();
   const [selectedMachineId, setSelectedMachineId] = useState<number | undefined>();
   const [showShiftForm, setShowShiftForm] = useState(false);
   const [selectedOperation, setSelectedOperation] = useState<any>(null);
@@ -397,7 +399,7 @@ export const ActiveMachinesMonitor: React.FC = () => {
 
   // ИСПРАВЛЕНО: Добавлена инвалидация кэша для автообновления данных
   const handleShiftFormSuccess = () => {
-    message.success('Запись смены создана успешно');
+    message.success(t('shifts.record_created'));
     
     // Инвалидируем все связанные запросы для обновления данных
     queryClient.invalidateQueries({ queryKey: ['shifts'] });
@@ -426,10 +428,10 @@ export const ActiveMachinesMonitor: React.FC = () => {
 
   const getMachineStatusText = (status: string) => {
     switch (status) {
-      case 'working': return 'В работе';
-      case 'setup': return 'Наладка';
-      case 'maintenance': return 'Ремонт';
-      default: return 'Простой';
+      case 'working': return t('shifts.working');
+      case 'setup': return t('shifts.setup');
+      case 'maintenance': return t('shifts.maintenance');
+      default: return t('shifts.idle');
     }
   };
 
@@ -444,7 +446,7 @@ export const ActiveMachinesMonitor: React.FC = () => {
       <div style={{ textAlign: 'center', padding: '50px' }}>
         <Spin size="large" />
         <div style={{ marginTop: 16 }}>
-          <Text>Загрузка данных о станках...</Text>
+          <Text>{t('shifts.loading_machines')}</Text>
         </div>
       </div>
     );
@@ -453,7 +455,7 @@ export const ActiveMachinesMonitor: React.FC = () => {
   if (machinesError) {
     return (
       <div style={{ textAlign: 'center', padding: '50px' }}>
-        <Text type="danger">Ошибка загрузки данных о станках</Text>
+        <Text type="danger">{t('shifts.machines_error')}</Text>
       </div>
     );
   }
@@ -464,8 +466,8 @@ export const ActiveMachinesMonitor: React.FC = () => {
         image={Empty.PRESENTED_IMAGE_SIMPLE}
         description={
           <span>
-            Нет активных станков.<br />
-            Проверьте настройки станков в базе данных.
+            {t('shifts.no_active_machines')}.<br />
+            {t('shifts.check_machine_settings')}.
           </span>
         }
       />
@@ -476,10 +478,10 @@ export const ActiveMachinesMonitor: React.FC = () => {
     <div>
       <div style={{ marginBottom: 24 }}>
         <Title level={3}>
-          <ToolOutlined /> Мониторинг производства
+          <ToolOutlined /> {t('shifts.monitoring')}
         </Title>
         <Text type="secondary">
-          Активные станки и ход выполнения заказов в реальном времени
+          {t('shifts.active_machines_status')}
         </Text>
       </div>
 
@@ -493,7 +495,7 @@ export const ActiveMachinesMonitor: React.FC = () => {
                     status={getMachineStatusColor(machine.status) as any} 
                     text={machine.machineName}
                   />
-                  <Tag color="blue">{getMachineTypeLabel(machine.machineType)}</Tag>
+                  <Tag color="blue">{getMachineTypeLabel(machine.machineType, t)}</Tag>
                 </Space>
               }
               extra={
@@ -502,13 +504,13 @@ export const ActiveMachinesMonitor: React.FC = () => {
                 </Tag>
               }
               actions={[
-                <Tooltip title="Создать запись смены">
+                <Tooltip title={t('shifts.shift_record')}>
                   <Button
                     type="primary"
                     icon={<FileTextOutlined />}
                     onClick={() => handleCreateShiftRecord(machine.id)}
                   >
-                    Запись смены
+                    {t('shifts.shift_record')}
                   </Button>
                 </Tooltip>
               ]}
@@ -527,46 +529,46 @@ export const ActiveMachinesMonitor: React.FC = () => {
                     }}
                     onClick={() => handleOperationClick(machine.currentOperationDetails)}
                   >
-                    <Text strong>Текущая операция:</Text>
+                    <Text strong>{t('shifts.current_operation')}:</Text>
                     <br />
-                    <Text>Операция {machine.currentOperationDetails.operationNumber}</Text>
+                    <Text>{t('form.operation')} {machine.currentOperationDetails.operationNumber}</Text>
                     <br />
                     <Text type="secondary">
                       {machine.currentOperationDetails.orderDrawingNumber}
                     </Text>
                     <br />
                     <Text type="secondary" style={{ fontSize: '11px' }}>
-                      <BarChartOutlined /> Нажмите для детальной статистики
+                      <BarChartOutlined /> {t('shifts.click_for_analytics')}
                     </Text>
                   </div>
 
                   <div style={{ marginBottom: 12 }}>
-                    <Text>Прогресс выполнения:</Text>
+                    <Text>{t('shifts.progress_execution')}:</Text>
                     <Progress 
                       percent={Math.round(machine.currentOperationDetails.progress || 0)} 
                       size="small"
                       status={(machine.currentOperationDetails.progress || 0) > 80 ? 'success' : 'active'}
                     />
                     <Text type="secondary" style={{ fontSize: '11px' }}>
-                      {machine.currentOperationDetails.totalProduced || 0} из {machine.currentOperationDetails.targetQuantity || 0} деталей
+                      {machine.currentOperationDetails.totalProduced || 0} {t('shifts.of')} {machine.currentOperationDetails.targetQuantity || 0} {t('shifts.parts_suffix')}
                     </Text>
                   </div>
 
                   <div style={{ marginBottom: 12 }}>
                     <Text>
-                      <ClockCircleOutlined /> Время: {machine.currentOperationDetails.estimatedTime}мин
+                      <ClockCircleOutlined /> {t('form.time')}: {machine.currentOperationDetails.estimatedTime}{t('shifts.minutes')}
                     </Text>
                   </div>
 
                   <Divider style={{ margin: '12px 0' }} />
 
                   <div>
-                    <Text strong>Производство по операции:</Text>
+                    <Text strong>{t('shifts.production_by_operation')}:</Text>
                     <div style={{ marginTop: 8 }}>
                       <Row gutter={8}>
                         <Col span={12}>
                           <div style={{ textAlign: 'center', padding: '8px', backgroundColor: '#f0f9ff', borderRadius: '4px' }}>
-                            <Text type="secondary">День</Text>
+                            <Text type="secondary">{t('shifts.day')}</Text>
                             <br />
                             <Text strong style={{ fontSize: '18px' }}>
                               {machine.currentOperationProduction?.dayShift.quantity || 0}
@@ -587,7 +589,7 @@ export const ActiveMachinesMonitor: React.FC = () => {
                         </Col>
                         <Col span={12}>
                           <div style={{ textAlign: 'center', padding: '8px', backgroundColor: '#f6f6f6', borderRadius: '4px' }}>
-                            <Text type="secondary">Ночь</Text>
+                            <Text type="secondary">{t('shifts.night')}</Text>
                             <br />
                             <Text strong style={{ fontSize: '18px' }}>
                               {machine.currentOperationProduction?.nightShift.quantity || 0}
@@ -614,10 +616,10 @@ export const ActiveMachinesMonitor: React.FC = () => {
                 <div style={{ textAlign: 'center', padding: '20px' }}>
                   <PauseCircleOutlined style={{ fontSize: '48px', color: '#d9d9d9' }} />
                   <div style={{ marginTop: 12 }}>
-                    <Text type="secondary">Станок простаивает</Text>
+                    <Text type="secondary">{t('shifts.machine_idle')}</Text>
                     <br />
                     <Text type="secondary" style={{ fontSize: '12px' }}>
-                      Нет назначенных операций
+                      {t('shifts.no_assigned_operations')}
                     </Text>
                   </div>
                 </div>

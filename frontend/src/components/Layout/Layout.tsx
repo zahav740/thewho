@@ -21,7 +21,7 @@ import {
 } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
 import { useTranslation } from '../../i18n';
-import { LanguageSwitcher } from '../LanguageSwitcher';
+import { LanguageSwitcher } from '../LanguageSwitcher/LanguageSwitcher';
 
 const { Header, Sider, Content } = AntLayout;
 const { Title } = Typography;
@@ -31,6 +31,9 @@ export const Layout: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { t } = useTranslation();
+
+  console.log('Layout render with t function:', t);
+  console.log('Translated menu.production:', t('menu.production'));
 
   const menuItems: MenuProps['items'] = [
     {

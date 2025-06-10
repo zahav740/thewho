@@ -1,9 +1,9 @@
 /**
  * @file: DatabasePage.tsx
- * @description: Страница базы данных заказов с поддержкой i18n
+ * @description: Страница базы данных заказов (ОБНОВЛЕНО: добавлен стабильный CSV импорт)
  * @dependencies: OrdersList, OrderForm, CSVImportModal
  * @created: 2025-01-28
- * @updated: 2025-06-10 // Добавлена поддержка переводов
+ * @updated: 2025-06-09 // Добавлен стабильный CSV импорт
  */
 import React, { useState } from 'react';
 import { Button, Row, Col, message, Space, Tooltip } from 'antd';
@@ -23,10 +23,8 @@ import { OrderForm } from './components/OrderForm.SIMPLE';
 import { CSVImportModal } from './components/CSVImportModal';
 import ExcelUploaderWithSettings from '../../components/ExcelUploader/ExcelUploaderWithSettings';
 import { EnhancedExcelImporter } from '../../components/ExcelUploader/EnhancedExcelImporter';
-import { useTranslation } from '../../i18n';
 
 export const DatabasePage: React.FC = () => {
-  const { t, tWithParams } = useTranslation();
   const [showOrderForm, setShowOrderForm] = useState(false);
   const [showCSVImport, setShowCSVImport] = useState(false);
   const [showEnhancedExcelImport, setShowEnhancedExcelImport] = useState(false);
@@ -52,10 +50,10 @@ export const DatabasePage: React.FC = () => {
   const handleDeleteOrder = async (orderId: number) => {
     try {
       await ordersApi.delete(orderId);
-      message.success(t('message.success.deleted'));
+      message.success('Заказ успешно удален');
       queryClient.invalidateQueries({ queryKey: ['orders'] });
     } catch (error) {
-      message.error(t('message.error.delete'));
+      message.error('Ошибка при удалении заказа');
     }
   };
 
@@ -71,22 +69,23 @@ export const DatabasePage: React.FC = () => {
 
   const handleCSVImportSuccess = () => {
     queryClient.invalidateQueries({ queryKey: ['orders'] });
-    message.success(t('message.success.csv_imported'));
+    message.success('Данные успешно импортированы через CSV');
   };
 
   const handleEnhancedExcelImportSuccess = (result: any) => {
     queryClient.invalidateQueries({ queryKey: ['orders'] });
     message.success(
-      tWithParams('message.success.excel_imported', { created: result.created, updated: result.updated })
+      `Улучшенный Excel импорт завершен! Создано: ${result.created}, Обновлено: ${result.updated}`,
+      6
     );
   };
 
   const handleExcelUpload = async (file: File, data?: any[], settings?: any) => {
     try {
-      console.log('🔶 Excel upload attempt (may be unstable)');
-      console.log('File:', file.name, 'Size:', file.size);
+      console.log('🔶 ПОПЫТКА ЗАГРУЗКИ EXCEL (может быть нестабильно)');
+      console.log('Файл:', file.name, 'Размер:', file.size);
       
-      // Check backend
+      // Проверяем backend
       try {
         const healthCheck = await fetch('http://localhost:5100/api/orders', {
           method: 'GET',
@@ -94,56 +93,59 @@ export const DatabasePage: React.FC = () => {
         });
         
         if (!healthCheck.ok) {
-          throw new Error(`Backend unavailable: ${healthCheck.status}`);
+          throw new Error(`Backend недоступен: ${healthCheck.status}`);
         }
       } catch (error) {
-        console.error('Backend unavailable:', error);
+        console.error('Backend недоступен:', error);
         message.error(
           <div>
-            <div><WarningOutlined /> {t('message.error.backend_unavailable')}</div>
+            <div><WarningOutlined /> Backend сервер недоступен!</div>
             <div style={{ fontSize: '12px', marginTop: '4px' }}>
-              {t('message.try_csv_instead')}
+              Попробуйте <strong>стабильный CSV импорт</strong> вместо Excel
             </div>
-          </div>
+          </div>,
+          6
         );
         throw error;
       }
       
-      // Try Excel upload (unstable)
+      // Пытаемся загрузить Excel (нестабильно)
       const result = await ordersApi.importExcel(
         file, 
         settings?.colorFilters?.filter((f: any) => f.selected)?.map((f: any) => f.color) || []
       );
       
-      console.log('✅ Excel import successful:', result);
+      console.log('✅ Excel импорт успешен:', result);
       
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       
       message.success(
         <div>
-          <CheckCircleOutlined /> {t('message.success.excel_completed')}
+          <CheckCircleOutlined /> Excel импорт завершен!
           <div style={{ fontSize: '12px', marginTop: '4px' }}>
-            {tWithParams('message.created_updated', { created: result.created || 0, updated: result.updated || 0 })}
+            Создано: {result.created || 0}, Обновлено: {result.updated || 0}
           </div>
-        </div>
+        </div>,
+        4
       );
       
       return result;
       
     } catch (error) {
-      console.error('❌ Excel import error:', error);
+      console.error('❌ Ошибка Excel импорта:', error);
       
-      // Suggest alternative
+      // Предлагаем альтернативу
       message.error(
         <div>
-          <div><WarningOutlined /> {t('message.error.excel_upload')}</div>
+          <div><WarningOutlined /> Ошибка загрузки Excel файла</div>
           <div style={{ fontSize: '12px', marginTop: '4px', color: '#1890ff' }}>
-            💡 {t('message.try_csv_stable')}
+            💡 Попробуйте <strong>стабильный CSV импорт</strong> - он работает всегда!
           </div>
-        </div>
+        </div>,
+        8
       );
       
-      // Auto-open CSV import as alternative
+      // Автоматически открываем CSV импорт как альтернативу
       setTimeout(() => {
         setShowCSVImport(true);
       }, 2000);
@@ -163,12 +165,12 @@ export const DatabasePage: React.FC = () => {
                 icon={<PlusOutlined />}
                 onClick={handleCreateOrder}
               >
-                {t('database.new_order')}
+                Новый заказ
               </Button>
               
               <Space.Compact>
-                {/* Stable CSV import - recommended */}
-                <Tooltip title={t('tooltip.csv_reliable')}>
+                {/* Стабильный CSV импорт - рекомендуется */}
+                <Tooltip title="100% надежный импорт данных через копипаст из Excel">
                   <Button
                     type="primary"
                     icon={<ImportOutlined />}
@@ -178,13 +180,13 @@ export const DatabasePage: React.FC = () => {
                       borderColor: '#52c41a'
                     }}
                   >
-                    {t('database.csv_import')}
+                    CSV Импорт
                     <CheckCircleOutlined style={{ marginLeft: 4 }} />
                   </Button>
                 </Tooltip>
                 
-                {/* 🆕 NEW Enhanced Excel import */}
-                <Tooltip title={t('tooltip.excel_2_enhanced')}>
+                {/* 🆕 НОВЫЙ Улучшенный Excel импорт */}
+                <Tooltip title="🆕 НОВЫЙ! Улучшенный Excel импорт с детальным анализом и выбором">
                   <Button
                     type="primary"
                     icon={<FileExcelOutlined />}
@@ -194,18 +196,18 @@ export const DatabasePage: React.FC = () => {
                       border: 'none'
                     }}
                   >
-                    {t('database.excel_2_0')}
+                    Excel 2.0
                     <CheckCircleOutlined style={{ marginLeft: 4, color: '#52c41a' }} />
                   </Button>
                 </Tooltip>
                 
-                {/* Old Excel uploader - may be unstable */}
-                <Tooltip title={t('tooltip.excel_1_unstable')}>
+                {/* Старый Excel загрузчик - может быть нестабилен */}
+                <Tooltip title="Старая загрузка Excel файлов (может быть нестабильна)">
                   <Button
                     type="default"
                     icon={<FileExcelOutlined />}
                     onClick={() => {
-                      // Create input for file selection
+                      // Создаем input для выбора файла
                       const input = document.createElement('input');
                       input.type = 'file';
                       input.accept = '.xlsx,.xls';
@@ -218,7 +220,7 @@ export const DatabasePage: React.FC = () => {
                       input.click();
                     }}
                   >
-                    {t('database.excel_1_0')}
+                    Excel 1.0
                     <WarningOutlined style={{ marginLeft: 4, color: '#faad14' }} />
                   </Button>
                 </Tooltip>
@@ -228,7 +230,7 @@ export const DatabasePage: React.FC = () => {
                 icon={<ReloadOutlined />}
                 onClick={() => refetch()}
               >
-                {t('database.refresh')}
+                Обновить
               </Button>
             </div>
           </div>
@@ -250,7 +252,7 @@ export const DatabasePage: React.FC = () => {
         </Col>
       </Row>
 
-      {/* Order creation/editing form */}
+      {/* Форма создания/редактирования заказа */}
       <OrderForm
         visible={showOrderForm}
         orderId={editingOrderId}
@@ -258,14 +260,14 @@ export const DatabasePage: React.FC = () => {
         onSuccess={handleFormSuccess}
       />
 
-      {/* NEW: Stable CSV import */}
+      {/* НОВЫЙ: Стабильный CSV импорт */}
       <CSVImportModal
         visible={showCSVImport}
         onClose={() => setShowCSVImport(false)}
         onSuccess={handleCSVImportSuccess}
       />
 
-      {/* 🆕 NEW: Enhanced Excel import */}
+      {/* 🆕 НОВЫЙ: Улучшенный Excel импорт */}
       <EnhancedExcelImporter
         visible={showEnhancedExcelImport}
         onClose={() => setShowEnhancedExcelImport(false)}

@@ -1,8 +1,9 @@
 /**
  * @file: OperationAnalyticsModal.tsx
- * @description: Модальное окно с полной аналитикой операции
+ * @description: Модальное окно с полной аналитикой операции (ИСПРАВЛЕНО - добавлены печать и экспорт)
  * @dependencies: antd, react-query, shiftsApi, operationsApi
  * @created: 2025-06-09
+ * @updated: 2025-06-10 - Добавлены функции печати и экспорта
  */
 import React, { useState } from 'react';
 import {
@@ -24,6 +25,7 @@ import {
   Button,
   Empty,
   Spin,
+  message,
 } from 'antd';
 import {
   ClockCircleOutlined,
@@ -38,6 +40,8 @@ import {
   PlayCircleOutlined,
   PauseCircleOutlined,
   SettingOutlined,
+  PrinterOutlined,
+  DownloadOutlined,
 } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
 import { shiftsApi } from '../../services/shiftsApi';
@@ -71,6 +75,7 @@ export const OperationAnalyticsModal: React.FC<OperationAnalyticsModalProps> = (
   machine,
 }) => {
   const [activeTab, setActiveTab] = useState('overview');
+  const [exporting, setExporting] = useState(false);
 
   // Загрузка данных смен для этого станка
   const { data: shifts, isLoading: shiftsLoading } = useQuery({
@@ -197,6 +202,90 @@ export const OperationAnalyticsModal: React.FC<OperationAnalyticsModalProps> = (
     };
   }, [shifts, machine]);
 
+  // Функция расчета эффективности смены
+  const calculateShiftEfficiency = (shift: any): number => {
+    const estimatedTime = machine?.currentOperationDetails?.estimatedTime || 20;
+    if (shift.timePerUnit && shift.timePerUnit > 0) {
+      return Math.round((estimatedTime / shift.timePerUnit) * 100);
+    }
+    return 0;
+  };
+
+  // Функция печати
+  const handlePrint = () => {
+    window.print();
+  };
+
+  // Функция экспорта
+  const handleExport = async () => {
+    if (!machine?.currentOperationDetails?.orderDrawingNumber) {
+      message.error('Номер чертежа не определен');
+      return;
+    }
+
+    setExporting(true);
+    try {
+      // Подготавливаем данные для экспорта
+      const exportData = {
+        operation: {
+          number: machine?.currentOperationDetails?.operationNumber || 0,
+          type: machine?.currentOperationDetails?.operationType || '',
+          drawing: machine?.currentOperationDetails?.orderDrawingNumber || '',
+          machine: machine?.machineName || '',
+          exportDate: new Date().toISOString()
+        },
+        progress: {
+          totalProduced: analytics.totalQuantity,
+          target: machine?.currentOperationDetails?.orderQuantity || 0,
+          progress: analytics.efficiency,
+          remaining: Math.max(0, (machine?.currentOperationDetails?.orderQuantity || 0) - analytics.totalQuantity)
+        },
+        time: {
+          totalWorkingTime: analytics.totalTime,
+          averageTimePerUnit: analytics.averageTimePerUnit,
+          setupTime: analytics.setupData.reduce((sum, setup) => sum + setup.time, 0),
+          estimatedCompletion: analytics.estimatedCompletion?.toISOString() || null,
+          workingDaysLeft: analytics.workingDaysLeft
+        },
+        shifts: {
+          dayShifts: analytics.dayShiftData,
+          nightShifts: analytics.nightShiftData,
+          setupRecords: analytics.setupData,
+          totalShifts: analytics.dayShiftData.length + analytics.nightShiftData.length
+        }
+      };
+
+      // Создаем CSV-строку
+      const csvHeader = 'Дата,Тип_смены,Количество,Оператор,Время_на_деталь,Общее_время,Эффективность\n';
+      const csvRows = [
+        ...analytics.dayShiftData.map(shift => 
+          `${shift.date},Дневная,${shift.quantity},${shift.operator},${shift.timePerUnit},${shift.totalTime},${calculateShiftEfficiency(shift)}`
+        ),
+        ...analytics.nightShiftData.map(shift => 
+          `${shift.date},Ночная,${shift.quantity},${shift.operator},${shift.timePerUnit},${shift.totalTime},${calculateShiftEfficiency(shift)}`
+        )
+      ].join('\n');
+
+      const csvContent = csvHeader + csvRows;
+
+      // Скачиваем файл
+      const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `analytics_${machine.machineName}_${machine.currentOperationDetails.orderDrawingNumber}_${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      message.success('Файл аналитики успешно экспортирован');
+    } catch (error) {
+      console.error('Ошибка экспорта:', error);
+      message.error('Ошибка при экспорте данных');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const formatTime = (minutes: number): string => {
     if (!minutes || minutes <= 0) return '0 мин';
     
@@ -302,12 +391,37 @@ export const OperationAnalyticsModal: React.FC<OperationAnalyticsModalProps> = (
   return (
     <Modal
       title={
-        <Space>
-          <ToolOutlined style={{ color: '#1890ff' }} />
-          <span style={{ fontSize: '18px', fontWeight: 'bold' }}>
-            Аналитика операции - {machine.machineName}
-          </span>
-        </Space>
+        <Row align="middle" justify="space-between">
+          <Col>
+            <Space>
+              <ToolOutlined style={{ color: '#1890ff' }} />
+              <span style={{ fontSize: '18px', fontWeight: 'bold' }}>
+                Аналитика операции - {machine.machineName}
+              </span>
+            </Space>
+          </Col>
+          <Col>
+            <Space>
+              <Button 
+                icon={<PrinterOutlined />} 
+                size="small"
+                onClick={handlePrint}
+                title="Печать отчета"
+              >
+                Печать
+              </Button>
+              <Button 
+                icon={<DownloadOutlined />} 
+                size="small"
+                onClick={handleExport}
+                loading={exporting}
+                title="Экспорт в CSV"
+              >
+                Экспорт
+              </Button>
+            </Space>
+          </Col>
+        </Row>
       }
       open={visible}
       onCancel={onClose}
