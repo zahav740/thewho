@@ -21,6 +21,7 @@ import { PlanningModule } from './modules/planning/planning.module';
 import { TestModule } from './modules/test/test.module';
 import { PetsModule } from './modules/pets/pets.module';
 import { TranslationsModule } from './modules/translations/translations.module';
+import { OperationAnalyticsModule } from './modules/operation-analytics/operation-analytics.module';
 import { HeaderSizeMiddleware } from './common/middleware/header-size.middleware';
 import { OrdersDataMiddleware } from './modules/orders/orders.middleware';
 
@@ -64,6 +65,7 @@ import { OrdersDataMiddleware } from './modules/orders/orders.middleware';
     TestModule,
     PetsModule,
     TranslationsModule, // Модуль переводов
+    OperationAnalyticsModule, // Модуль аналитики операций
   ],
 })
 export class AppModule implements NestModule {

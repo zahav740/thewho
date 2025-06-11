@@ -136,7 +136,7 @@ export class CalendarServiceFixed {
     // Получаем все операции для этого станка в периоде
     const operations = await this.operationRepository.find({
       where: {
-        machineId: machine.id,
+        assignedMachine: machine.id,
         // Можно добавить фильтр по датам если есть поле даты в операции
       },
       relations: ['order']

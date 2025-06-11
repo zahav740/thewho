@@ -19,7 +19,7 @@ import {
 import { TranslationsService, CreateTranslationDto, UpdateTranslationDto } from './translations.service';
 import { Translation } from './translation.entity';
 
-@Controller('api/translations')
+@Controller('translations')
 export class TranslationsController {
   constructor(private readonly translationsService: TranslationsService) {}
 

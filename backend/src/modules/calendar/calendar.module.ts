@@ -11,7 +11,7 @@ import { Machine } from '../../database/entities/machine.entity';
 import { Order } from '../../database/entities/order.entity';
 import { ShiftRecord } from '../../database/entities/shift-record.entity';
 import { CalendarController } from './calendar.controller';
-import { CalendarService } from './calendar.service';
+import { CalendarServiceFixed } from './calendar.service';
 import { WorkingDaysService } from './working-days.service';
 import { EnhancedCalendarController } from './enhanced-calendar.controller';
 import { EnhancedCalendarService } from './enhanced-calendar.service';
@@ -19,7 +19,7 @@ import { EnhancedCalendarService } from './enhanced-calendar.service';
 @Module({
   imports: [TypeOrmModule.forFeature([Operation, Machine, Order, ShiftRecord])],
   controllers: [CalendarController, EnhancedCalendarController],
-  providers: [CalendarService, WorkingDaysService, EnhancedCalendarService],
-  exports: [CalendarService, WorkingDaysService, EnhancedCalendarService],
+  providers: [CalendarServiceFixed, WorkingDaysService, EnhancedCalendarService],
+  exports: [CalendarServiceFixed, WorkingDaysService, EnhancedCalendarService],
 })
 export class CalendarModule {}

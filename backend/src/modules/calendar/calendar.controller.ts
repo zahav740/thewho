@@ -12,6 +12,14 @@ import { Machine } from '../../database/entities/machine.entity';
 import { Operation } from '../../database/entities/operation.entity';
 import { Order } from '../../database/entities/order.entity';
 
+interface CalendarDay {
+  date: string;
+  isWorkingDay: boolean;
+  dayType: string;
+  completedShifts?: any[];
+  plannedOperation?: any;
+}
+
 @ApiTags('calendar')
 @Controller('calendar')
 export class CalendarController {
@@ -148,7 +156,7 @@ export class CalendarController {
       const isWorkingDay = ![5, 6].includes(dayOfWeek);
       const isPast = current < new Date();
       
-      const day = {
+      const day: CalendarDay = {
         date: dateStr,
         isWorkingDay,
         dayType: isWorkingDay ? 'WORKING' : 'WEEKEND'
