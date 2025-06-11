@@ -4,7 +4,7 @@
  * @dependencies: antd, dayjs, react-query, enhancedCalendarApi
  * @created: 2025-06-11
  */
-import React, { useState } from 'react';
+import React from 'react';
 import {
   Card,
   Table,
@@ -27,26 +27,23 @@ import {
   CheckCircleOutlined,
   ClockCircleOutlined,
   SettingOutlined,
-  UserOutlined,
   CalendarOutlined,
   BarChartOutlined,
   InfoCircleOutlined,
   ReloadOutlined,
-  EyeOutlined,
 } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import 'dayjs/locale/ru';
 import { 
   enhancedCalendarApi, 
-  EnhancedCalendarData, 
   MachineSchedule, 
   CalendarDay, 
   PlannedOperation, 
   CompletedShift 
 } from '../../../services/enhancedCalendarApi';
 
-const { Title, Text } = Typography;
+const { Text } = Typography; // Убираем неиспользуемые
 
 dayjs.locale('ru');
 
@@ -62,7 +59,8 @@ interface EnhancedProductionCalendarProps {
 }
 
 export const EnhancedProductionCalendar: React.FC<EnhancedProductionCalendarProps> = ({ filter }) => {
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  // Убираем неиспользуемое состояние
+  // const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   const { 
     data: calendarData, 
@@ -310,7 +308,7 @@ export const EnhancedProductionCalendar: React.FC<EnhancedProductionCalendarProp
   const renderDayCell = (machine: any, day: CalendarDay) => {
     const dayDate = dayjs(day.date);
     const isToday = dayDate.isSame(dayjs(), 'day');
-    const isPast = dayDate.isBefore(dayjs(), 'day');
+    // const isPast = dayDate.isBefore(dayjs(), 'day'); // Неиспользуемая переменная
     
     // Пропускаем выходные если они скрыты
     if (!filter.showWeekends && !day.isWorkingDay) {

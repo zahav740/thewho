@@ -12,7 +12,6 @@ import {
   DatePicker,
   Select,
   InputNumber,
-  Input,
   Radio,
   Space,
   Divider,
@@ -27,7 +26,7 @@ import { machinesApi } from '../../../services/machinesApi';
 import { operationsApi } from '../../../services/operationsApi';
 import { operatorsApi } from '../../../services/operatorsApi'; // 🆕 Добавляем API операторов
 import { CreateShiftRecordDto, ShiftType } from '../../../types/shift.types';
-import { OperationStatus } from '../../../types/operation.types';
+// import { OperationStatus } from '../../../types/operation.types'; // Убран неиспользуемый импорт
 import { useTranslation } from '../../../i18n';
 
 const { Option } = Select;
@@ -88,12 +87,7 @@ export const ShiftForm: React.FC<ShiftFormProps> = ({
     type: machine.machineType || machine.type
   }));
 
-  // Получаем операции с данными о заказах (для обратной совместимости)
-  const { data: operations } = useQuery({
-    queryKey: ['operations', 'in-progress'],
-    queryFn: () => operationsApi.getAll(OperationStatus.IN_PROGRESS),
-    enabled: false, // Отключаем автоматический запрос
-  });
+
 
   // Предзаполнение станка при открытии формы
   React.useEffect(() => {

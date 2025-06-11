@@ -23,7 +23,7 @@ import {
   CalendarOutlined, 
   BarChartOutlined, 
   AlertOutlined, 
-  SettingOutlined,
+
   InfoCircleOutlined,
   ExportOutlined,
   ReloadOutlined

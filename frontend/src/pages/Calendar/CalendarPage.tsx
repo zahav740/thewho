@@ -14,7 +14,7 @@ import { MachineUtilization } from './components/MachineUtilization';
 import { UpcomingDeadlines } from './components/UpcomingDeadlines';
 
 const { RangePicker } = DatePicker;
-const { Title, Text } = Typography;
+const { Text } = Typography; // Убираем неиспользуемый Title
 
 export const CalendarPage: React.FC = () => {
   const [dateRange, setDateRange] = useState<[Dayjs, Dayjs]>([

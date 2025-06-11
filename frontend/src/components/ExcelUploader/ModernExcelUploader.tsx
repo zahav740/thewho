@@ -73,7 +73,6 @@ const ModernExcelUploader: React.FC<ModernExcelUploaderProps> = ({
   description = 'Перетащите файл сюда или нажмите для выбора',
 }) => {
   const [files, setFiles] = useState<ExcelFile[]>([]);
-  const [isProcessing, setIsProcessing] = useState(false);
   const [previewModalVisible, setPreviewModalVisible] = useState(false);
   const [selectedFileIndex, setSelectedFileIndex] = useState<number>(-1);
 

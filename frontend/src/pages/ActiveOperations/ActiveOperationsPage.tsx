@@ -20,29 +20,20 @@ import {
   Progress,
   message,
   Tooltip,
-  Badge,
   Statistic
 } from 'antd';
 import { 
   ToolOutlined, 
-  ClockCircleOutlined, 
   PlayCircleOutlined,
-  InfoCircleOutlined,
   ReloadOutlined,
-  EditOutlined,
   CheckCircleOutlined,
   BarChartOutlined,
   FireOutlined,
-  ThunderboltOutlined,
-  CalendarOutlined,
-  TeamOutlined,
-  SettingOutlined,
   DashboardOutlined,
   EyeOutlined
 } from '@ant-design/icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { machinesApi } from '../../services/machinesApi';
-import { shiftsApi } from '../../services/shiftsApi';
 import { formatEstimatedTime } from '../../types/machine.types';
 import { EnhancedOperationAnalyticsModal } from '../../components/OperationAnalyticsModal/EnhancedOperationAnalyticsModal';
 import { useTranslation } from '../../i18n';

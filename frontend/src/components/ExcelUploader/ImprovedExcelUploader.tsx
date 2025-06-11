@@ -4,7 +4,7 @@
  * @dependencies: antd, xlsx
  * @created: 2025-05-29
  */
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   Upload,
   Card,
@@ -16,13 +16,11 @@ import {
   Typography,
   Row,
   Col,
-  Divider,
   Modal,
   Table,
   message,
   Spin,
   Input,
-  Select,
   Checkbox,
   Tooltip,
   Badge,
@@ -39,15 +37,14 @@ import {
   FilterOutlined,
   ClearOutlined,
   DownloadOutlined,
-  SearchOutlined,
 } from '@ant-design/icons';
-import { UploadFile, UploadProps } from 'antd/es/upload/interface';
+import { UploadProps } from 'antd/es/upload/interface';
 import type { ColumnsType } from 'antd/es/table';
 
 const { Dragger } = Upload;
 const { Title, Text, Paragraph } = Typography;
 const { Search } = Input;
-const { Option } = Select;
+
 
 interface ExcelFile {
   file: File;
@@ -100,7 +97,6 @@ const ImprovedExcelUploader: React.FC<ImprovedExcelUploaderProps> = ({
   }
 }) => {
   const [files, setFiles] = useState<ExcelFile[]>([]);
-  const [isProcessing, setIsProcessing] = useState(false);
   const [previewModalVisible, setPreviewModalVisible] = useState(false);
   const [selectedFileIndex, setSelectedFileIndex] = useState<number>(-1);
   const [filters, setFilters] = useState<ColumnFilter[]>([]);

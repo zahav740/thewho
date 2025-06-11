@@ -11,9 +11,11 @@ import {
   CreateOrderDto,
   UpdateOrderDto,
   OrdersFilter,
-  OrdersResponse,
-  OrderFormOperationDto
+  OrdersResponse
 } from '../types/order.types';
+
+// Оставляем комментарий о неиспользуемом типе:
+// OrderFormOperationDto - неиспользуемый тип
 
 export const ordersApi = {
   // Получить все заказы с фильтрацией

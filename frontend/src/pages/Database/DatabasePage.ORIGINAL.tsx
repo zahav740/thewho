@@ -21,7 +21,7 @@ import { OrdersFilter } from '../../types/order.types';
 import { OrdersList } from './components/OrdersList';
 import { OrderForm } from './components/OrderForm.SIMPLE';
 import { CSVImportModal } from './components/CSVImportModal';
-import ExcelUploaderWithSettings from '../../components/ExcelUploader/ExcelUploaderWithSettings';
+
 import { EnhancedExcelImporter } from '../../components/ExcelUploader/EnhancedExcelImporter';
 
 export const DatabasePage: React.FC = () => {

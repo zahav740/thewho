@@ -24,7 +24,6 @@ import {
   MenuOutlined,
   RightOutlined,
   CheckCircleOutlined,
-  ExclamationCircleOutlined,
 } from '@ant-design/icons';
 import ContextMenu from '../../components/ContextMenu';
 import { ModernExcelUploader } from '../../components/ExcelUploader';

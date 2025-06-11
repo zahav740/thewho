@@ -21,7 +21,6 @@ import {
   Space,
   Switch,
   Tooltip,
-  Progress,
   message,
   Typography
 } from 'antd';
@@ -35,11 +34,11 @@ import {
   DeleteOutlined,
   FilterOutlined
 } from '@ant-design/icons';
-import type { UploadFile, UploadProps } from 'antd/es/upload';
+import type { UploadProps } from 'antd/es/upload';
 import enhancedOrdersApi, { ExcelPreviewResult, ExcelOrderPreview, ImportResult } from '../../services/enhancedOrdersApi';
 
 const { Step } = Steps;
-const { Title, Text } = Typography;
+const { Text } = Typography;
 const { Dragger } = Upload;
 
 interface EnhancedExcelImporterProps {

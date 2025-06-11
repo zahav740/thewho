@@ -78,16 +78,15 @@ export const BulkDeleteModal: React.FC<BulkDeleteModalProps> = ({
     }
   };
 
-  // Исключить ВСЕ заказы (не только видимые)
-  const handleExcludeAll = () => {
-    const allIds = orders.map(order => order.id.toString());
-    setExcludedIds(allIds);
-  };
+  // Эти функции зарезервированы для будущего использования
+  // const handleExcludeAll = () => {
+  //   const allIds = orders.map(order => order.id.toString());
+  //   setExcludedIds(allIds);
+  // };
 
-  // Включить ВСЕ заказы (не только видимые) 
-  const handleIncludeAll = () => {
-    setExcludedIds([]);
-  };
+  // const handleIncludeAll = () => {
+  //   setExcludedIds([]);
+  // };
 
   // Исключить все видимые (для работы с фильтром)
   const handleExcludeAllVisible = () => {

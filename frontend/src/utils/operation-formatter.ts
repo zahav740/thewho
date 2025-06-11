@@ -112,8 +112,10 @@ export const formatOrderData = (data: any): any => {
   return result;
 };
 
-export default {
+const operationFormatter = {
   formatOperation,
   formatOperations,
   formatOrderData
 };
+
+export default operationFormatter;

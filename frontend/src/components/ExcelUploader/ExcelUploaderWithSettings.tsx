@@ -5,7 +5,7 @@
  * @created: 2025-05-29
  * @updated: 2025-06-09 // УБРАНЫ ЗАГЛУШКИ - ТОЛЬКО РЕАЛЬНЫЕ ДАННЫЕ
  */
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   Upload,
   Card,
@@ -17,12 +17,10 @@ import {
   Typography,
   Row,
   Col,
-  Divider,
   Modal,
   Table,
   message,
   Spin,
-  Input,
   Badge,
   Tooltip,
   Checkbox,
@@ -37,18 +35,15 @@ import {
   DeleteOutlined,
   ReloadOutlined,
   FilterOutlined,
-  ClearOutlined,
   DownloadOutlined,
-  SearchOutlined,
   SettingOutlined,
 } from '@ant-design/icons';
-import { UploadFile, UploadProps } from 'antd/es/upload/interface';
+import { UploadProps } from 'antd/es/upload/interface';
 import type { ColumnsType } from 'antd/es/table';
-import ImportSettingsModal, { ImportSettings, ColorFilter, ColumnMapping } from './ImportSettingsModal';
+import ImportSettingsModal, { ImportSettings } from './ImportSettingsModal';
 
 const { Dragger } = Upload;
 const { Title, Text, Paragraph } = Typography;
-const { Search } = Input;
 
 interface ExcelFileWithSettings {
   file: File;
@@ -64,11 +59,7 @@ interface ExcelFileWithSettings {
   importSettings?: ImportSettings;
 }
 
-interface ColumnFilter {
-  column: string;
-  values: string[];
-  searchText?: string;
-}
+// Удален неиспользуемый интерфейс ColumnFilter
 
 export interface ExcelUploaderWithSettingsProps {
   onUpload?: (file: File, data?: any[], settings?: ImportSettings) => Promise<any>;
@@ -112,10 +103,34 @@ const ExcelUploaderWithSettings: React.FC<ExcelUploaderWithSettingsProps> = ({
   const [previewModalVisible, setPreviewModalVisible] = useState(false);
   const [settingsModalVisible, setSettingsModalVisible] = useState(false);
   const [selectedFileIndex, setSelectedFileIndex] = useState<number>(-1);
-  const [filters, setFilters] = useState<ColumnFilter[]>([]);
-  const [globalSearch, setGlobalSearch] = useState<string>('');
+  // Удалены неиспользуемые состояния фильтров
   const [showSettingsAfterUpload, setShowSettingsAfterUpload] = useState(true);
   const [pendingFileIndex, setPendingFileIndex] = useState<number>(-1);
+  
+  // Функция определения цвета строки на основе реальных данных
+  const determineRowColor = useCallback((row: any): string => {
+    // Пытаемся определить цвет по различным полям
+    const status = String(row.status || row.статус || '').toLowerCase();
+    const priority = String(row.priority || row.приоритет || '').toLowerCase();
+    
+    // Логика определения цвета:
+    if (status.includes('готов') || status.includes('ready') || status.includes('completed')) {
+      return 'green'; // Готовые заказы
+    } else if (status.includes('критич') || status.includes('срочн') || status.includes('critical') || priority.includes('критич') || priority === '1') {
+      return 'red'; // Критичные заказы
+    } else if (status.includes('план') || status.includes('plan') || priority.includes('план') || priority === '4') {
+      return 'blue'; // Плановые заказы
+    } else {
+      return 'yellow'; // Обычные заказы по умолчанию
+    }
+  }, []);
+  
+  // Функция определения приоритета по цвету
+  const determineColorPriority = useCallback((row: any): number => {
+    const color = determineRowColor(row);
+    const priorityMap = { green: 1, red: 3, blue: 4, yellow: 2 };
+    return priorityMap[color as keyof typeof priorityMap] || 2;
+  }, [determineRowColor]);
   
   // Настройки импорта по умолчанию
   const [defaultImportSettings, setDefaultImportSettings] = useState<ImportSettings>({
@@ -201,32 +216,9 @@ const ExcelUploaderWithSettings: React.FC<ExcelUploaderWithSettingsProps> = ({
       console.error('❌ Ошибка чтения РЕАЛЬНОГО Excel файла:', error);
       throw new Error(`Ошибка чтения Excel: ${error.message || 'Неизвестная ошибка'}`);
     }
-  }, []);
+  }, [determineRowColor, determineColorPriority]);
 
-  // Функция определения цвета строки на основе реальных данных
-  const determineRowColor = (row: any): string => {
-    // Пытаемся определить цвет по различным полям
-    const status = String(row.status || row.статус || '').toLowerCase();
-    const priority = String(row.priority || row.приоритет || '').toLowerCase();
-    
-    // Логика определения цвета:
-    if (status.includes('готов') || status.includes('ready') || status.includes('completed')) {
-      return 'green'; // Готовые заказы
-    } else if (status.includes('критич') || status.includes('срочн') || status.includes('critical') || priority.includes('критич') || priority === '1') {
-      return 'red'; // Критичные заказы
-    } else if (status.includes('план') || status.includes('plan') || priority.includes('план') || priority === '4') {
-      return 'blue'; // Плановые заказы
-    } else {
-      return 'yellow'; // Обычные заказы по умолчанию
-    }
-  };
 
-  // Функция определения приоритета по цвету
-  const determineColorPriority = (row: any): number => {
-    const color = determineRowColor(row);
-    const priorityMap = { green: 1, red: 3, blue: 4, yellow: 2 };
-    return priorityMap[color as keyof typeof priorityMap] || 2;
-  };
 
   // Применение цветовых фильтров
   const applyColorFilters = useCallback((data: any[], settings: ImportSettings): any[] => {
@@ -324,7 +316,7 @@ const ExcelUploaderWithSettings: React.FC<ExcelUploaderWithSettingsProps> = ({
       ));
       message.error(`Ошибка обработки файла "${file.name}": ${error.message}`);
     }
-  }, [files.length, onUpload, readExcelFileWithColors, applyColorFilters, defaultImportSettings]);
+  }, [files.length, onUpload, readExcelFileWithColors, applyColorFilters, defaultImportSettings, showSettingsAfterUpload]);
 
   const handleImportSettingsApply = useCallback((settings: ImportSettings) => {
     setDefaultImportSettings(settings);
@@ -420,7 +412,7 @@ const ExcelUploaderWithSettings: React.FC<ExcelUploaderWithSettingsProps> = ({
 
   const getStatusColor = (status: string) => statusMapping[status]?.color || 'default';
   const getStatusText = (status: string) => statusMapping[status]?.text || status;
-  const canDownload = (status: string) => statusMapping[status]?.canDownload || false;
+  // const canDownload = (status: string) => statusMapping[status]?.canDownload || false; // Зарезервировано для будущего использования
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -432,15 +424,15 @@ const ExcelUploaderWithSettings: React.FC<ExcelUploaderWithSettingsProps> = ({
     }
   };
 
-  const getRowColor = (record: any) => {
-    const colorMap = {
-      green: '#f6ffed',
-      yellow: '#fffbe6', 
-      red: '#fff2f0',
-      blue: '#f0f5ff',
-    };
-    return colorMap[record.rowColor as keyof typeof colorMap] || '#ffffff';
-  };
+  // const getRowColor = (record: any) => {
+  //   const colorMap = {
+  //     green: '#f6ffed',
+  //     yellow: '#fffbe6', 
+  //     red: '#fff2f0',
+  //     blue: '#f0f5ff',
+  //   };
+  //   return colorMap[record.rowColor as keyof typeof colorMap] || '#ffffff';
+  // }; // Зарезервировано для будущего использования
 
   // Создание колонок для таблицы превью
   const createPreviewColumns = (headers: string[], fileIndex: number): ColumnsType<any> => {

@@ -26,6 +26,7 @@ import dayjs from 'dayjs';
 import { ordersApi } from '../../../services/ordersApi';
 import { CreateOrderDto, Priority, OrderFormOperationDto } from '../../../types/order.types';
 import { OperationType } from '../../../types/operation.types';
+import { useTranslation } from '../../../hooks/useTranslation';
 
 const { Option } = Select;
 
@@ -42,6 +43,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
   onClose,
   onSuccess,
 }) => {
+  const { t, tWithParams } = useTranslation();
   const [loading, setLoading] = useState(false);
   const isEdit = !!orderId;
   const dataLoadedRef = useRef(false); // Флаг для предотвращения повторной загрузки
@@ -121,13 +123,13 @@ export const OrderForm: React.FC<OrderFormProps> = ({
   const createMutation = useMutation({
     mutationFn: ordersApi.create,
     onSuccess: () => {
-      message.success('Заказ успешно создан');
+      message.success(t('order_form.order_created'));
       dataLoadedRef.current = false; // Сброс флага
       onSuccess();
     },
     onError: (error: any) => {
       console.error('Ошибка при создании заказа:', error);
-      message.error('Ошибка при создании заказа: ' + (error.response?.data?.message || error.message));
+      message.error(t('order_form.create_error') + ': ' + (error.response?.data?.message || error.message));
     },
   });
 
@@ -135,13 +137,13 @@ export const OrderForm: React.FC<OrderFormProps> = ({
     mutationFn: ({ id, data }: { id: number; data: any }) =>
       ordersApi.update(id, data),
     onSuccess: () => {
-      message.success('Заказ успешно обновлен');
+      message.success(t('order_form.order_updated'));
       dataLoadedRef.current = false; // Сброс флага
       onSuccess();
     },
     onError: (error: any) => {
       console.error('Ошибка при обновлении заказа:', error);
-      message.error('Ошибка при обновлении заказа: ' + (error.response?.data?.message || error.message));
+      message.error(t('order_form.update_error') + ': ' + (error.response?.data?.message || error.message));
     },
   });
 
@@ -197,7 +199,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
 
   const operationColumns = [
     {
-      title: '№',
+      title: t('order_form.operation_number'),
       dataIndex: 'operationNumber',
       width: 60,
       render: (_: any, __: any, index: number) => (
@@ -211,7 +213,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
       ),
     },
     {
-      title: 'Тип операции',
+      title: t('order_form.operation_type'),
       dataIndex: 'operationType',
       width: 150,
       render: (_: any, __: any, index: number) => (
@@ -220,15 +222,15 @@ export const OrderForm: React.FC<OrderFormProps> = ({
           control={control}
           render={({ field }) => (
             <Select {...field} style={{ width: '100%' }}>
-              <Option value={OperationType.MILLING}>Фрезерная</Option>
-              <Option value={OperationType.TURNING}>Токарная</Option>
+              <Option value={OperationType.MILLING}>{t('order_form.milling')}</Option>
+              <Option value={OperationType.TURNING}>{t('order_form.turning')}</Option>
             </Select>
           )}
         />
       ),
     },
     {
-      title: 'Оси',
+      title: t('order_form.machine_axes'),
       dataIndex: 'machineAxes',
       width: 80,
       render: (_: any, __: any, index: number) => (
@@ -245,7 +247,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
       ),
     },
     {
-      title: 'Время (мин)',
+      title: t('order_form.estimated_time'),
       dataIndex: 'estimatedTime',
       width: 100,
       render: (_: any, __: any, index: number) => (
@@ -276,13 +278,13 @@ export const OrderForm: React.FC<OrderFormProps> = ({
 
   return (
     <Modal
-      title={isEdit ? 'Редактировать заказ' : 'Новый заказ'}
+      title={isEdit ? t('order_form.edit_order') : t('order_form.new_order')}
       open={visible}
       onCancel={onClose}
       width={800}
       footer={[
         <Button key="cancel" onClick={onClose}>
-          Отмена
+          {t('order_form.cancel')}
         </Button>,
         <Button
           key="submit"
@@ -290,14 +292,14 @@ export const OrderForm: React.FC<OrderFormProps> = ({
           loading={loading}
           onClick={handleSubmit(onSubmit)}
         >
-          {isEdit ? 'Сохранить' : 'Создать'}
+          {isEdit ? t('order_form.save') : t('order_form.create')}
         </Button>,
       ]}
     >
       <Spin spinning={loading}>
         <Form layout="vertical">
           <Form.Item
-            label="Номер чертежа"
+            label={t('order_form.drawing_number')}
             required
             validateStatus={errors.drawingNumber ? 'error' : ''}
             help={errors.drawingNumber?.message}
@@ -305,23 +307,23 @@ export const OrderForm: React.FC<OrderFormProps> = ({
             <Controller
               name="drawingNumber"
               control={control}
-              rules={{ required: 'Обязательное поле' }}
+              rules={{ required: t('order_form.required_field') }}
               render={({ field }) => (
-                <Input {...field} placeholder="Например: C6HP0021A" />
+                <Input {...field} placeholder={t('order_form.drawing_placeholder')} />
               )}
             />
           </Form.Item>
 
           <Space size="large" style={{ width: '100%' }}>
             <Form.Item
-              label="Количество"
+              label={t('order_form.quantity')}
               required
               validateStatus={errors.quantity ? 'error' : ''}
             >
               <Controller
                 name="quantity"
                 control={control}
-                rules={{ required: 'Обязательное поле', min: 1 }}
+                rules={{ required: t('order_form.required_field'), min: 1 }}
                 render={({ field }) => (
                   <InputNumber {...field} min={1} style={{ width: 120 }} />
                 )}
@@ -329,33 +331,33 @@ export const OrderForm: React.FC<OrderFormProps> = ({
             </Form.Item>
 
             <Form.Item
-              label="Приоритет"
+              label={t('order_form.priority')}
               required
               validateStatus={errors.priority ? 'error' : ''}
             >
               <Controller
                 name="priority"
                 control={control}
-                rules={{ required: 'Обязательное поле' }}
+                rules={{ required: t('order_form.required_field') }}
                 render={({ field }) => (
                   <Select {...field} style={{ width: 150 }}>
-                    <Option value={Priority.HIGH}>Высокий</Option>
-                    <Option value={Priority.MEDIUM}>Средний</Option>
-                    <Option value={Priority.LOW}>Низкий</Option>
+                    <Option value={Priority.HIGH}>{t('priority.HIGH')}</Option>
+                    <Option value={Priority.MEDIUM}>{t('priority.MEDIUM')}</Option>
+                    <Option value={Priority.LOW}>{t('priority.LOW')}</Option>
                   </Select>
                 )}
               />
             </Form.Item>
 
             <Form.Item
-              label="Срок выполнения"
+              label={t('order_form.deadline')}
               required
               validateStatus={errors.deadline ? 'error' : ''}
             >
               <Controller
                 name="deadline"
                 control={control}
-                rules={{ required: 'Обязательное поле' }}
+                rules={{ required: t('order_form.required_field') }}
                 render={({ field }) => (
                   <DatePicker
                     {...field}
@@ -368,17 +370,17 @@ export const OrderForm: React.FC<OrderFormProps> = ({
             </Form.Item>
           </Space>
 
-          <Form.Item label="Тип работы">
+          <Form.Item label={t('order_form.work_type')}>
             <Controller
               name="workType"
               control={control}
               render={({ field }) => (
-                <Input {...field} placeholder="Например: Фрезерная обработка" />
+                <Input {...field} placeholder={t('order_form.work_type_placeholder')} />
               )}
             />
           </Form.Item>
 
-          <Form.Item label="Операции" required>
+          <Form.Item label={t('order_form.operations')} required>
             <Table
               dataSource={fields}
               columns={operationColumns}
@@ -392,13 +394,13 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                   icon={<PlusOutlined />}
                   block
                 >
-                  Добавить операцию
+                  {t('order_form.add_operation')}
                 </Button>
               )}
             />
             {fields.length > 0 && (
               <div style={{ marginTop: 8, color: '#666', fontSize: '12px' }}>
-                Операций в форме: {fields.length}
+                {tWithParams('order_form.operations_count', { count: fields.length })}
               </div>
             )}
           </Form.Item>

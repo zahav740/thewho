@@ -304,7 +304,7 @@ export class ExcelImportService {
     // Создаем операции
     for (const opData of orderData.operations) {
       const operation = this.operationRepository.create({
-        sequenceNumber: opData.operationNumber,
+        operationNumber: opData.operationNumber,
         operationType: opData.operationType,
         estimatedTime: opData.estimatedTime,
         order: savedOrder,
@@ -330,7 +330,7 @@ export class ExcelImportService {
 
     for (const opData of orderData.operations) {
       const operation = this.operationRepository.create({
-        sequenceNumber: opData.operationNumber,
+        operationNumber: opData.operationNumber,
         operationType: opData.operationType,
         estimatedTime: opData.estimatedTime,
         order: existingOrder,

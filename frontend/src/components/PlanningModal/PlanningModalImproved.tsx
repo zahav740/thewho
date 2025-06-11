@@ -3,7 +3,7 @@
  * @description: УЛУЧШЕННОЕ модальное окно планирования с правильным учетом операций в работе
  * @dependencies: antd, planningApi, MachineAvailability
  * @created: 2025-06-08
- * @fixed: 2025-06-09 - исправлен незакрытый тег Result
+ * @fixed: 2025-06-09 - исправлен незакрытый тег Result и удалена неиспользуемая функция
  */
 import React, { useState } from 'react';
 import {
@@ -83,9 +83,6 @@ const PlanningModalImproved: React.FC<PlanningModalImprovedProps> = ({
   const [currentStep, setCurrentStep] = useState(0);
   const [planningResult, setPlanningResult] = useState<ImprovedPlanningResult | null>(null);
   const [showResultModal, setShowResultModal] = useState(false);
-  const [selectedOperation, setSelectedOperation] = useState<any>(null);
-  const [selectedOrder, setSelectedOrder] = useState<any>(null);
-  const [showOperationModal, setShowOperationModal] = useState(false);
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [selectedOperationForAssign, setSelectedOperationForAssign] = useState<any>(null);
 
@@ -103,7 +100,6 @@ const PlanningModalImproved: React.FC<PlanningModalImprovedProps> = ({
     mutationFn: planningApi.planProductionImproved,
     onSuccess: (result: any) => {
       console.log('✅ УЛУЧШЕННОЕ планирование успешно:', result);
-      // Приводим результат к нужному формату
       setPlanningResult(result as ImprovedPlanningResult);
       setCurrentStep(2);
       setShowResultModal(true);
@@ -118,7 +114,6 @@ const PlanningModalImproved: React.FC<PlanningModalImprovedProps> = ({
     mutationFn: planningApi.demoImprovedPlanning,
     onSuccess: (result: any) => {
       console.log('✅ ДЕМО улучшенного планирования успешно:', result);
-      // Приводим результат к нужному формату
       setPlanningResult(result as ImprovedPlanningResult);
       setCurrentStep(2);
       setShowResultModal(true);
@@ -147,16 +142,13 @@ const PlanningModalImproved: React.FC<PlanningModalImprovedProps> = ({
   // 🆕 Мутация для назначения операции
   const assignOperationMutation = useMutation({
     mutationFn: ({ operationId, machineId }: { operationId: string; machineId: number }) => {
-      // Используем API из planningApi для назначения
       return planningApi.assignOperation(operationId, machineId.toString());
     },
     onSuccess: (result) => {
       console.log('✅ Операция успешно назначена:', result);
       message.success(`Операция успешно назначена на станок ${selectedMachine?.machineName}`);
-      // Закрываем модальное окно и обновляем список станков
       handleClose();
-      // Можно добавить обновление списка станков
-      window.location.reload(); // Простое обновление
+      window.location.reload();
     },
     onError: (error) => {
       console.error('❌ Ошибка при назначении операции:', error);
@@ -169,7 +161,6 @@ const PlanningModalImproved: React.FC<PlanningModalImprovedProps> = ({
     console.log('🎯 Выбрана операция для назначения:', operation);
     setSelectedOperationForAssign(operation);
     
-    // Подтверждаем назначение
     const order = planningResult?.result.details.selectedOrders.find(o => o.id === operation.orderId);
     const drawingNumber = order?.drawingNumber || `Заказ #${operation.orderId}`;
     
@@ -212,26 +203,6 @@ const PlanningModalImproved: React.FC<PlanningModalImprovedProps> = ({
     }
   };
 
-  const getMachineTypeColor = (type: string) => {
-    switch (type) {
-      case 'MILLING':
-        return '#1890ff';
-      case 'TURNING':
-        return '#52c41a';
-      default:
-        return '#666';
-    }
-  };
-
-  const getMachineIcon = (type: string) => {
-    switch (type) {
-      case 'TURNING':
-        return <ToolOutlined rotate={90} />;
-      default:
-        return <ToolOutlined />;
-    }
-  };
-
   const steps = [
     {
       title: 'Выбранный станок',
@@ -254,13 +225,9 @@ const PlanningModalImproved: React.FC<PlanningModalImprovedProps> = ({
     setCurrentStep(0);
     setPlanningResult(null);
     setShowResultModal(false);
-    setSelectedOperation(null);
-    setSelectedOrder(null);
-    setShowOperationModal(false);
     onCancel();
   };
 
-  // Сбрасываем состояние при открытии модального окна
   React.useEffect(() => {
     if (visible && selectedMachine) {
       console.log('🔄 Модальное окно открылось, сбрасываем состояние');
@@ -274,8 +241,6 @@ const PlanningModalImproved: React.FC<PlanningModalImprovedProps> = ({
     console.log('🚫 PlanningModal: No selectedMachine, returning null');
     return null;
   }
-
-  const machineTypeColor = getMachineTypeColor(selectedMachine.machineType);
 
   console.log('✅ PlanningModal: Rendering modal with machine:', selectedMachine.machineName);
 
@@ -307,7 +272,6 @@ const PlanningModalImproved: React.FC<PlanningModalImprovedProps> = ({
 
         {currentStep === 0 && (
           <>
-            {/* Анализ системы */}
             {systemAnalysis?.success && (
               <Alert
                 message="🔍 Анализ системы"
@@ -334,7 +298,6 @@ const PlanningModalImproved: React.FC<PlanningModalImprovedProps> = ({
               />
             )}
 
-            {/* Рекомендации системы */}
             {showAnalysis && systemAnalysis?.analysis?.recommendations && (
               <Card title="📋 Рекомендации системы" style={{ marginBottom: 24, borderRadius: '8px' }}>
                 {systemAnalysis.analysis.recommendations.map((rec: any, index: number) => (
@@ -468,7 +431,6 @@ const PlanningModalImproved: React.FC<PlanningModalImprovedProps> = ({
         )}
       </Modal>
 
-      {/* Модальное окно с результатами */}
       <Modal
         title={<span style={{ fontSize: '18px', fontWeight: 'bold' }}>📊 Результаты улучшенного планирования</span>}
         open={showResultModal}
@@ -488,7 +450,6 @@ const PlanningModalImproved: React.FC<PlanningModalImprovedProps> = ({
       >
         {planningResult && (
           <div>
-            {/* Статистика */}
             <Row gutter={24} style={{ marginBottom: 32 }}>
               <Col span={6}>
                 <Card size="small" style={{ textAlign: 'center', borderRadius: '8px' }}>
@@ -532,7 +493,6 @@ const PlanningModalImproved: React.FC<PlanningModalImprovedProps> = ({
               </Col>
             </Row>
 
-            {/* Анализ */}
             <Collapse 
               style={{ marginBottom: 24 }}
               items={[
@@ -569,7 +529,6 @@ const PlanningModalImproved: React.FC<PlanningModalImprovedProps> = ({
               ]}
             />
 
-            {/* Очередь операций */}
             <Title level={4} style={{ marginBottom: '20px', color: '#262626' }}>
               📋 Очередь операций для станка "{selectedMachine.machineName}"
             </Title>

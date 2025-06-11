@@ -5,7 +5,7 @@
  * @created: 2025-06-07
  * @updated: 2025-06-07 - Исправлены ошибки hooks и TypeScript
  */
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   Modal,
   Row,
@@ -18,7 +18,7 @@ import {
   Tag,
   Space,
   Button,
-  Divider,
+
   Alert,
   Spin,
   message,
@@ -31,15 +31,15 @@ import {
   UserOutlined,
   BarChartOutlined,
   CheckCircleOutlined,
-  WarningOutlined,
+
   DownloadOutlined,
   ReloadOutlined,
 } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
 import dayjs from 'dayjs';
-import operationHistoryApi, { OperationHistoryRecord, OperatorEfficiencyStats } from '../../../services/operationHistoryApi';
+import operationHistoryApi, { OperationHistoryRecord } from '../../../services/operationHistoryApi';
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 const { RangePicker } = DatePicker;
 
 interface OperationDetailModalProps {
@@ -314,8 +314,6 @@ export const OperationDetailModal: React.FC<OperationDetailModalProps> = ({
   };
 
   const totalProduced = operationHistory?.reduce((sum, record) => sum + record.quantityProduced, 0) || 0;
-  const targetQuantity = operation.targetQuantity || 100;
-  const progressPercent = (totalProduced / targetQuantity) * 100;
 
   const bestOperator = operatorStats[0];
 
@@ -324,7 +322,7 @@ export const OperationDetailModal: React.FC<OperationDetailModalProps> = ({
       title={
         <Space>
           <BarChartOutlined />
-          Детальная статистика операции {operation.operationNumber}
+          <Text strong style={{ fontSize: '16px' }}>Детальная статистика операции {operation.operationNumber}</Text>
         </Space>
       }
       open={visible}

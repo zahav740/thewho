@@ -5,7 +5,7 @@
  * @created: 2025-06-09
  * @updated: 2025-06-09 // ИСПРАВЛЕНО: TypeScript ошибки
  */
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import {
   Modal,
   Upload,
@@ -33,7 +33,7 @@ import {
 import { ordersApi } from '../services/ordersApi';
 
 const { Dragger } = Upload;
-const { Title, Text, Paragraph } = Typography;
+const { Text, Paragraph } = Typography; // Оставляем только используемые
 
 interface StableExcelImporterProps {
   visible: boolean;
@@ -70,7 +70,7 @@ export const StableExcelImporter: React.FC<StableExcelImporterProps> = ({
   });
   const [csvData, setCsvData] = useState('');
   const [currentStep, setCurrentStep] = useState<'upload' | 'preview' | 'uploading' | 'complete'>('upload');
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  // fileInputRef удален как неиспользуемый
 
   // ✅ ИСПРАВЛЕНО: Убрана опция timeout из fetch
   const checkApiConnection = async (): Promise<boolean> => {
@@ -195,7 +195,6 @@ export const StableExcelImporter: React.FC<StableExcelImporterProps> = ({
       console.log('📋 Используем разделитель:', separator === '\t' ? 'TAB' : 'SEMICOLON');
 
       const orders: ParsedOrder[] = [];
-      const errors: string[] = [];
 
       // Парсим строки данных (пропускаем заголовок)
       for (let i = 1; i < lines.length; i++) {
@@ -215,10 +214,10 @@ export const StableExcelImporter: React.FC<StableExcelImporterProps> = ({
             orders.push(order);
             console.log(`✅ Строка ${i + 1}: ${order.drawingNumber} (${order.quantity} шт.)`);
           } else {
-            errors.push(`Строка ${i + 1}: недостаточно данных`);
+            console.warn(`Строка ${i + 1}: недостаточно данных`);
           }
         } catch (error) {
-          errors.push(`Строка ${i + 1}: ${error}`);
+          console.warn(`Строка ${i + 1}: ${error}`);
         }
       }
 
@@ -229,17 +228,10 @@ export const StableExcelImporter: React.FC<StableExcelImporterProps> = ({
       setParsedOrders(orders);
       setCurrentStep('preview');
 
-      if (errors.length > 0) {
-        notification.warning({
-          message: 'Частичная обработка',
-          description: `Обработано ${orders.length} заказов, пропущено ${errors.length} строк с ошибками`
-        });
-      } else {
-        notification.success({
-          message: 'Данные обработаны',
-          description: `Успешно обработано ${orders.length} заказов`
-        });
-      }
+      notification.success({
+        message: 'Данные обработаны',
+        description: `Успешно обработано ${orders.length} заказов`
+      });
 
     } catch (error) {
       notification.error({
@@ -301,6 +293,8 @@ export const StableExcelImporter: React.FC<StableExcelImporterProps> = ({
       let created = 0;
       let errors = 0;
       const total = parsedOrders.length;
+      
+      console.log(`Начинаем загрузку ${total} заказов...`);
 
       // Загружаем по одному заказу для стабильности
       for (let i = 0; i < parsedOrders.length; i++) {
@@ -327,9 +321,16 @@ export const StableExcelImporter: React.FC<StableExcelImporterProps> = ({
       const successRate = Math.round(created / total * 100);
       
       if (created > 0) {
+        const message = errors > 0 ? 
+          `Загрузка завершена с предупреждениями!` : 
+          'Загрузка завершена!';
+        const description = errors > 0 ? 
+          `Успешно создано ${created} заказов из ${total}. Ошибок: ${errors}` :
+          `Успешно создано ${created} заказов из ${total} (${successRate}%)`;
+        
         notification.success({
-          message: 'Загрузка завершена!',
-          description: `Успешно создано ${created} заказов из ${total} (${successRate}%)`
+          message,
+          description
         });
         
         // Вызываем callback для обновления списка

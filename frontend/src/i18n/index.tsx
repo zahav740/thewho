@@ -7,10 +7,10 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { translations } from './translations';
 import { fetchTranslations } from './api';
-import type { Language, TranslationKey, ClientTranslations, TranslationAPI, TranslationFormData } from './types';
+import type { Language } from './types';
 
-// Переэкспортируем типы
-export type { Language, TranslationKey, ClientTranslations, TranslationAPI, TranslationFormData } from './types';
+// Переэкспортируем только используемые типы
+export type { Language, TranslationAPI, ClientTranslations, TranslationFormData } from './types';
 
 interface I18nContextType {
   currentLanguage: Language;
@@ -29,6 +29,13 @@ class I18nService {
   private isLoaded = false;
   private loadPromise: Promise<void> | null = null;
 
+  constructor() {
+    // Инициализируем как загруженные сразу со статическими переводами
+    this.isLoaded = true;
+    console.log('I18nService initialized with static translations');
+    console.log('Static order_form keys:', Object.keys(this.translations.ru).filter(k => k.startsWith('order_form')));
+  }
+
   /**
    * Получить перевод по ключу
    */
@@ -37,6 +44,12 @@ class I18nService {
       const translation = this.translations[language][key];
       if (translation) {
         return translation;
+      }
+      
+      // Отладка для order_form ключей
+      if (key.startsWith('order_form')) {
+        console.warn(`Перевод не найден для ключа: ${key}`);
+        console.log(`Доступные order_form ключи:`, Object.keys(this.translations[language]).filter(k => k.startsWith('order_form')));
       }
       
       // Если перевод не найден, возвращаем ключ
@@ -66,6 +79,7 @@ class I18nService {
    * Загрузить переводы с сервера
    */
   async loadTranslationsFromAPI(): Promise<void> {
+    // Уже загружены статические переводы, но можем дополнить из API
     if (this.loadPromise) {
       return this.loadPromise;
     }
@@ -76,21 +90,29 @@ class I18nService {
 
   private async performLoad(): Promise<void> {
     try {
+      console.log('Loading translations from API...');
       const apiTranslations = await fetchTranslations();
       
+      console.log('Static translations RU keys:', Object.keys(this.translations.ru).filter(k => k.startsWith('order_form')));
+      console.log('API translations RU keys:', Object.keys(apiTranslations.ru || {}).filter(k => k.startsWith('order_form')));
+      
       // Объединяем статические переводы с переводами из API
+      // ВАЖНО: статические переводы имеют приоритет!
       const mergedTranslations: Record<Language, Record<string, string>> = {
-        ru: { ...this.translations.ru, ...apiTranslations.ru },
-        en: { ...this.translations.en, ...apiTranslations.en },
+        ru: { ...apiTranslations.ru, ...this.translations.ru },
+        en: { ...apiTranslations.en, ...this.translations.en },
       };
+      
+      console.log('Merged translations RU order_form keys:', Object.keys(mergedTranslations.ru).filter(k => k.startsWith('order_form')));
       
       this.translations = mergedTranslations;
       this.isLoaded = true;
       
-      console.log('Translations loaded from API');
+      console.log('Translations loaded and merged successfully');
     } catch (error) {
       console.error('Error loading translations from API:', error);
       // В случае ошибки продолжаем работать со статическими переводами
+      console.log('Using static translations only');
       this.isLoaded = true;
     }
   }
@@ -131,15 +153,19 @@ export const I18nProvider: React.FC<I18nProviderProps> = ({ children }) => {
   };
 
   const [currentLanguage, setCurrentLanguage] = useState<Language>(getInitialLanguage);
-  const [isLoaded, setIsLoaded] = useState(false);
+  const [isLoaded] = useState(true); // Начинаем с true, так как статические переводы уже доступны
 
-  // Загружаем переводы при инициализации
+  // Дополнительно загружаем переводы с API (необязательно)
   useEffect(() => {
-    const loadTranslations = async () => {
-      await i18nService.loadTranslationsFromAPI();
-      setIsLoaded(true);
+    const loadApiTranslations = async () => {
+      try {
+        await i18nService.loadTranslationsFromAPI();
+        console.log('API translations loaded successfully');
+      } catch (error) {
+        console.warn('Failed to load API translations, using static only:', error);
+      }
     };
-    loadTranslations();
+    loadApiTranslations();
   }, []);
 
   const setLanguage = (language: Language) => {

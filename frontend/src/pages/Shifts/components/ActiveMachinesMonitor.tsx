@@ -21,26 +21,20 @@ import {
   Badge,
   Divider,
   message,
-  Modal,
-  Statistic,
 } from 'antd';
 import {
-  PlayCircleOutlined,
   PauseCircleOutlined,
   ToolOutlined,
   ClockCircleOutlined,
-  UserOutlined,
   FileTextOutlined,
-  SettingOutlined,
   BarChartOutlined,
-  PrinterOutlined,
 } from '@ant-design/icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { machinesApi } from '../../../services/machinesApi';
 import { operationsApi } from '../../../services/operationsApi';
 import { shiftsApi } from '../../../services/shiftsApi';
 import { OperationStatus } from '../../../types/operation.types';
-import { MachineAvailability } from '../../../types/machine.types';
+
 import { ShiftForm } from './ShiftForm';
 import { OperationDetailModal } from './OperationDetailModal';
 import { useTranslation } from '../../../i18n';
@@ -182,6 +176,8 @@ export const ActiveMachinesMonitor: React.FC = () => {
     let totalParts = 0;
     let totalTime = 0;
     let workingSessions = 0;
+    
+    console.log(`Вычисляем эффективность оператора ${operatorName}...`);
 
     operatorShifts.forEach(shift => {
       if (shift.dayShiftOperator === operatorName) {
@@ -217,11 +213,12 @@ export const ActiveMachinesMonitor: React.FC = () => {
     // Эффективность использования времени
     const efficiency = Math.min(100, Math.max(0, planVsFact));
     
-    // Общий рейтинг (0-10)
+    // Общий рейтинг (0-10) с учетом количества рабочих сессий
+    const sessionBonus = Math.min(2, workingSessions * 0.1); // Бонус за стабильность работы
     const rating = Math.round(
       (Math.min(10, partsPerHour) + 
        Math.min(10, efficiency / 10) + 
-       Math.min(10, consistency / 10)) / 3
+       Math.min(10, consistency / 10) + sessionBonus) / 3
     );
 
     return {
@@ -260,15 +257,37 @@ export const ActiveMachinesMonitor: React.FC = () => {
     return Math.min((totalProduced / targetQuantity) * 100, 100);
   }, []);
 
-  // НОВАЯ ФУНКЦИЯ: Фильтрация смен по текущей операции
+  // ИСПРАВЛЕННАЯ ФУНКЦИЯ: Фильтрация смен по текущей операции С УЧЕТОМ ВРЕМЕНИ НАЗНАЧЕНИЯ
   const getOperationShifts = React.useCallback((
     machineId: string, 
     operationDetails: any, 
-    allShifts: any[]
+    allShifts: any[],
+    operationAssignedAt?: string | Date
   ) => {
     if (!operationDetails || !allShifts) return [];
     
-    // Фильтруем смены по станку И по номеру чертежа текущей операции
+    // Если есть время назначения операции, фильтруем смены только после этого времени
+    if (operationAssignedAt) {
+      const operationStartTime = new Date(operationAssignedAt);
+      console.log(`🕒 Фильтруем смены для ${operationDetails.orderDrawingNumber} после ${operationStartTime.toISOString()}`);
+      
+      const filteredShifts = allShifts.filter(shift => {
+        const shiftTime = new Date(shift.createdAt);
+        const matchesMachine = shift.machineId === parseInt(machineId);
+        const matchesDrawing = shift.drawingNumber === operationDetails.orderDrawingNumber;
+        const isAfterAssignment = shiftTime >= operationStartTime;
+        
+        console.log(`📋 Смена ${shift.id}: машина=${matchesMachine}, чертеж=${matchesDrawing}, время=${isAfterAssignment}`);
+        
+        return matchesMachine && matchesDrawing && isAfterAssignment;
+      });
+      
+      console.log(`✅ Найдено ${filteredShifts.length} смен для текущей операции`);
+      return filteredShifts;
+    }
+    
+    // Fallback: старая логика без учета времени
+    console.log(`⚠️ Используем старую логику фильтрации (нет времени назначения)`);
     return allShifts.filter(shift => 
       shift.machineId === parseInt(machineId) && 
       shift.drawingNumber === operationDetails.orderDrawingNumber
@@ -285,9 +304,14 @@ export const ActiveMachinesMonitor: React.FC = () => {
         op => op.machineId === parseInt(machine.id)
       );
 
-      // ИСПРАВЛЕНО: Фильтруем смены только по ТЕКУЩЕЙ операции
+      // ИСПРАВЛЕНО: Фильтруем смены только по ТЕКУЩЕЙ операции И времени назначения
       const operationShifts = machine.currentOperationDetails 
-        ? getOperationShifts(machine.id, machine.currentOperationDetails, todayShifts || [])
+        ? getOperationShifts(
+            machine.id, 
+            machine.currentOperationDetails, 
+            todayShifts || [],
+            machine.lastFreedAt // ✅ Передаем время назначения операции
+          )
         : [];
 
       console.log(`🔍 Станок ${machine.machineName}:`, {
@@ -435,11 +459,7 @@ export const ActiveMachinesMonitor: React.FC = () => {
     }
   };
 
-  const formatTime = (minutes: number) => {
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    return `${hours}ч ${mins}м`;
-  };
+
 
   if (isLoading) {
     return (
@@ -564,6 +584,19 @@ export const ActiveMachinesMonitor: React.FC = () => {
 
                   <div>
                     <Text strong>{t('shifts.production_by_operation')}:</Text>
+                    {/* НОВОЕ: Индикатор новой операции */}
+                    {(machine.currentOperationProduction?.dayShift.quantity || 0) === 0 && 
+                     (machine.currentOperationProduction?.nightShift.quantity || 0) === 0 && (
+                      <div style={{ textAlign: 'center', margin: '8px 0' }}>
+                        <Tag color="green" style={{ fontSize: '11px' }}>
+                          🆕 НОВАЯ ОПЕРАЦИЯ
+                        </Tag>
+                        <br />
+                        <Text type="secondary" style={{ fontSize: '10px' }}>
+                          Производство еще не началось
+                        </Text>
+                      </div>
+                    )}
                     <div style={{ marginTop: 8 }}>
                       <Row gutter={8}>
                         <Col span={12}>

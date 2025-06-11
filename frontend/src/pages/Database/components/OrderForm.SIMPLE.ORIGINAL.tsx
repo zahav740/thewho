@@ -21,9 +21,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Controller, useForm, useFieldArray } from 'react-hook-form';
 import dayjs from 'dayjs';
 import { ordersApi } from '../../../services/ordersApi';
-import { CreateOrderDto, Priority, OrderFormOperationDto } from '../../../types/order.types';
+import { CreateOrderDto, Priority } from '../../../types/order.types'; // OrderFormOperationDto - неиспользуемый тип
 import { OperationType } from '../../../types/operation.types';
-import { useTranslation } from '../../../i18n';
+
 
 const { Option } = Select;
 
@@ -40,14 +40,15 @@ export const OrderForm: React.FC<OrderFormProps> = ({
   onClose,
   onSuccess,
 }) => {
-  const { t } = useTranslation();
+  // const { t } = useTranslation(); // Неиспользуемая переменная
   const [loading, setLoading] = useState(false);
   const isEdit = !!orderId;
   const queryClient = useQueryClient();
 
   console.log('🔧 OrderForm rendered:', { visible, orderId, isEdit });
 
-  const { control, handleSubmit, reset, formState: { errors }, setValue, getValues } = useForm<CreateOrderDto>({
+  const { control, handleSubmit, reset, formState: { errors } } = useForm<CreateOrderDto>({
+    // setValue, getValues - закомментированы как неиспользуемые
     defaultValues: {
       drawingNumber: '',
       quantity: 1,

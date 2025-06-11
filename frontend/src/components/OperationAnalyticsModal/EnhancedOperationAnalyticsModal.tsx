@@ -30,7 +30,6 @@ import {
   WarningOutlined,
   InfoCircleOutlined,
   SettingOutlined,
-  DashboardOutlined,
   BarChartOutlined,
   PrinterOutlined,
   DownloadOutlined,

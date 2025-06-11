@@ -3,7 +3,7 @@
  * @description: Страница истории операций с фильтрами и экспортом (Ant Design)
  * @created: 2025-06-07
  */
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
   Card, 
   Typography, 
@@ -15,8 +15,6 @@ import {
   Select,
   DatePicker,
   Tag,
-  Alert,
-  Spin,
   Statistic,
   Space,
   message,
@@ -72,13 +70,6 @@ const OperationHistory: React.FC = () => {
     loadDrawings();
   }, []);
 
-  // Загрузка данных при изменении выбранного чертежа
-  useEffect(() => {
-    if (filters.drawingNumber) {
-      loadOperationHistory();
-    }
-  }, [filters.drawingNumber, filters.dateRange]);
-
   const loadDrawings = async () => {
     try {
       setLoading(true);
@@ -101,7 +92,7 @@ const OperationHistory: React.FC = () => {
     }
   };
 
-  const loadOperationHistory = async () => {
+  const loadOperationHistory = useCallback(async () => {
     if (!filters.drawingNumber) return;
 
     try {
@@ -176,7 +167,14 @@ const OperationHistory: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filters.drawingNumber, filters.dateRange]);
+
+  // Загрузка данных при изменении выбранного чертежа
+  useEffect(() => {
+    if (filters.drawingNumber) {
+      loadOperationHistory();
+    }
+  }, [filters.drawingNumber, filters.dateRange, loadOperationHistory]);
 
   const handleFilterChange = (field: keyof Filters, value: any) => {
     setFilters(prev => ({

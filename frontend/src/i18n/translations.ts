@@ -70,6 +70,34 @@ export const translations: Record<'ru' | 'en', Record<string, string>> = {
     'form.order': 'Заказ',
     'form.operation': 'Операция',
 
+    // Order Form - RU переводы для формы заказа
+    'order_form.new_order': 'Новый заказ',
+    'order_form.edit_order': 'Редактировать заказ',
+    'order_form.drawing_number': 'Номер чертежа',
+    'order_form.drawing_placeholder': 'Например: C6HP0021A',
+    'order_form.quantity': 'Количество',
+    'order_form.priority': 'Приоритет',
+    'order_form.deadline': 'Срок выполнения',
+    'order_form.work_type': 'Тип работы',
+    'order_form.work_type_placeholder': 'Например: Фрезерная обработка',
+    'order_form.operations': 'Операции',
+    'order_form.operation_number': '№',
+    'order_form.operation_type': 'Тип операции',
+    'order_form.machine_axes': 'Оси',
+    'order_form.estimated_time': 'Время (мин)',
+    'order_form.add_operation': 'Добавить операцию',
+    'order_form.operations_count': 'Операций: {{count}}',
+    'order_form.milling': 'Фрезерная',
+    'order_form.turning': 'Токарная',
+    'order_form.required_field': 'Обязательное поле',
+    'order_form.create': 'Создать',
+    'order_form.save': 'Сохранить',
+    'order_form.cancel': 'Отмена',
+    'order_form.order_created': 'Заказ успешно создан',
+    'order_form.order_updated': 'Заказ успешно обновлен',
+    'order_form.create_error': 'Ошибка при создании заказа',
+    'order_form.update_error': 'Ошибка при обновлении заказа',
+
     // Сообщения
     'message.success.saved': 'Успешно сохранено',
     'message.success.deleted': 'Успешно удалено',
@@ -332,6 +360,11 @@ export const translations: Record<'ru' | 'en', Record<string, string>> = {
     'priority.high': 'Высокий',
     'priority.medium': 'Средний',
     'priority.low': 'Низкий',
+    
+    // Приоритеты для выпадающих списков
+    'priority.HIGH': 'Высокий',
+    'priority.MEDIUM': 'Средний',
+    'priority.LOW': 'Низкий',
     'priority.critical_emoji': '🚨 Критический',
     'priority.high_emoji': '🔥 Высокий',
     'priority.medium_emoji': '⚡ Средний',
@@ -810,6 +843,11 @@ export const translations: Record<'ru' | 'en', Record<string, string>> = {
     'priority.high': 'High',
     'priority.medium': 'Medium',
     'priority.low': 'Low',
+    
+    // Priorities for dropdowns
+    'priority.HIGH': 'High',
+    'priority.MEDIUM': 'Medium',
+    'priority.LOW': 'Low',
     'priority.critical_emoji': '🚨 Critical',
     'priority.high_emoji': '🔥 High',
     'priority.medium_emoji': '⚡ Medium',
@@ -955,7 +993,7 @@ export const translations: Record<'ru' | 'en', Record<string, string>> = {
     'recommendations.uneven_load_desc': 'Day shift is loaded significantly more than night shift. Consider load redistribution.',
     'recommendations.uneven_load_impact': 'Overall productivity increase of 10-15%',
 
-    // Order Form
+    // Order Form - EN переводы для формы заказа
     'order_form.new_order': 'New Order',
     'order_form.edit_order': 'Edit Order',
     'order_form.drawing_number': 'Drawing Number',

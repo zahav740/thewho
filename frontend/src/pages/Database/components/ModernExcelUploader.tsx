@@ -6,9 +6,9 @@
  */
 import React, { useState } from 'react';
 import { Button, Modal, Tag, Checkbox, Space, message, Row, Col, Alert, Card } from 'antd';
-import { FileExcelOutlined, CloudUploadOutlined, SettingOutlined, CheckCircleOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
+import { SettingOutlined, CheckCircleOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { ModernExcelUploader } from '../../../components/ExcelUploader';
-import { ordersApi } from '../../../services/ordersApi';
+// import { ordersApi } from '../../../services/ordersApi'; // Неиспользуемый импорт
 
 interface ExcelUploaderProps {
   onSuccess: () => void;

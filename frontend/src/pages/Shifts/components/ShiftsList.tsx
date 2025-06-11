@@ -7,7 +7,7 @@
  */
 import React from 'react';
 import { Table, Tag, Button, Space, Popconfirm, Alert, Tooltip } from 'antd';
-import { EditOutlined, DeleteOutlined, UserOutlined, ClockCircleOutlined, ToolOutlined } from '@ant-design/icons';
+import { EditOutlined, DeleteOutlined, UserOutlined, ToolOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import { ShiftRecord, ShiftType } from '../../../types/shift.types';
@@ -36,13 +36,7 @@ export const ShiftsList: React.FC<ShiftsListProps> = ({
     return hours > 0 ? `${hours}ч ${mins}м` : `${mins}м`;
   };
 
-  const getShiftTypeTag = (type: ShiftType) => {
-    return type === ShiftType.DAY ? (
-      <Tag color="orange">{t('shifts.day')}</Tag>
-    ) : (
-      <Tag color="blue">{t('shifts.night')}</Tag>
-    );
-  };
+
 
   const columns: ColumnsType<ShiftRecord> = [
     {

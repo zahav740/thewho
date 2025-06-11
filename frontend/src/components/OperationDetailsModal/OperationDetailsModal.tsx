@@ -17,14 +17,11 @@ import {
   Button,
   Alert,
   Divider,
-  Statistic,
   Space
 } from 'antd';
 import {
-  CloseOutlined,
   PrinterOutlined,
   RiseOutlined,
-  FileTextOutlined,
   UserOutlined,
   DashboardOutlined,
   LineChartOutlined

@@ -32,7 +32,7 @@ import {
   DeleteOutlined,
   ReloadOutlined,
 } from '@ant-design/icons';
-import { UploadFile, UploadProps } from 'antd/es/upload/interface';
+import { UploadProps } from 'antd/es/upload/interface';
 
 const { Dragger } = Upload;
 const { Title, Text, Paragraph } = Typography;
@@ -72,7 +72,7 @@ const ModernExcelUploader: React.FC<ModernExcelUploaderProps> = ({
   description = 'Перетащите файл сюда или нажмите для выбора',
 }) => {
   const [files, setFiles] = useState<ExcelFile[]>([]);
-  const [isProcessing, setIsProcessing] = useState(false);
+  // Удалено неиспользуемое состояние isProcessing
   const [previewModalVisible, setPreviewModalVisible] = useState(false);
   const [selectedFileIndex, setSelectedFileIndex] = useState<number>(-1);
 

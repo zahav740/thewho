@@ -27,14 +27,14 @@ import {
   ToolOutlined,
   ClockCircleOutlined,
   InfoCircleOutlined,
-  ExclamationCircleOutlined,
+
 } from '@ant-design/icons';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { planningApi } from '../../services/planningApi';
 import { machinesApi } from '../../services/machinesApi';
 import { MachineAvailability } from '../../types/machine.types';
 
-const { Title, Text, Paragraph } = Typography;
+const { Title, Text } = Typography;
 
 interface PlanningResult {
   selectedOrders: any[];
@@ -66,7 +66,7 @@ const PlanningModal: React.FC<PlanningModalProps> = ({
   console.log('🎯 Current state:', { currentStep, planningResult: !!planningResult, showResultModal });
 
   // Загрузка списка станков для получения полной информации
-  const { data: machines } = useQuery({
+  useQuery({
     queryKey: ['machines'],
     queryFn: machinesApi.getAll,
   });
@@ -225,7 +225,7 @@ const PlanningModal: React.FC<PlanningModalProps> = ({
       setShowResultModal(false);
       console.log('🔄 State reset completed');
     }
-  }, [visible, selectedMachine]);
+  }, [visible, selectedMachine, currentStep, planningResult]);
 
   if (!selectedMachine) {
     console.log('🚫 PlanningModal: No selectedMachine, returning null');

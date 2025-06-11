@@ -23,7 +23,7 @@ import {
   CheckCircleOutlined,
   DeleteOutlined,
 } from '@ant-design/icons';
-import { UploadFile, UploadProps } from 'antd/es/upload/interface';
+import { UploadProps } from 'antd/es/upload/interface';
 
 const { Dragger } = Upload;
 const { Title, Text, Paragraph } = Typography;

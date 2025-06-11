@@ -21,7 +21,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Controller, useForm, useFieldArray } from 'react-hook-form';
 import dayjs from 'dayjs';
 import { ordersApi } from '../../../services/ordersApi';
-import { CreateOrderDto, Priority, OrderFormOperationDto } from '../../../types/order.types';
+import { CreateOrderDto, Priority } from '../../../types/order.types'; // OrderFormOperationDto неиспользуем
 import { OperationType } from '../../../types/operation.types';
 import { useTranslation } from '../../../i18n';
 
@@ -47,7 +47,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
 
   console.log('🔧 OrderForm rendered:', { visible, orderId, isEdit });
 
-  const { control, handleSubmit, reset, formState: { errors }, setValue, getValues } = useForm<CreateOrderDto>({
+  const { control, handleSubmit, reset, formState: { errors } } = useForm<CreateOrderDto>({ // setValue, getValues неиспользуемы
     defaultValues: {
       drawingNumber: '',
       quantity: 1,

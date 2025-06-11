@@ -5,9 +5,9 @@
  * @created: 2025-01-28
  * @updated: 2025-01-28 - Добавлена поддержка i18n
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useLocation, useNavigate, Outlet } from 'react-router-dom';
-import { Layout as AntLayout, Menu, Typography, Space } from 'antd';
+import { Layout as AntLayout, Menu, Typography } from 'antd';
 import {
   AppstoreOutlined,
   DatabaseOutlined,
@@ -131,7 +131,7 @@ export const Layout: React.FC = () => {
           <Title level={3} style={{ margin: '16px 0' }}>
             {getPageTitle(location.pathname, t)}
           </Title>
-          <LanguageSwitcher />
+          <LanguageSwitcher variant="adaptive" size="small" />
         </Header>
         
         <Content style={{ margin: '24px' }}>
