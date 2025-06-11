@@ -13,11 +13,13 @@ import { ShiftRecord } from '../../database/entities/shift-record.entity';
 import { CalendarController } from './calendar.controller';
 import { CalendarService } from './calendar.service';
 import { WorkingDaysService } from './working-days.service';
+import { EnhancedCalendarController } from './enhanced-calendar.controller';
+import { EnhancedCalendarService } from './enhanced-calendar.service';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Operation, Machine, Order, ShiftRecord])],
-  controllers: [CalendarController],
-  providers: [CalendarService, WorkingDaysService],
-  exports: [CalendarService, WorkingDaysService],
+  controllers: [CalendarController, EnhancedCalendarController],
+  providers: [CalendarService, WorkingDaysService, EnhancedCalendarService],
+  exports: [CalendarService, WorkingDaysService, EnhancedCalendarService],
 })
 export class CalendarModule {}
