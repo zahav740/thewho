@@ -85,7 +85,17 @@ const OperationHistory: React.FC = () => {
       const data = await operationHistoryService.getAvailableDrawings();
       setDrawings(data);
     } catch (err) {
-      message.error(err instanceof Error ? err.message : 'Ошибка при загрузке списка чертежей');
+      console.error('Ошибка загрузки чертежей:', err);
+      
+      // Добавляем заглушку с тестовыми данными
+      const testDrawings: DrawingInfo[] = [
+        { drawingNumber: 'C6HP0021A', recordCount: 15, lastDate: new Date() },
+        { drawingNumber: 'TEST-001', recordCount: 8, lastDate: new Date() },
+        { drawingNumber: 'DEMO-002', recordCount: 12, lastDate: new Date() }
+      ];
+      setDrawings(testDrawings);
+      
+      message.warning('Не удалось загрузить чертежи с сервера. Показаны тестовые данные.');
     } finally {
       setLoading(false);
     }
@@ -107,7 +117,62 @@ const OperationHistory: React.FC = () => {
       
       setRecords(data);
     } catch (err) {
-      message.error(err instanceof Error ? err.message : 'Ошибка при загрузке истории операций');
+      console.error('Ошибка загрузки истории:', err);
+      
+      // Добавляем заглушку с тестовыми данными
+      const testRecords: OperationHistoryRecord[] = [
+        {
+          id: 1,
+          drawingNumber: filters.drawingNumber,
+          operationId: 1,
+          operationNumber: 10,
+          operationType: 'MILLING',
+          machineId: 1,
+          machineName: 'Doosan 3',
+          operatorName: 'Kirill',
+          shiftType: 'DAY',
+          quantityProduced: 15,
+          timePerUnit: 25,
+          totalTime: 375,
+          efficiencyRating: 85.5,
+          dateCompleted: new Date('2025-06-08')
+        },
+        {
+          id: 2,
+          drawingNumber: filters.drawingNumber,
+          operationId: 2,
+          operationNumber: 10,
+          operationType: 'MILLING',
+          machineId: 1,
+          machineName: 'Doosan 3',
+          operatorName: 'Аркадий',
+          shiftType: 'NIGHT',
+          quantityProduced: 20,
+          timePerUnit: 24,
+          totalTime: 480,
+          efficiencyRating: 90.2,
+          dateCompleted: new Date('2025-06-08')
+        },
+        {
+          id: 3,
+          drawingNumber: filters.drawingNumber,
+          operationId: 3,
+          operationNumber: 20,
+          operationType: 'TURNING',
+          machineId: 2,
+          machineName: 'Haas ST-10Y',
+          operatorName: 'Denis',
+          shiftType: 'DAY',
+          quantityProduced: 12,
+          timePerUnit: 30,
+          totalTime: 360,
+          efficiencyRating: 78.3,
+          dateCompleted: new Date('2025-06-07')
+        }
+      ];
+      setRecords(testRecords);
+      
+      message.warning('Не удалось загрузить историю с сервера. Показаны тестовые данные.');
     } finally {
       setLoading(false);
     }
@@ -128,21 +193,47 @@ const OperationHistory: React.FC = () => {
 
     try {
       setLoading(true);
-      const downloadUrl = await operationHistoryService.exportToExcel({
-        drawingNumber: filters.drawingNumber,
-        dateFrom: filters.dateRange?.[0]?.toDate(),
-        dateTo: filters.dateRange?.[1]?.toDate(),
-        exportType: 'excel'
-      });
-
-      // Извлекаем имя файла из URL
-      const fileName = downloadUrl.split('/').pop();
-      if (fileName) {
-        await operationHistoryService.downloadFile(fileName);
-        message.success('Файл Excel успешно скачан');
+      
+      // Проверяем, есть ли данные для экспорта
+      if (filteredRecords.length === 0) {
+        message.warning('Нет данных для экспорта');
+        return;
       }
+
+      // Создаем CSV с данными истории операций
+      const csvHeader = 'Дата,Операция_№,Тип_операции,Станок,Оператор,Смена,Количество,Время_на_деталь,Общее_время,Эффективность\n';
+      
+      const csvRows = filteredRecords.map(record => {
+        const date = dayjs(record.dateCompleted).format('DD.MM.YYYY');
+        const shiftType = record.shiftType === 'DAY' ? 'День' : 'Ночь';
+        const operator = record.operatorName || '-';
+        const timePerUnit = record.timePerUnit ? `${record.timePerUnit}` : '-';
+        const totalTime = record.totalTime ? `${Math.round(record.totalTime / 60)}:${(record.totalTime % 60).toString().padStart(2, '0')}` : '-';
+        const efficiency = record.efficiencyRating && typeof record.efficiencyRating === 'number' ? `${Number(record.efficiencyRating).toFixed(1)}%` : '-';
+        
+        return `${date},${record.operationNumber},${record.operationType},${record.machineName},${operator},${shiftType},${record.quantityProduced},${timePerUnit},${totalTime},${efficiency}`;
+      }).join('\n');
+
+      const csvContent = csvHeader + csvRows;
+
+      // Скачиваем файл
+      const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      
+      const dateFrom = filters.dateRange?.[0]?.format('DD-MM-YYYY') || 'все_даты';
+      const dateTo = filters.dateRange?.[1]?.format('DD-MM-YYYY') || '';
+      const dateRangeStr = dateTo ? `${dateFrom}_${dateTo}` : dateFrom;
+      
+      link.download = `operation_history_${filters.drawingNumber}_${dateRangeStr}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      message.success('Файл истории операций успешно экспортирован');
     } catch (err) {
-      message.error(err instanceof Error ? err.message : 'Ошибка при экспорте данных');
+      console.error('Ошибка экспорта:', err);
+      message.error('Ошибка при экспорте данных');
     } finally {
       setLoading(false);
     }
@@ -266,7 +357,7 @@ const OperationHistory: React.FC = () => {
       key: 'efficiencyRating',
       sorter: (a, b) => (a.efficiencyRating || 0) - (b.efficiencyRating || 0),
       render: (efficiency: number) => {
-        if (!efficiency) return '-';
+        if (!efficiency || typeof efficiency !== 'number') return '-';
         
         let color = 'default';
         if (efficiency >= 90) color = 'success';
@@ -275,7 +366,7 @@ const OperationHistory: React.FC = () => {
         
         return (
           <Tag color={color}>
-            {efficiency.toFixed(1)}%
+            {Number(efficiency).toFixed(1)}%
           </Tag>
         );
       },
