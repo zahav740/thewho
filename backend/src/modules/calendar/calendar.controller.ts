@@ -183,7 +183,7 @@ export class CalendarController {
           sr."dayShiftTimePerUnit",
           sr."nightShiftTimePerUnit",
           sr."setupTime",
-          sr."drawingnumber" as drawing_number,
+          sr."drawingNumber" as drawing_number,
           COALESCE(o."operationNumber", 1) as operation_number
         FROM shift_records sr
         LEFT JOIN operations o ON sr."operationId" = o.id
@@ -258,7 +258,7 @@ export class CalendarController {
         FROM operations o
         JOIN orders ord ON o."orderId" = ord.id
         LEFT JOIN shift_records sr ON sr."operationId" = o.id
-        WHERE o."assignedMachine" = $1 AND o.status IN ('pending', 'in_progress')
+        WHERE o."machineId" = $1 AND o.status IN ('PENDING', 'IN_PROGRESS')
         GROUP BY o.id, ord.id
         ORDER BY o."createdAt" ASC
         LIMIT 1

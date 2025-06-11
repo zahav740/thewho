@@ -122,22 +122,27 @@ class EnhancedCalendarApi {
    */
   async getEnhancedCalendarView(startDate: string, endDate: string): Promise<EnhancedCalendarData> {
     try {
+      console.log('Запрос календаря из БД:', { startDate, endDate });
+      
       // Используем основной calendar API, который работает с БД
       const response = await api.get('/calendar', {
         params: { startDate, endDate },
       });
       
-      // Проверяем структуру ответа
-      if (response.data.period && response.data.machineSchedules) {
-        return response.data;
+      console.log('Ответ от backend:', response.data);
+      
+      // Проверяем, что получили валидные данные
+      if (response.data && !response.data.error && response.data.machineSchedules) {
+        return {
+          period: response.data.period || { startDate, endDate },
+          totalWorkingDays: response.data.totalWorkingDays || 10,
+          machineSchedules: response.data.machineSchedules || []
+        };
       }
       
-      // Если структура не матчит, преобразуем данные
-      return {
-        period: response.data.period || { startDate, endDate },
-        totalWorkingDays: response.data.totalWorkingDays || 10,
-        machineSchedules: response.data.machineSchedules || []
-      };
+      // Если данные не валидные, выбрасываем ошибку
+      throw new Error('Невалидные данные от backend');
+      
     } catch (error) {
       console.error('Ошибка получения календаря из БД:', error);
       
@@ -303,111 +308,7 @@ class EnhancedCalendarApi {
     };
   }
 
-  /**
-   * Генерация моковых данных для демонстрации
-   */
-  private getMockCalendarData(startDate: string, endDate: string): EnhancedCalendarData {
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    const days: string[] = [];
-    
-    // Генерируем список дней
-    const current = new Date(start);
-    while (current <= end) {
-      days.push(current.toISOString().split('T')[0]);
-      current.setDate(current.getDate() + 1);
-    }
-    
-    // Моковые станки
-    const machines = [
-      { id: 1, name: 'Doosan 3', type: 'MILLING' },
-      { id: 2, name: 'Haas ST-10Y', type: 'TURNING' },
-      { id: 3, name: 'Mitsubishi', type: 'MILLING' },
-      { id: 4, name: 'DMG Mori', type: 'TURNING' },
-    ];
 
-    const machineSchedules: MachineSchedule[] = machines.map(machine => ({
-      machineId: machine.id,
-      machineName: machine.name,
-      machineType: machine.type,
-      days: days.map(date => {
-        const dateObj = new Date(date);
-        const isWorkingDay = this.isWorkingDay(dateObj);
-        const isPast = dateObj < new Date();
-        const dayType = isWorkingDay ? 'WORKING' : 'WEEKEND';
-        
-        const calendarDay: CalendarDay = {
-          date,
-          isWorkingDay,
-          dayType
-        };
-
-        // Добавляем моковые данные для некоторых дней
-        if (isWorkingDay && Math.random() > 0.3) {
-          if (isPast) {
-            // Для прошедших дней - выполненные смены
-            calendarDay.completedShifts = [];
-            
-            if (Math.random() > 0.4) {
-              calendarDay.completedShifts.push({
-                shiftType: 'DAY',
-                operatorName: ['Кирилл', 'Аркадий', 'Denis'][Math.floor(Math.random() * 3)],
-                drawingNumber: ['C6HP0021A', 'TH1K4108A', 'G63828A'][Math.floor(Math.random() * 3)],
-                operationNumber: Math.floor(Math.random() * 3) + 1,
-                quantityProduced: Math.floor(Math.random() * 20) + 5,
-                timePerPart: Math.floor(Math.random() * 10) + 15,
-                setupTime: Math.random() > 0.7 ? Math.floor(Math.random() * 60) + 60 : undefined,
-                totalTime: Math.floor(Math.random() * 200) + 300,
-                efficiency: Math.floor(Math.random() * 40) + 60,
-              });
-            }
-            
-            if (Math.random() > 0.6) {
-              calendarDay.completedShifts.push({
-                shiftType: 'NIGHT',
-                operatorName: ['Кирилл', 'Аркадий', 'Denis'][Math.floor(Math.random() * 3)],
-                drawingNumber: ['C6HP0021A', 'TH1K4108A', 'G63828A'][Math.floor(Math.random() * 3)],
-                operationNumber: Math.floor(Math.random() * 3) + 1,
-                quantityProduced: Math.floor(Math.random() * 15) + 3,
-                timePerPart: Math.floor(Math.random() * 8) + 18,
-                totalTime: Math.floor(Math.random() * 150) + 200,
-                efficiency: Math.floor(Math.random() * 35) + 65,
-              });
-            }
-          } else {
-            // Для будущих дней - запланированные операции
-            if (Math.random() > 0.6) {
-              calendarDay.plannedOperation = {
-                operationId: Math.floor(Math.random() * 100) + 1,
-                drawingNumber: ['C6HP0021A', 'TH1K4108A', 'G63828A'][Math.floor(Math.random() * 3)],
-                operationNumber: Math.floor(Math.random() * 3) + 1,
-                estimatedTimePerPart: Math.floor(Math.random() * 10) + 15,
-                totalQuantity: Math.floor(Math.random() * 50) + 20,
-                estimatedDurationDays: Math.floor(Math.random() * 5) + 1,
-                startDate: date,
-                endDate: new Date(new Date(date).getTime() + (Math.floor(Math.random() * 5) + 1) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-                currentProgress: Math.random() > 0.7 ? {
-                  completedQuantity: Math.floor(Math.random() * 15),
-                  remainingQuantity: Math.floor(Math.random() * 35) + 10,
-                  progressPercent: Math.floor(Math.random() * 60) + 10,
-                } : undefined
-              };
-            }
-          }
-        }
-
-        return calendarDay;
-      })
-    }));
-
-    const workingDaysCount = days.filter(date => this.isWorkingDay(new Date(date))).length;
-
-    return {
-      period: { startDate, endDate },
-      totalWorkingDays: workingDaysCount,
-      machineSchedules
-    };
-  }
 }
 
 export const enhancedCalendarApi = new EnhancedCalendarApi();
