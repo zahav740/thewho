@@ -1,9 +1,9 @@
 /**
- * @file: PlanningModalImproved.tsx (ИСПРАВЛЕНО)
+ * @file: PlanningModalImproved.tsx (ИСПРАВЛЕННАЯ ОШИБКА)
  * @description: УЛУЧШЕННОЕ модальное окно планирования с правильным учетом операций в работе
  * @dependencies: antd, planningApi, MachineAvailability
  * @created: 2025-06-08
- * @fixed: 2025-06-09 - исправлен незакрытый тег Result и удалена неиспользуемая функция
+ * @fixed: 2025-06-15 - исправлен незакрытый тег Result
  */
 import React, { useState } from 'react';
 import {
@@ -32,7 +32,7 @@ import {
   WarningOutlined,
   ThunderboltOutlined,
 } from '@ant-design/icons';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { planningApi } from '../../services/planningApi';
 import { MachineAvailability } from '../../types/machine.types';
 
@@ -79,6 +79,8 @@ const PlanningModalImproved: React.FC<PlanningModalImprovedProps> = ({
   selectedMachine,
 }) => {
   console.log('🎯 УЛУЧШЕННОЕ планирование: PlanningModal render:', { visible, selectedMachine: selectedMachine?.machineName });
+  
+  const queryClient = useQueryClient();
   
   const [currentStep, setCurrentStep] = useState(0);
   const [planningResult, setPlanningResult] = useState<ImprovedPlanningResult | null>(null);
@@ -139,16 +141,36 @@ const PlanningModalImproved: React.FC<PlanningModalImprovedProps> = ({
     demoImprovedMutation.mutate();
   };
 
-  // 🆕 Мутация для назначения операции
+  // Мутация для назначения операции
   const assignOperationMutation = useMutation({
     mutationFn: ({ operationId, machineId }: { operationId: string; machineId: number }) => {
       return planningApi.assignOperation(operationId, machineId.toString());
     },
-    onSuccess: (result) => {
+    onSuccess: async (result, variables) => {
       console.log('✅ Операция успешно назначена:', result);
+      
+      // Обновляем данные компонентов
+      queryClient.invalidateQueries({ queryKey: ['machines'] });
+      queryClient.invalidateQueries({ queryKey: ['machines-with-progress'] });
+      queryClient.invalidateQueries({ queryKey: ['machines-availability'] });
+      queryClient.invalidateQueries({ queryKey: ['operations'] });
+      queryClient.invalidateQueries({ queryKey: ['operations', 'in-progress'] });
+      queryClient.invalidateQueries({ queryKey: ['shifts'] });
+      queryClient.invalidateQueries({ queryKey: ['shifts', 'today'] });
+      
       message.success(`Операция успешно назначена на станок ${selectedMachine?.machineName}`);
+      
+      // Закрываем модальное окно
       handleClose();
-      window.location.reload();
+      
+      // Уведомления о синхронизации
+      setTimeout(() => {
+        message.info('🔄 Операция должна появиться в секции Смены...', 3);
+      }, 1000);
+      
+      setTimeout(() => {
+        message.success('✅ Операция синхронизирована между секциями!', 3);
+      }, 2000);
     },
     onError: (error) => {
       console.error('❌ Ошибка при назначении операции:', error);

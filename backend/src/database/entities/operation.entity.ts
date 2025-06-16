@@ -62,6 +62,12 @@ export class Operation {
   @Column({ name: 'assignedAt', nullable: true })
   assignedAt: Date;
 
+  @Column({ name: 'completedAt', nullable: true })
+  completedAt: Date;
+
+  @Column({ name: 'actualQuantity', nullable: true })
+  actualQuantity: number;
+
   // СВЯЗЬ С ЗАКАЗОМ - используем существующее поле orderId
   @ManyToOne(() => Order, (order) => order.operations, {
     onDelete: 'CASCADE', 

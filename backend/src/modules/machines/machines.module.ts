@@ -9,14 +9,17 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Machine } from '../../database/entities/machine.entity';
 import { Operation } from '../../database/entities/operation.entity';
+import { Order } from '../../database/entities/order.entity';
 import { MachinesController } from './machines.controller';
 import { MachinesService } from './machines.service';
+import { MachinesStatusController } from './machines-status.controller';
+import { MachineAssignmentController } from './machine-assignment.controller';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Machine, Operation]),
+    TypeOrmModule.forFeature([Machine, Operation, Order]),
   ],
-  controllers: [MachinesController],
+  controllers: [MachinesController, MachinesStatusController, MachineAssignmentController],
   providers: [MachinesService],
   exports: [MachinesService],
 })

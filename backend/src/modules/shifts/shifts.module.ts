@@ -1,21 +1,21 @@
 /**
  * @file: shifts.module.ts
- * @description: Модуль для управления сменами
+ * @description: Модуль для управления сменами (ИСПРАВЛЕНО - без EventEmitter)
  * @dependencies: TypeORM, ShiftRecord entity, ShiftsService
  * @created: 2025-01-28
- * @updated: 2025-06-07 - Убран конфликт контроллеров
+ * @updated: 2025-06-16 - Убран EventEmitter для совместимости
  */
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+// import { EventEmitterModule } from '@nestjs/event-emitter'; // Пакет не установлен
 import { ShiftsController } from './shifts.controller';
 import { ShiftsService } from './shifts.service';
-// Убираем простой контроллер, чтобы избежать конфликтов
-// import { ShiftsSimpleController } from './shifts-simple.controller';
 import { ShiftRecord } from '../../database/entities/shift-record.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([ShiftRecord])
+    TypeOrmModule.forFeature([ShiftRecord]),
+    // EventEmitterModule.forRoot(), // 🆕 Для отправки событий синхронизации (ОТКЛЮЧЕНО)
   ],
   controllers: [ShiftsController], // Только основной контроллер
   providers: [ShiftsService],

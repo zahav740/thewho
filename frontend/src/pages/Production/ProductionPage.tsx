@@ -6,17 +6,22 @@
  * @updated: 2025-06-08
  */
 import React, { useState } from 'react';
-import { Row, Col, Spin, Alert, Button, Switch, Space, Card } from 'antd';
+import { Row, Col, Spin, Alert, Button, Switch, Space, Card, Typography, Tag } from 'antd';
 import { ThunderboltOutlined, BugOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from '../../i18n';
 import { machinesApi } from '../../services/machinesApi';
+import { synchronizationApi } from '../../services/synchronizationApi'; // 🆕 Новый API синхронизации
+import { useSynchronization } from '../../hooks'; // 🆕 Хук синхронизации
 import { MachineAvailability } from '../../types/machine.types';
 import { MachineCard } from './components/MachineCard';
 import { OrderRecommendations } from './components/OrderRecommendations';
 import { PlanningModal } from '../../components/PlanningModal';
+import { QUERY_KEYS } from '../../utils/queryKeys';
 // 🆕 ИМПОРТ УЛУЧШЕННОГО ПЛАНИРОВАНИЯ
 import PlanningModalImproved from '../../components/PlanningModal/PlanningModalImproved';
+
+const { Text } = Typography;
 
 export const ProductionPage: React.FC = () => {
   const { t, currentLanguage } = useTranslation();
@@ -25,9 +30,28 @@ export const ProductionPage: React.FC = () => {
   const [planningMachine, setPlanningMachine] = useState<MachineAvailability | null>(null);
   // 🆕 СОСТОЯНИЕ ДЛЯ УЛУЧШЕННОГО ПЛАНИРОВАНИЯ
   const [useImprovedPlanning, setUseImprovedPlanning] = useState(true); // По умолчанию включено
+  // НОВОЕ: Состояние для выбранной операции
+  const [selectedOperation, setSelectedOperation] = useState<any>(null);
+
+  // 🆕 НОВОЕ: Система синхронизации
+  const {
+    forceSyncAll,
+    syncOperation,
+    getSyncStatus,
+    checkSyncHealth,
+  } = useSynchronization({
+    autoSync: true,
+    syncInterval: 15000, // Синхронизация каждые 15 секунд
+    onSyncSuccess: (data) => {
+      console.log('✅ Автоматическая синхронизация завершена:', data);
+    },
+    onSyncError: (error) => {
+      console.error('❌ Ошибка автоматической синхронизации:', error);
+    },
+  });
 
   const { data: machines, isLoading, error } = useQuery({
-    queryKey: ['machines'],
+    queryKey: QUERY_KEYS.MACHINES, // Обновлено: централизованный ключ
     queryFn: machinesApi.getAll,
     refetchInterval: 5000, // Обновляем каждые 5 секунд
   });
@@ -44,6 +68,81 @@ export const ProductionPage: React.FC = () => {
   const handleClosePlanningModal = () => {
     setPlanningModalVisible(false);
     setPlanningMachine(null);
+  };
+
+  // 🆕 НОВОЕ: Обработчик выбора операции с полной синхронизацией
+  const handleOperationSelect = async (operation: any) => {
+    try {
+      console.log('🎯 Операция выбрана в Производстве:', operation);
+      
+      // 🆕 1. Назначаем операцию через новый API
+      const syncResult = await synchronizationApi.assignOperationThroughPlanning({
+        operationId: operation.id,
+        machineId: operation.machineId || operation.assignedMachine,
+      });
+      
+      if (syncResult.success) {
+        console.log('✅ Операция успешно назначена и синхронизирована:', syncResult);
+        
+        // 🆕 2. Обновляем выбранную операцию с данными синхронизации
+        const enhancedOperation = {
+          ...operation,
+          syncedWithShifts: true,
+          assignedAt: syncResult.data.assignedAt,
+          synchronizationStatus: syncResult.data.synchronizationStatus,
+        };
+        
+        setSelectedOperation(enhancedOperation);
+        
+        // 🆕 3. Отправляем событие для real-time обновления
+        window.dispatchEvent(new CustomEvent('operationAssigned', {
+          detail: enhancedOperation
+        }));
+        
+        // 🆕 4. Принудительная синхронизация всех данных
+        await forceSyncAll();
+        
+        console.log('📢 Операция', operation.operationNumber, 'назначена и синхронизирована с Модулем Смен');
+        
+      } else {
+        console.error('❌ Ошибка назначения операции:', syncResult.error);
+        
+        // Откат к старому методу
+        await handleLegacyOperationSelect(operation);
+      }
+      
+    } catch (error) {
+      console.error('❌ Ошибка при назначении операции с синхронизацией:', error);
+      
+      // Откат к старому методу
+      await handleLegacyOperationSelect(operation);
+    }
+  };
+
+  // 🆕 Откат к старому методу (для совместимости)
+  const handleLegacyOperationSelect = async (operation: any) => {
+    try {
+      console.log('⚠️ Откат к старому методу назначения операции');
+      
+      setSelectedOperation({
+        ...operation,
+        syncedWithShifts: false,
+        legacyMode: true,
+      });
+      
+      // Сохраняем в localStorage для обратной совместимости
+      localStorage.setItem('selectedOperation', JSON.stringify(operation));
+      
+      // Отправляем событие для legacy-синхронизации
+      window.dispatchEvent(new CustomEvent('operationAssigned', {
+        detail: { ...operation, legacyMode: true }
+      }));
+      
+      console.log('⚠️ Операция назначена через старый метод (без автоматической синхронизации)');
+      
+    } catch (error) {
+      console.error('❌ Ошибка при откате к старому методу:', error);
+    }
   };
 
   if (isLoading) {
@@ -129,6 +228,45 @@ export const ProductionPage: React.FC = () => {
                   }}
                 />
                 <span>{t('planning.improved')}</span>
+                
+                {/* 🆕 НОВОЕ: Кнопки управления синхронизацией */}
+                <Button
+                  type="primary"
+                  size="small"
+                  icon={<span>🔄</span>}
+                  onClick={async () => {
+                    try {
+                      console.log('🔄 Ручная синхронизация...');
+                      await forceSyncAll();
+                      console.log('✅ Ручная синхронизация завершена');
+                    } catch (error) {
+                      console.error('❌ Ошибка ручной синхронизации:', error);
+                    }
+                  }}
+                  style={{
+                    backgroundColor: '#52c41a',
+                    borderColor: '#52c41a',
+                    marginLeft: '16px'
+                  }}
+                >
+                  Синхронизация
+                </Button>
+                
+                <Button
+                  size="small"
+                  icon={<span>🌡️</span>}
+                  onClick={async () => {
+                    try {
+                      console.log('🌡️ Проверка системы...');
+                      const healthStatus = await checkSyncHealth();
+                      console.log('✅ Система синхронизации работает:', healthStatus);
+                    } catch (error) {
+                      console.error('❌ Ошибка проверки системы:', error);
+                    }
+                  }}
+                >
+                  Проверка
+                </Button>
               </Space>
             </Space>
             
@@ -181,7 +319,105 @@ export const ProductionPage: React.FC = () => {
       {selectedMachine && (
         <Row gutter={[16, 16]} style={{ marginTop: 24 }}>
           <Col span={24}>
-            <OrderRecommendations machine={selectedMachine} />
+            <OrderRecommendations 
+              machine={selectedMachine} 
+              onOperationSelect={handleOperationSelect}
+            />
+          </Col>
+        </Row>
+      )}
+
+      {/* 🆕 НОВОЕ: Отображение выбранной операции с статусом синхронизации */}
+      {selectedOperation && (
+        <Row gutter={[16, 16]} style={{ marginTop: 24 }}>
+          <Col span={24}>
+            <Card 
+              title="🎆 Выбранная операция" 
+              extra={
+                <Space>
+                  {selectedOperation.syncedWithShifts && (
+                    <Tag color="green" style={{ fontSize: '12px' }}>
+                      ✅ Синхронизировано
+                    </Tag>
+                  )}
+                  <Button 
+                    type="link" 
+                    onClick={() => {
+                      setSelectedOperation(null);
+                      localStorage.removeItem('selectedOperation');
+                      // 🆕 Отправляем событие об очистке
+                      window.dispatchEvent(new CustomEvent('operationCleared'));
+                      console.log('🗑️ Операция очищена');
+                    }}
+                  >
+                    Очистить
+                  </Button>
+                </Space>
+              }
+              style={{ 
+                borderColor: selectedOperation.syncedWithShifts ? '#52c41a' : '#faad14',
+                backgroundColor: selectedOperation.syncedWithShifts ? '#f6ffed' : '#fffbe6',
+                borderRadius: '12px'
+              }}
+            >
+              <Space direction="vertical" style={{ width: '100%' }}>
+                <Text strong style={{ fontSize: '16px', color: selectedOperation.syncedWithShifts ? '#52c41a' : '#faad14' }}>
+                  📋 Операция #{selectedOperation.operationNumber}
+                </Text>
+                <div>
+                  <Text strong>Тип:</Text> {selectedOperation.operationType}
+                </div>
+                <div>
+                  <Text strong>Станок:</Text> {selectedOperation.machineName} ({selectedOperation.machineType})
+                </div>
+                <div>
+                  <Text strong>Чертеж:</Text> {selectedOperation.orderDrawingNumber}
+                </div>
+                <div>
+                  <Text strong>Время:</Text> {selectedOperation.estimatedTime} мин
+                </div>
+                
+                {/* 🆕 Информация о синхронизации */}
+                {selectedOperation.syncedWithShifts ? (
+                  <div style={{ 
+                    padding: '12px', 
+                    backgroundColor: '#d4edda', 
+                    borderRadius: '8px',
+                    marginTop: '8px',
+                    border: '2px solid #52c41a'
+                  }}>
+                    <Text strong style={{ color: '#155724' }}>
+                      ✅ Операция назначена и синхронизирована
+                    </Text>
+                    <br />
+                    <Text style={{ fontSize: '12px', color: '#155724' }}>
+                      • Автоматически создана запись смены<br />
+                      • Отображается в мониторинге смен<br />
+                      • Прогресс обновляется автоматически
+                    </Text>
+                    {selectedOperation.synchronizationStatus && (
+                      <div style={{ marginTop: '8px' }}>
+                        <Text style={{ fontSize: '11px', color: '#666' }}>
+                          Прогресс: {selectedOperation.synchronizationStatus.progress.toFixed(1)}% 
+                          ({selectedOperation.synchronizationStatus.totalProduced}/{selectedOperation.synchronizationStatus.targetQuantity})
+                        </Text>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div style={{ 
+                    padding: '8px', 
+                    backgroundColor: '#fff3cd', 
+                    borderRadius: '6px',
+                    marginTop: '8px'
+                  }}>
+                    <Text strong style={{ color: '#856404' }}>
+                      ⚠️ Операция выбрана, но не синхронизирована
+                    </Text>
+                  </div>
+                )}
+              </Space>
+            </Card>
           </Col>
         </Row>
       )}

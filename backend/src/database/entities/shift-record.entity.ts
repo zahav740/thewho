@@ -102,4 +102,13 @@ export class ShiftRecord {
 
   @UpdateDateColumn({ name: 'updatedAt' })
   updatedAt: Date;
+
+  @Column({ name: 'archived', default: false })
+  archived: boolean;
+
+  @Column({ name: 'archivedAt', nullable: true })
+  archivedAt: Date;
+
+  @Column({ name: 'resetAt', nullable: true })
+  resetAt: Date;
 }

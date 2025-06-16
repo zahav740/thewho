@@ -24,7 +24,7 @@ import { CreateMachineDto } from './dto/create-machine.dto';
 import { UpdateMachineDto } from './dto/update-machine.dto';
 import { Machine } from '../../database/entities/machine.entity';
 
-// Интерфейс для совместимости с frontend
+// Интерфейсы для расширенной функциональности
 interface MachineAvailability {
   id: string;
   machineName: string;
@@ -39,9 +39,27 @@ interface MachineAvailability {
     estimatedTime: number;
     orderId: number;
     orderDrawingNumber: string;
+    orderQuantity: number;
+    producedQuantity: number;
+    isCompleted?: boolean;
+  };
+  shiftProgress?: {
+    totalProduced: number;
+    remainingQuantity: number;
+    completionPercentage: number;
+    lastUpdateDate: Date;
   };
   createdAt: string;
   updatedAt: string;
+}
+
+interface OperationCompletionResult {
+  isCompleted: boolean;
+  totalProduced: number;
+  targetQuantity: number;
+  remainingQuantity: number;
+  completionPercentage: number;
+  canComplete: boolean;
 }
 
 @ApiTags('machines')
@@ -56,7 +74,7 @@ export class MachinesController {
   ) {}
 
   /**
-   * Получить реальные данные операции по ID
+   * Получить реальные данные операции по ID с данными заказа
    */
   private async getOperationDetails(operationId: number) {
     try {
@@ -67,7 +85,9 @@ export class MachinesController {
           op.operationtype as "operationType",
           op."estimatedTime",
           op."orderId",
-          ord.drawing_number as "orderDrawingNumber"
+          op."actualQuantity",
+          ord.drawing_number as "orderDrawingNumber",
+          ord.quantity as "orderQuantity"
         FROM operations op
         LEFT JOIN orders ord ON op."orderId" = ord.id
         WHERE op.id = $1
@@ -77,6 +97,27 @@ export class MachinesController {
     } catch (error) {
       this.logger.error(`Ошибка при получении данных операции ${operationId}:`, error);
       return null;
+    }
+  }
+
+  /**
+   * Получить прогресс операции из данных смен
+   */
+  private async getShiftProgress(operationId: number, machineId: number) {
+    try {
+      const result = await this.dataSource.query(`
+        SELECT 
+          COALESCE(SUM(COALESCE("dayShiftQuantity", 0) + COALESCE("nightShiftQuantity", 0)), 0) as "totalProduced",
+          MAX(date) as "lastUpdateDate",
+          COUNT(*) as "shiftRecordsCount"
+        FROM shift_records 
+        WHERE "operationId" = $1 AND "machineId" = $2 AND archived = false
+      `, [operationId, machineId]);
+      
+      return result[0] || { totalProduced: 0, lastUpdateDate: null, shiftRecordsCount: 0 };
+    } catch (error) {
+      this.logger.error(`Ошибка при получении прогресса смен для операции ${operationId}:`, error);
+      return { totalProduced: 0, lastUpdateDate: null, shiftRecordsCount: 0 };
     }
   }
 

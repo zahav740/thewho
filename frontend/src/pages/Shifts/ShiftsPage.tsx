@@ -6,7 +6,7 @@
  * @updated: 2025-06-07
  */
 import React, { useState } from 'react';
-import { Row, Col, Button, DatePicker, Space, Tabs } from 'antd';
+import { Row, Col, Button, DatePicker, Space, Tabs, Badge } from 'antd';
 import { PlusOutlined, BarChartOutlined, MonitorOutlined, UnorderedListOutlined } from '@ant-design/icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs, { Dayjs } from 'dayjs';
@@ -21,7 +21,11 @@ import { useTranslation } from '../../i18n';
 const { RangePicker } = DatePicker;
 const { TabPane } = Tabs;
 
-export const ShiftsPage: React.FC = () => {
+interface ShiftsPageProps {
+  selectedOperation?: any; // Переданная операция из ProductionPage
+}
+
+export const ShiftsPage: React.FC<ShiftsPageProps> = ({ selectedOperation: propsSelectedOperation }) => {
   const { t } = useTranslation();
   const [showForm, setShowForm] = useState(false);
   const [editingShiftId, setEditingShiftId] = useState<number | undefined>();
@@ -31,6 +35,25 @@ export const ShiftsPage: React.FC = () => {
     dayjs().startOf('month'),
     dayjs().endOf('month'),
   ]);
+  
+  // НОВОЕ: Читаем выбранную операцию из localStorage
+  const [selectedOperationFromStorage, setSelectedOperationFromStorage] = useState<any>(null);
+  
+  React.useEffect(() => {
+    const savedOperation = localStorage.getItem('selectedOperation');
+    if (savedOperation) {
+      try {
+        const operation = JSON.parse(savedOperation);
+        setSelectedOperationFromStorage(operation);
+        console.log('💾 Загружена операция из localStorage:', operation);
+      } catch (error) {
+        console.error('Ошибка парсинга операции из localStorage:', error);
+      }
+    }
+  }, [activeTab]); // Перечитываем при смене таба
+  
+  // Используем операцию из props или localStorage
+  const selectedOperation = propsSelectedOperation || selectedOperationFromStorage;
   
   const queryClient = useQueryClient();
 
@@ -107,11 +130,14 @@ export const ShiftsPage: React.FC = () => {
             <span>
               <MonitorOutlined />
               {t('shifts.monitoring')}
+              {selectedOperation && (
+                <Badge count={1} size="small" style={{ marginLeft: '4px' }} />
+              )}
             </span>
           } 
           key="monitor"
         >
-          <ActiveMachinesMonitor />
+          <ActiveMachinesMonitor selectedOperation={selectedOperation} />
         </TabPane>
         
         <TabPane 

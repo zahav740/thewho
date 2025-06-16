@@ -1,0 +1,167 @@
+/**
+ * @file: MachineCard.enhanced.tsx
+ * @description: Улучшенная версия MachineCard с детальной диагностикой синхронизации
+ * @created: 2025-06-15
+ */
+
+// НОВЫЙ УЛУЧШЕННЫЙ АЛГОРИТМ СОПОСТАВЛЕНИЯ С ДИАГНОСТИКОЙ
+const operationProgress = React.useMemo(() => {
+  console.log(`🔍 === ДИАГНОСТИКА СИНХРОНИЗАЦИИ ДЛЯ СТАНКА ${machine.machineName} ===`);
+  
+  if (!machine.currentOperationDetails || !todayShifts) {
+    console.log(`🚫 Недостаточно данных:`, {
+      hasOperation: !!machine.currentOperationDetails,
+      hasShifts: !!todayShifts,
+      shiftsLength: todayShifts?.length || 0
+    });
+    return null;
+  }
+
+  console.log(`📊 Исходные данные:`);
+  console.log(`   Станок ID: ${machine.id} (тип: ${typeof machine.id})`);
+  console.log(`   Операция: ${machine.currentOperationDetails.orderDrawingNumber}`);
+  console.log(`   Всего смен: ${todayShifts.length}`);
+
+  // Детальная диагностика каждой смены
+  console.log(`📋 Анализ всех смен:`);
+  todayShifts.forEach((shift: any, index: number) => {
+    console.log(`   Смена ${index + 1} (ID: ${shift.id}):`);
+    console.log(`     machineId: ${shift.machineId} (тип: ${typeof shift.machineId})`);
+    console.log(`     drawingNumber: "${shift.drawingNumber}"`);
+    console.log(`     orderDrawingNumber: "${shift.orderDrawingNumber}"`);
+    console.log(`     operationId: ${shift.operationId}`);
+    console.log(`     дата: ${shift.date}`);
+    console.log(`     день: ${shift.dayShiftQuantity}, ночь: ${shift.nightShiftQuantity}`);
+  });
+
+  // Пробуем разные алгоритмы сопоставления
+  console.log(`🎯 Тестирование алгоритмов сопоставления:`);
+
+  // Алгоритм 1: По ID станка + чертеж
+  const algorithm1Results = todayShifts.filter((shift: any) => {
+    const shiftMachineId = parseInt(shift.machineId?.toString() || '0');
+    const currentMachineId = parseInt(machine.id?.toString() || '0');
+    const machineMatches = shiftMachineId === currentMachineId;
+
+    const shiftDrawing = (shift.drawingNumber || shift.orderDrawingNumber || '').toString().trim();
+    const operationDrawing = (machine.currentOperationDetails?.orderDrawingNumber || '').toString().trim();
+    const drawingMatches = shiftDrawing === operationDrawing;
+
+    console.log(`   Алгоритм 1 - Смена ${shift.id}:`);
+    console.log(`     Станок: ${shiftMachineId} === ${currentMachineId} → ${machineMatches}`);
+    console.log(`     Чертеж: "${shiftDrawing}" === "${operationDrawing}" → ${drawingMatches}`);
+    console.log(`     Результат: ${machineMatches && drawingMatches}`);
+
+    return machineMatches && drawingMatches;
+  });
+
+  // Алгоритм 2: Только по ID станка
+  const algorithm2Results = todayShifts.filter((shift: any) => {
+    const shiftMachineId = parseInt(shift.machineId?.toString() || '0');
+    const currentMachineId = parseInt(machine.id?.toString() || '0');
+    const matches = shiftMachineId === currentMachineId;
+
+    console.log(`   Алгоритм 2 - Смена ${shift.id}: ${shiftMachineId} === ${currentMachineId} → ${matches}`);
+    return matches;
+  });
+
+  // Алгоритм 3: По operationId (если есть)
+  const algorithm3Results = todayShifts.filter((shift: any) => {
+    if (!shift.operationId || !machine.currentOperationId) return false;
+    
+    const shiftOpId = shift.operationId?.toString();
+    const machineOpId = machine.currentOperationId?.toString();
+    const matches = shiftOpId === machineOpId;
+
+    console.log(`   Алгоритм 3 - Смена ${shift.id}: "${shiftOpId}" === "${machineOpId}" → ${matches}`);
+    return matches;
+  });
+
+  // Алгоритм 4: Гибкий поиск по чертежу (без учета станка)
+  const algorithm4Results = todayShifts.filter((shift: any) => {
+    const shiftDrawing = (shift.drawingNumber || shift.orderDrawingNumber || '').toString().trim();
+    const operationDrawing = (machine.currentOperationDetails?.orderDrawingNumber || '').toString().trim();
+    
+    if (!shiftDrawing || !operationDrawing) return false;
+    
+    // Убираем суффиксы и нормализуем
+    const normalizedShift = shiftDrawing.replace(/-TEST$/i, '').toUpperCase();
+    const normalizedOperation = operationDrawing.replace(/-TEST$/i, '').toUpperCase();
+    const matches = normalizedShift === normalizedOperation;
+
+    console.log(`   Алгоритм 4 - Смена ${shift.id}: "${normalizedShift}" === "${normalizedOperation}" → ${matches}`);
+    return matches;
+  });
+
+  console.log(`📈 Результаты алгоритмов:`);
+  console.log(`   Алгоритм 1 (станок + чертеж): ${algorithm1Results.length} смен`);
+  console.log(`   Алгоритм 2 (только станок): ${algorithm2Results.length} смен`);
+  console.log(`   Алгоритм 3 (operationId): ${algorithm3Results.length} смен`);
+  console.log(`   Алгоритм 4 (только чертеж): ${algorithm4Results.length} смен`);
+
+  // Выбираем лучший результат
+  let matchedShifts: any[] = [];
+  let usedAlgorithm = 'none';
+
+  if (algorithm1Results.length > 0) {
+    matchedShifts = algorithm1Results;
+    usedAlgorithm = 'станок + чертеж';
+  } else if (algorithm3Results.length > 0) {
+    matchedShifts = algorithm3Results;
+    usedAlgorithm = 'operationId';
+  } else if (algorithm4Results.length > 0) {
+    matchedShifts = algorithm4Results;
+    usedAlgorithm = 'только чертеж';
+  } else if (algorithm2Results.length > 0) {
+    matchedShifts = algorithm2Results;
+    usedAlgorithm = 'только станок';
+  }
+
+  console.log(`🎯 Использован алгоритм: "${usedAlgorithm}"`);
+  console.log(`✅ Найдено ${matchedShifts.length} подходящих смен`);
+
+  if (matchedShifts.length === 0) {
+    console.log(`❌ НЕ НАЙДЕНО СОВПАДЕНИЙ - ПРОБЛЕМА В ДАННЫХ ИЛИ АЛГОРИТМЕ`);
+    console.log(`🔧 Рекомендации по исправлению:`);
+    console.log(`   1. Проверьте соответствие machineId в сменах и станках`);
+    console.log(`   2. Проверьте соответствие номеров чертежей`);
+    console.log(`   3. Убедитесь что operationId заполнен в сменах`);
+    console.log(`   4. Проверьте формат данных (строки vs числа)`);
+  }
+
+  // Вычисляем результаты на основе найденных смен
+  const totalProduced = matchedShifts.reduce((sum: number, shift: any) => {
+    const dayShift = shift.dayShiftQuantity || 0;
+    const nightShift = shift.nightShiftQuantity || 0;
+    const total = dayShift + nightShift;
+    console.log(`📊 Смена ${shift.id}: ${dayShift} + ${nightShift} = ${total}`);
+    return sum + total;
+  }, 0);
+
+  const targetQuantity = 30;
+  const percentage = Math.min((totalProduced / targetQuantity) * 100, 100);
+
+  const result = {
+    completedParts: totalProduced,
+    totalParts: targetQuantity,
+    percentage: Math.round(percentage),
+    isCompleted: totalProduced >= targetQuantity,
+    startedAt: matchedShifts.length > 0 ? new Date(matchedShifts[0].date) : null,
+    dayShiftQuantity: matchedShifts.reduce((sum: number, shift: any) => sum + (shift.dayShiftQuantity || 0), 0),
+    nightShiftQuantity: matchedShifts.reduce((sum: number, shift: any) => sum + (shift.nightShiftQuantity || 0), 0),
+    dayShiftOperator: matchedShifts.find((shift: any) => shift.dayShiftOperator)?.dayShiftOperator || '-',
+    nightShiftOperator: matchedShifts.find((shift: any) => shift.nightShiftOperator)?.nightShiftOperator || 'Аркадий',
+    // Диагностическая информация
+    _debug: {
+      usedAlgorithm,
+      matchedShiftsCount: matchedShifts.length,
+      matchedShiftIds: matchedShifts.map(s => s.id),
+      totalShiftsAnalyzed: todayShifts.length
+    }
+  };
+
+  console.log(`🏁 Финальный результат:`, result);
+  console.log(`🔍 === КОНЕЦ ДИАГНОСТИКИ ===`);
+
+  return result;
+}, [machine.currentOperationDetails, machine.id, todayShifts]);

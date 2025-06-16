@@ -24,13 +24,19 @@ import { UpdateShiftRecordDto } from './dto/update-shift-record.dto';
 import { ShiftsFilterDto } from './dto/shifts-filter.dto';
 import { ShiftRecord } from '../../database/entities/shift-record.entity';
 import { ShiftStatisticsDto } from './dto/shift-statistics.dto';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 
 @ApiTags('shifts')
 @Controller('shifts')
 export class ShiftsController {
   private readonly logger = new Logger(ShiftsController.name);
 
-  constructor(private readonly shiftsService: ShiftsService) {}
+  constructor(
+    private readonly shiftsService: ShiftsService,
+    @InjectRepository(ShiftRecord)
+    private readonly shiftRecordRepository: Repository<ShiftRecord>,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: 'Получить записи смен с фильтрацией' })
@@ -169,14 +175,32 @@ export class ShiftsController {
     }
   }
 
-  @Get('machine/:machineId')
-  @ApiOperation({ summary: 'Получить смены по станку' })
-  async getByMachine(@Param('machineId') machineId: string): Promise<ShiftRecord[]> {
+  @Post('reset-operation')
+  @ApiOperation({ summary: 'Сбросить данные смен для операции' })
+  async resetOperationShifts(@Body() body: { operationId: number }): Promise<any> {
     try {
-      this.logger.log(`Получение смен по станку: ${machineId}`);
-      return await this.shiftsService.getShiftsByMachine(+machineId);
+      this.logger.log(`Сброс данных смен для операции ${body.operationId}`);
+      
+      // Обнуляем данные смен
+      const result = await this.shiftRecordRepository.update(
+        { operationId: body.operationId },
+        { 
+          dayShiftQuantity: 0,
+          nightShiftQuantity: 0,
+          dayShiftTimePerUnit: 0,
+          nightShiftTimePerUnit: 0
+        }
+      );
+
+      return {
+        success: true,
+        message: 'Данные смен успешно сброшены',
+        operationId: body.operationId,
+        affectedRows: result.affected
+      };
+      
     } catch (error) {
-      this.logger.error(`Ошибка при получении смен по станку ${machineId}: ${error.message}`, error.stack);
+      this.logger.error(`Ошибка при сбросе данных смен: ${error.message}`, error.stack);
       throw error;
     }
   }

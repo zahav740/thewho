@@ -29,6 +29,18 @@ export const machinesApi = {
     }
   },
 
+  // Получить актуальный статус всех станков (новое!)
+  getAllWithStatus: async (): Promise<MachineAvailability[]> => {
+    try {
+      const response = await api.get('/machines/status/all');
+      return response.data;
+    } catch (error) {
+      console.error('machinesApi.getAllWithStatus error:', error);
+      // Откат к старому API при ошибке
+      return await machinesApi.getAll();
+    }
+  },
+
   // Получить только доступные станки
   getAvailable: async (): Promise<MachineAvailability[]> => {
     try {
@@ -51,13 +63,13 @@ export const machinesApi = {
     }
   },
 
-  // Обновить доступность станка
+  // Обновить доступность станка (ИСПРАВЛЕННАЯ ВЕРСИЯ)
   updateAvailability: async (machineName: string, isAvailable: boolean): Promise<MachineAvailability> => {
     try {
       const response = await api.put(`/machines/${encodeURIComponent(machineName)}/availability`, {
         isAvailable
       });
-      return response.data;
+      return response.data; // Новый API возвращает правильную структуру
     } catch (error) {
       console.error('machinesApi.updateAvailability error:', error);
       throw error;
@@ -75,24 +87,37 @@ export const machinesApi = {
     }
   },
 
-  // Назначить операцию на станок
+  // Назначить операцию на станок (ИСПРАВЛЕННАЯ ВЕРСИЯ)
   assignOperation: async (machineName: string, operationId: string): Promise<MachineAvailability> => {
     try {
       const response = await api.post(`/machines/${encodeURIComponent(machineName)}/assign-operation`, {
-        operationId
+        operationId: parseInt(operationId)
       });
-      return response.data;
+      return response.data.machine; // Возвращаем данные машины из нового API
     } catch (error) {
       console.error('machinesApi.assignOperation error:', error);
       throw error;
     }
   },
 
-  // Отменить назначение операции на станок
+  // НОВОЕ: Назначить операцию на станок с корректным ответом
+  assignOperationCorrect: async (machineId: string, operationId: number): Promise<any> => {
+    try {
+      const response = await api.post(`/machines/${encodeURIComponent(machineId)}/assign-operation`, {
+        operationId
+      });
+      return response.data; // Возвращаем полный результат с машиной и операцией
+    } catch (error) {
+      console.error('machinesApi.assignOperationCorrect error:', error);
+      throw error;
+    }
+  },
+
+  // Отменить назначение операции на станок (ИСПРАВЛЕННАЯ ВЕРСИЯ)
   unassignOperation: async (machineName: string): Promise<MachineAvailability> => {
     try {
       const response = await api.delete(`/machines/${encodeURIComponent(machineName)}/assign-operation`);
-      return response.data;
+      return response.data.machine || response.data; // Обрабатываем оба варианта ответа
     } catch (error) {
       console.error('machinesApi.unassignOperation error:', error);
       throw error;

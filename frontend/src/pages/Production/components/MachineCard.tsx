@@ -1,9 +1,9 @@
 /**
  * @file: MachineCard.tsx
- * @description: Карточка станка (улучшенная версия)
+ * @description: Machine card component (enhanced version)
  * @dependencies: antd, machine.types
  * @created: 2025-01-28
- * @updated: 2025-06-07 - Улучшен дизайн и функциональность
+ * @updated: 2025-06-07 - Enhanced design and functionality
  */
 import React, { useState } from 'react';
 import { Card, Tag, Badge, Row, Col, Button, Typography, Space, Modal, InputNumber, Form, Input, Divider, message } from 'antd';
@@ -26,6 +26,11 @@ import {
   formatEstimatedTime 
 } from '../../../types/machine.types';
 import { machinesApi } from '../../../services/machinesApi';
+import { shiftsApi } from '../../../services/shiftsApi';
+import { useOperationCompletion } from '../../../hooks';
+import { OperationCompletionModal } from '../../../components/OperationCompletion';
+import { QUERY_KEYS, invalidateOperationRelatedQueries } from '../../../utils/queryKeys';
+import dayjs from 'dayjs';
 
 const { confirm } = Modal;
 const { Text } = Typography;
@@ -52,22 +57,189 @@ export const MachineCard: React.FC<MachineCardProps> = ({
   const [editForm] = Form.useForm();
   const [progressForm] = Form.useForm();
 
-  // Получение актуального прогресса операции
-  const { data: operationProgress } = useQuery({
-    queryKey: ['operation-progress', machine.currentOperationId],
-    queryFn: async () => {
-      if (!machine.currentOperationId) return null;
-      // Симуляция прогресса для демонстрации
-      return {
-        completedParts: Math.floor(Math.random() * 80) + 10,
-        totalParts: 100,
-        percentage: Math.floor(Math.random() * 80) + 10,
-        startedAt: new Date(Date.now() - Math.random() * 3600000),
-      };
+  // НОВОЕ: Система завершения операций
+  const {
+    completionModalVisible,
+    currentCompletedOperation,
+    handleCloseOperation,
+    handleContinueOperation,
+    handlePlanNewOperation,
+    handleCloseModal,
+    checkSpecificOperation,
+    isClosing,
+    isContinuing,
+    isArchiving,
+  } = useOperationCompletion({
+    checkInterval: 0, // Отключаем автоматическую проверку для Production страницы
+    targetQuantity: 30,
+    onOperationClosed: (operation) => {
+      console.log('📋 Операция закрыта в Production:', operation.operationNumber);
+      // Обновлено: полная синхронизация
+      invalidateOperationRelatedQueries(queryClient);
     },
-    enabled: !!machine.currentOperationId,
-    refetchInterval: 10000, // Обновляем каждые 10 секунд
+    onOperationContinued: (operation) => {
+      console.log('▶️ Операция продолжена в Production:', operation.operationNumber);
+    },
+    onNewOperationPlanned: (operation) => {
+      console.log('🚀 Планируем новую операцию в Production для станка:', operation.machineName);
+      // Обновлено: полная синхронизация
+      invalidateOperationRelatedQueries(queryClient);
+      // Открываем модальное окно планирования
+      if (onOpenPlanningModal) {
+        // Находим станок по имени
+        const foundMachine = { ...machine, machineName: operation.machineName };
+        onOpenPlanningModal(foundMachine);
+      }
+    },
   });
+
+  // Получение реальных данных производства из смен (ИСПРАВЛЕНО: расширен период)
+  const { data: todayShifts = [] } = useQuery({
+    queryKey: ['shifts', 'recent', machine.id],
+    queryFn: async () => {
+      // ИСПРАВЛЕНИЕ: Запрашиваем данные за последние 3 дня вместо только сегодня
+      const startDate = dayjs().subtract(3, 'days').format('YYYY-MM-DD');
+      const endDate = dayjs().format('YYYY-MM-DD');
+      console.log(`🔍 ИСПРАВЛЕНО: Запрос смен для станка ${machine.machineName} (ID: ${machine.id}) за период ${startDate} - ${endDate}`);
+      return shiftsApi.getAll({
+        startDate,
+        endDate,
+      });
+    },
+    refetchInterval: 5000, // Обновляем каждые 5 секунд
+  });
+
+  // ДИАГНОСТИКА: Добавляем более детальное логирование
+  React.useEffect(() => {
+    console.log(`🔍 === ПОЛНАЯ ДИАГНОСТИКА СТАНКА ${machine.machineName} ===`);
+    console.log(`🏭 Данные станка:`, {
+      id: machine.id,
+      machineName: machine.machineName,
+      isAvailable: machine.isAvailable,
+      currentOperationId: machine.currentOperationId,
+      hasCurrentOperationDetails: !!machine.currentOperationDetails,
+      currentOperationDetails: machine.currentOperationDetails
+    });
+    
+    console.log(`📊 Данные смен:`, {
+      shiftsCount: todayShifts?.length || 0,
+      shifts: todayShifts
+    });
+    
+    if (todayShifts && todayShifts.length > 0) {
+      console.log(`✅ Получены смены для станка ${machine.machineName}:`, todayShifts);
+      console.log(`📊 Всего смен: ${todayShifts.length}`);
+      
+      // Фильтруем смены для текущего станка
+      const machineShifts = todayShifts.filter((shift: any) => {
+        console.log(`📋 Проверяем смену ${shift.id}: machineId=${shift.machineId}, ожидаем=${machine.id}`);
+        return shift.machineId === parseInt(machine.id);
+      });
+      
+      console.log(`🎯 Смены для станка ${machine.machineName} (ID: ${machine.id}): ${machineShifts.length}`);
+      machineShifts.forEach((shift: any) => {
+        console.log(`  📝 Смена ${shift.id}: ${shift.drawingNumber || shift.orderDrawingNumber}, День: ${shift.dayShiftQuantity}, Ночь: ${shift.nightShiftQuantity}`);
+      });
+    } else {
+      console.log(`❌ НЕТ ДАННЫХ СМЕН или пустой массив`);
+    }
+    console.log(`🔍 === КОНЕЦ ДИАГНОСТИКИ ===`);
+  }, [todayShifts, machine.id, machine.machineName, machine.currentOperationDetails]);
+
+  // УЛУЧШЕННОЕ Вычисление прогресса операции на основе реальных данных смен
+  const operationProgress = React.useMemo(() => {
+    console.log(`🔍 === ДИАГНОСТИКА СИНХРОНИЗАЦИИ ДЛЯ СТАНКА ${machine.machineName} ===`);
+    
+    if (!machine.currentOperationDetails || !todayShifts) {
+      console.log(`🚫 Недостаточно данных:`, {
+        hasOperation: !!machine.currentOperationDetails,
+        hasShifts: !!todayShifts,
+        shiftsLength: todayShifts?.length || 0
+      });
+      return null;
+    }
+
+    console.log(`📊 Исходные данные:`);
+    console.log(`   Станок ID: ${machine.id} (тип: ${typeof machine.id})`);
+    console.log(`   Операция: ${machine.currentOperationDetails.orderDrawingNumber}`);
+    console.log(`   Всего смен: ${todayShifts.length}`);
+
+    // Детальная диагностика каждой смены
+    console.log(`📋 Анализ всех смен:`);
+    todayShifts.forEach((shift: any, index: number) => {
+      console.log(`   Смена ${index + 1} (ID: ${shift.id}):`);
+      console.log(`     machineId: ${shift.machineId} (тип: ${typeof shift.machineId})`);
+      console.log(`     drawingNumber: "${shift.drawingNumber}"`);
+      console.log(`     orderDrawingNumber: "${shift.orderDrawingNumber}"`);
+      console.log(`     operationId: ${shift.operationId}`);
+      console.log(`     дата: ${shift.date}`);
+      console.log(`     день: ${shift.dayShiftQuantity}, ночь: ${shift.nightShiftQuantity}`);
+    });
+
+    // УПРОЩЕННЫЙ алгоритм сопоставления (ИСПРАВЛЕНИЕ)
+    console.log(`🎯 УПРОЩЕННЫЙ поиск смен для операции ${machine.currentOperationDetails.orderDrawingNumber}`);
+    
+    let matchedShifts: any[] = [];
+    let usedAlgorithm = 'none';
+    
+    // Алгоритм 1: Поиск по ID станка
+    const algorithm1Results = todayShifts.filter((shift: any) => {
+      const shiftMachineId = parseInt(shift.machineId?.toString() || '0');
+      const currentMachineId = parseInt(machine.id?.toString() || '0');
+      const matches = shiftMachineId === currentMachineId;
+      
+      console.log(`   🔧 Алгоритм 1 - Смена ${shift.id}: станок ${shiftMachineId} === ${currentMachineId} → ${matches}`);
+      return matches;
+    });
+    
+    console.log(`📈 Алгоритм 1 (только станок): ${algorithm1Results.length} смен`);
+    
+    if (algorithm1Results.length > 0) {
+      matchedShifts = algorithm1Results;
+      usedAlgorithm = 'только по ID станка';
+    }
+
+    console.log(`🎯 Использован алгоритм: "${usedAlgorithm}"`);
+    console.log(`✅ Найдено ${matchedShifts.length} подходящих смен`);
+
+    if (matchedShifts.length === 0) {
+      console.log(`❌ НЕ НАЙДЕНО СОВПАДЕНИЙ - ПРОБЛЕМА В ДАННЫХ ИЛИ АЛГОРИТМЕ`);
+      console.log(`🔧 Рекомендации по исправлению:`);
+      console.log(`   1. Проверьте соответствие machineId в сменах и станках`);
+      console.log(`   2. Проверьте соответствие номеров чертежей`);
+      console.log(`   3. Убедитесь что operationId заполнен в сменах`);
+      console.log(`   4. Проверьте формат данных (строки vs числа)`);
+    }
+
+    // Вычисляем результаты на основе найденных смен
+    const totalProduced = matchedShifts.reduce((sum: number, shift: any) => {
+      const dayShift = shift.dayShiftQuantity || 0;
+      const nightShift = shift.nightShiftQuantity || 0;
+      const total = dayShift + nightShift;
+      console.log(`📊 Смена ${shift.id}: ${dayShift} + ${nightShift} = ${total}`);
+      return sum + total;
+    }, 0);
+
+    const targetQuantity = 30;
+    const percentage = Math.min((totalProduced / targetQuantity) * 100, 100);
+
+    const result = {
+      completedParts: totalProduced,
+      totalParts: targetQuantity,
+      percentage: Math.round(percentage),
+      isCompleted: totalProduced >= targetQuantity,
+      startedAt: matchedShifts.length > 0 ? new Date(matchedShifts[0].date) : null,
+      dayShiftQuantity: matchedShifts.reduce((sum: number, shift: any) => sum + (shift.dayShiftQuantity || 0), 0),
+      nightShiftQuantity: matchedShifts.reduce((sum: number, shift: any) => sum + (shift.nightShiftQuantity || 0), 0),
+      dayShiftOperator: matchedShifts.find((shift: any) => shift.dayShiftOperator)?.dayShiftOperator || '-',
+      nightShiftOperator: matchedShifts.find((shift: any) => shift.nightShiftOperator)?.nightShiftOperator || 'Аркадий',
+    };
+
+    console.log(`🏁 Финальный результат:`, result);
+    console.log(`🔍 === КОНЕЦ ДИАГНОСТИКИ ===`);
+
+    return result;
+  }, [machine.currentOperationDetails, machine.id, todayShifts]);
 
   const updateAvailabilityMutation = useMutation({
     mutationFn: async (isAvailable: boolean) => {
@@ -122,6 +294,7 @@ export const MachineCard: React.FC<MachineCardProps> = ({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['machines'] });
+      queryClient.invalidateQueries({ queryKey: ['shifts'] });
       setEditModalVisible(false);
       message.success('Операция обновлена успешно');
     },
@@ -139,8 +312,6 @@ export const MachineCard: React.FC<MachineCardProps> = ({
     },
   });
 
-
-
   const updateProgressMutation = useMutation({
     mutationFn: async (data: any) => {
       console.log('Обновление прогресса:', data);
@@ -148,6 +319,9 @@ export const MachineCard: React.FC<MachineCardProps> = ({
       return { success: true };
     },
     onSuccess: () => {
+      // Обновляем все связанные запросы
+      queryClient.invalidateQueries({ queryKey: ['machines'] });
+      queryClient.invalidateQueries({ queryKey: ['shifts'] });
       queryClient.invalidateQueries({ queryKey: ['operation-progress'] });
       setProgressModalVisible(false);
       message.success('Прогресс обновлен успешно');
@@ -182,13 +356,15 @@ export const MachineCard: React.FC<MachineCardProps> = ({
     });
   };
 
-
-
   const handleUpdateProgress = () => {
     if (operationProgress) {
       progressForm.setFieldsValue({
         completedParts: operationProgress.completedParts,
         totalParts: operationProgress.totalParts,
+        dayShiftQuantity: operationProgress.dayShiftQuantity,
+        nightShiftQuantity: operationProgress.nightShiftQuantity,
+        dayShiftOperator: operationProgress.dayShiftOperator,
+        nightShiftOperator: operationProgress.nightShiftOperator,
       });
     }
     setProgressModalVisible(true);
@@ -352,16 +528,8 @@ export const MachineCard: React.FC<MachineCardProps> = ({
                       block
                       size="large"
                       onClick={(e) => {
-                        console.log('🔥 Machine type button clicked for:', machine.machineName);
-                        console.log('🔥 onOpenPlanningModal exists:', !!onOpenPlanningModal);
                         e.stopPropagation();
-                        console.log('🔥 About to call onOpenPlanningModal with:', machine);
-                        try {
-                          onOpenPlanningModal(machine);
-                          console.log('🔥 onOpenPlanningModal called successfully');
-                        } catch (error) {
-                          console.error('🔥 Error calling onOpenPlanningModal:', error);
-                        }
+                        onOpenPlanningModal(machine);
                       }}
                       style={{ 
                         backgroundColor: machineTypeColor,
@@ -436,114 +604,250 @@ export const MachineCard: React.FC<MachineCardProps> = ({
                 size="small" 
                 style={{ 
                   borderRadius: '8px', 
-                  borderColor: '#faad14',
-                  backgroundColor: '#fff7e6'
+                  borderColor: operationProgress?.isCompleted ? '#52c41a' : '#faad14',
+                  backgroundColor: operationProgress?.isCompleted ? '#f6ffed' : '#fff7e6'
                 }}
               >
                 <Space direction="vertical" style={{ width: '100%' }}>
                   {/* Информация об операции */}
-                  <>
-                    <Row gutter={[8, 8]}>
-                      <Col span={24}>
-                        <Space wrap>
-                          <Tag color="orange" style={{ borderRadius: '12px', marginBottom: '4px' }}>
-                            📋 {t('machine.operation')} #{machine.currentOperationDetails.operationNumber}
+                  <Row gutter={[8, 8]}>
+                    <Col span={24}>
+                      <Space wrap>
+                        <Tag color={operationProgress?.isCompleted ? 'green' : 'orange'} style={{ borderRadius: '12px', marginBottom: '4px' }}>
+                          📋 {t('machine.operation')} #{machine.currentOperationDetails.operationNumber}
+                        </Tag>
+                        <Tag color="blue" style={{ borderRadius: '12px', marginBottom: '4px' }}>
+                          {machine.currentOperationDetails.operationType}
+                        </Tag>
+                        {operationProgress?.isCompleted && (
+                          <Tag color="success" style={{ borderRadius: '12px', marginBottom: '4px' }}>
+                            ✅ ЗАВЕРШЕНО
                           </Tag>
-                          <Tag color="blue" style={{ borderRadius: '12px', marginBottom: '4px' }}>
-                            {machine.currentOperationDetails.operationType}
-                          </Tag>
-                        </Space>
-                      </Col>
-                    </Row>
-                    <Row>
-                      <Col span={24}>
-                        <Text strong style={{ fontSize: '13px', color: '#d46b08' }}>
-                          📄 {machine.currentOperationDetails.orderDrawingNumber}
-                        </Text>
-                      </Col>
-                    </Row>
-                    <Row>
-                      <Col span={24}>
-                        <Text type="secondary" style={{ fontSize: '12px' }}>
-                          ⏱️ {t('machine.time')}: {formatEstimatedTime(machine.currentOperationDetails.estimatedTime)}
-                        </Text>
-                      </Col>
-                    </Row>
-                    {operationProgress && (
+                        )}
+                      </Space>
+                    </Col>
+                  </Row>
+                  <Row>
+                    <Col span={24}>
+                      <Text strong style={{ fontSize: '13px', color: operationProgress?.isCompleted ? '#389e0d' : '#d46b08' }}>
+                        📄 {machine.currentOperationDetails.orderDrawingNumber}
+                      </Text>
+                    </Col>
+                  </Row>
+                  <Row>
+                    <Col span={24}>
+                      <Text type="secondary" style={{ fontSize: '12px' }}>
+                        ⏱️ {t('machine.time')}: {formatEstimatedTime(machine.currentOperationDetails.estimatedTime)}
+                      </Text>
+                    </Col>
+                  </Row>
+                  {operationProgress && (
+                    <>
                       <Row>
                         <Col span={24}>
                           <Text type="secondary" style={{ fontSize: '12px' }}>
                             Детали: {operationProgress.completedParts}/{operationProgress.totalParts}
                           </Text>
+                          {operationProgress.isCompleted && (
+                            <Tag color="green" style={{ marginLeft: '8px', fontSize: '10px' }}>
+                              🎉 ГОТОВО!
+                            </Tag>
+                          )}
                           {operationProgress.startedAt && (
-                            <Text type="secondary" style={{ fontSize: '12px' }}>
-                              Начато: {new Date(operationProgress.startedAt).toLocaleTimeString()}
-                            </Text>
+                            <>
+                              <br />
+                              <Text type="secondary" style={{ fontSize: '12px' }}>
+                                Начато: {new Date(operationProgress.startedAt).toLocaleTimeString()}
+                              </Text>
+                            </>
                           )}
                         </Col>
                       </Row>
-                    )}
-                  </>
+                      
+                      {/* НОВОЕ: Отображение выполненного объема по сменам */}
+                      <Row style={{ marginTop: '8px' }}>
+                        <Col span={24}>
+                          <div style={{ 
+                            padding: '8px', 
+                            backgroundColor: '#f0f9ff', 
+                            borderRadius: '6px',
+                            border: '1px solid #91d5ff'
+                          }}>
+                            <Text strong style={{ fontSize: '12px', color: '#1890ff' }}>
+                              📊 ВЫПОЛНЕННЫЙ ОБЪЕМ:
+                            </Text>
+                            <br />
+                            <div style={{ marginTop: '4px' }}>
+                              <Text style={{ fontSize: '11px' }}>
+                                День: <Text strong>{operationProgress.dayShiftQuantity}</Text> ({operationProgress.dayShiftOperator})
+                              </Text>
+                              <br />
+                              <Text style={{ fontSize: '11px' }}>
+                                Ночь: <Text strong>{operationProgress.nightShiftQuantity}</Text> ({operationProgress.nightShiftOperator})
+                              </Text>
+                              <br />
+                              <Text style={{ fontSize: '12px', color: '#52c41a' }}>
+                                <span style={{ fontWeight: 'bold', fontSize: '14px' }}>Всего: {operationProgress.completedParts}</span> деталей
+                              </Text>
+                            </div>
+                          </div>
+                        </Col>
+                      </Row>
+                    </>
+                  )}
 
                   <Divider style={{ margin: '12px 0' }} />
                   
                   {/* CRUD кнопки для операции */}
-                  <Row gutter={8}>
-                    <Col span={6}>
+                  {operationProgress?.isCompleted ? (
+                    // Кнопки для завершенной операции
+                    <>
+                      <Row gutter={8}>
+                        <Col span={12}>
+                          <Button
+                            type="primary"
+                            size="small"
+                            block
+                            icon={<CheckCircleOutlined />}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleAvailabilityChange(true);
+                            }}
+                            style={{ fontSize: '11px', backgroundColor: '#52c41a', borderColor: '#52c41a' }}
+                          >
+                            ✅ Закрыть
+                          </Button>
+                        </Col>
+                        <Col span={12}>
+                          <Button
+                            type="default"
+                            size="small"
+                            block
+                            icon={<PlayCircleOutlined />}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (onOpenPlanningModal) {
+                                onOpenPlanningModal(machine);
+                              }
+                            }}
+                            style={{ fontSize: '11px' }}
+                          >
+                            🚀 Новая
+                          </Button>
+                        </Col>
+                      </Row>
+                      <Row style={{ marginTop: '8px' }}>
+                        <Col span={24}>
+                          <div style={{ 
+                            padding: '6px', 
+                            backgroundColor: '#f6ffed', 
+                            borderRadius: '4px',
+                            border: '1px solid #b7eb8f',
+                            textAlign: 'center'
+                          }}>
+                            <Text style={{ fontSize: '10px', color: '#52c41a' }}>
+                              ✅ Операция выполнена! Общий объем: <Text strong>{operationProgress?.completedParts}</Text> деталей
+                            </Text>
+                          </div>
+                        </Col>
+                      </Row>
+                    </>
+                  ) : (
+                    // Кнопки для активной операции
+                    <>
+                      <Row gutter={8}>
+                        <Col span={6}>
+                          <Button
+                            type="primary"
+                            size="small"
+                            block
+                            icon={<EditOutlined />}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEditOperation();
+                            }}
+                            style={{ fontSize: '11px' }}
+                          >
+                            Изм.
+                          </Button>
+                        </Col>
+                        <Col span={6}>
+                          <Button
+                            size="small"
+                            block
+                            icon={<WarningOutlined />}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleUpdateProgress();
+                            }}
+                            style={{ fontSize: '11px' }}
+                          >
+                            Прог.
+                          </Button>
+                        </Col>
+                        <Col span={6}>
+                          <Button
+                            danger
+                            size="small"
+                            block
+                            icon={<DeleteOutlined />}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteOperation();
+                            }}
+                            style={{ fontSize: '11px' }}
+                          >
+                            Удал.
+                          </Button>
+                        </Col>
+                        <Col span={6}>
+                          <Button
+                            danger
+                            size="small"
+                            block
+                            icon={<CloseCircleOutlined />}
+                            onClick={handleUnassignOperation}
+                            loading={unassignOperationMutation.isPending}
+                            style={{ fontSize: '11px' }}
+                          >
+                            Отм.
+                          </Button>
+                        </Col>
+                      </Row>
+                      <Row style={{ marginTop: '8px' }}>
+                        <Col span={24}>
+                          <div style={{ 
+                            padding: '6px', 
+                            backgroundColor: '#fff7e6', 
+                            borderRadius: '4px',
+                            border: '1px solid #ffd591'
+                          }}>
+                            <Text style={{ fontSize: '10px', color: '#d46b08' }}>
+                              📈 Производство: День {operationProgress?.dayShiftQuantity || 0} + Ночь {operationProgress?.nightShiftQuantity || 0} = <Text strong>{operationProgress?.completedParts || 0}</Text>
+                            </Text>
+                          </div>
+                        </Col>
+                      </Row>
+                    </>
+                  )}
+
+                  {/* НОВОЕ: Кнопка проверки завершения */}
+                  <Row gutter={8} style={{ marginTop: '8px' }}>
+                    <Col span={24}>
                       <Button
-                        type="primary"
+                        type="dashed"
                         size="small"
                         block
-                        icon={<EditOutlined />}
+                        icon={<CheckCircleOutlined />}
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleEditOperation();
+                          if (machine.currentOperationId) {
+                            checkSpecificOperation(machine.currentOperationId);
+                          }
                         }}
-                        style={{ fontSize: '11px' }}
+                        style={{ fontSize: '11px', borderColor: '#52c41a', color: '#52c41a' }}
                       >
-                        Изм.
-                      </Button>
-                    </Col>
-                    <Col span={6}>
-                      <Button
-                        size="small"
-                        block
-                        icon={<WarningOutlined />}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleUpdateProgress();
-                        }}
-                        style={{ fontSize: '11px' }}
-                      >
-                        Прог.
-                      </Button>
-                    </Col>
-                    <Col span={6}>
-                      <Button
-                        danger
-                        size="small"
-                        block
-                        icon={<DeleteOutlined />}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteOperation();
-                        }}
-                        style={{ fontSize: '11px' }}
-                      >
-                        Удал.
-                      </Button>
-                    </Col>
-                    <Col span={6}>
-                      <Button
-                        danger
-                        size="small"
-                        block
-                        icon={<CloseCircleOutlined />}
-                        onClick={handleUnassignOperation}
-                        loading={unassignOperationMutation.isPending}
-                        style={{ fontSize: '11px' }}
-                      >
-                        Отм.
+                        🎯 Проверить завершение
                       </Button>
                     </Col>
                   </Row>
@@ -653,8 +957,6 @@ export const MachineCard: React.FC<MachineCardProps> = ({
         </Form>
       </Modal>
 
-
-
       {/* Модальное окно обновления прогресса */}
       <Modal
         title="Обновление прогресса операции"
@@ -666,16 +968,63 @@ export const MachineCard: React.FC<MachineCardProps> = ({
           });
         }}
         confirmLoading={updateProgressMutation.isPending}
+        width={600}
       >
         <Form form={progressForm} layout="vertical">
-          <Form.Item name="completedParts" label="Выполнено деталей" rules={[{ required: true }]}>
-            <InputNumber min={0} style={{ width: '100%' }} />
-          </Form.Item>
-          <Form.Item name="totalParts" label="Всего деталей" rules={[{ required: true }]}>
-            <InputNumber min={1} style={{ width: '100%' }} />
-          </Form.Item>
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item name="completedParts" label="Общее количество (деталей)" rules={[{ required: true }]}>
+                <InputNumber min={0} style={{ width: '100%' }} disabled />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="totalParts" label="Плановое количество" rules={[{ required: true }]}>
+                <InputNumber min={1} style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+          </Row>
+          
+          <Divider>Производство по сменам</Divider>
+          
+          <Row gutter={16}>
+            <Col span={12}>
+              <Text strong>Дневная смена:</Text>
+              <Form.Item name="dayShiftQuantity" label="Количество" style={{ marginTop: 8 }}>
+                <InputNumber min={0} style={{ width: '100%' }} disabled />
+              </Form.Item>
+              <Form.Item name="dayShiftOperator" label="Оператор">
+                <Input disabled />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Text strong>Ночная смена:</Text>
+              <Form.Item name="nightShiftQuantity" label="Количество" style={{ marginTop: 8 }}>
+                <InputNumber min={0} style={{ width: '100%' }} disabled />
+              </Form.Item>
+              <Form.Item name="nightShiftOperator" label="Оператор">
+                <Input disabled />
+              </Form.Item>
+            </Col>
+          </Row>
+          
+          <div style={{ padding: '12px', backgroundColor: '#f0f9ff', borderRadius: '6px', marginTop: '16px' }}>
+            <Text strong style={{ color: '#1890ff' }}>
+              📊 Информация: Данные о производстве берутся из смен и обновляются автоматически.
+            </Text>
+          </div>
         </Form>
       </Modal>
+
+      {/* НОВОЕ: Модальное окно завершения операции */}
+      <OperationCompletionModal
+        visible={completionModalVisible}
+        completedOperation={currentCompletedOperation}
+        onClose={handleCloseModal}
+        onCloseOperation={handleCloseOperation}
+        onContinueOperation={handleContinueOperation}
+        onPlanNewOperation={handlePlanNewOperation}
+        loading={isClosing || isContinuing || isArchiving}
+      />
     </>
   );
 };

@@ -1,9 +1,9 @@
 /**
- * @file: ActiveMachinesMonitor.tsx
- * @description: Компонент мониторинга активных станков (ИСПРАВЛЕН - фильтрация по текущей операции)
- * @dependencies: antd, react-query, machinesApi, operationsApi
- * @created: 2025-06-07
- * @fixed: 2025-06-07 - Добавлена фильтрация данных по текущей операции и номеру чертежа
+ * @file: ActiveMachinesMonitor.tsx (🆕 СИНХРОНИЗИРОВАННАЯ ВЕРСИЯ)
+ * @description: Компонент мониторинга станков с полной синхронизацией Production ↔ Shifts
+ * @dependencies: antd, react-query, synchronizationApi, real-time events
+ * @created: 2025-06-12
+ * @updated: 2025-06-15 - Добавлена полная синхронизация с Production
  */
 import React, { useState } from 'react';
 import {
@@ -28,21 +28,34 @@ import {
   ClockCircleOutlined,
   FileTextOutlined,
   BarChartOutlined,
+  SyncOutlined,
 } from '@ant-design/icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { machinesApi } from '../../../services/machinesApi';
 import { operationsApi } from '../../../services/operationsApi';
 import { shiftsApi } from '../../../services/shiftsApi';
+import { synchronizationApi } from '../../../services/synchronizationApi'; // 🆕 Новый API
 import { OperationStatus } from '../../../types/operation.types';
 
 import { ShiftForm } from './ShiftForm';
 import { OperationDetailModal } from './OperationDetailModal';
+import DataDiagnostics from './DataDiagnostics';
+import SimpleProductionView from './SimpleProductionView';
+// СТАРОЕ: import { OperationCompletionModal } from './OperationCompletionModal';
+// НОВОЕ: Система автозавершения операций
+import OperationCompletionNotification from '../../../components/OperationCompletionNotification';
+import { OperationCompletionModal } from '../../../components/OperationCompletion';
+import { useOperationCompletionCheck, useOperationCompletion } from '../../../hooks';
 import { useTranslation } from '../../../i18n';
 import dayjs from 'dayjs';
 
 const { Title, Text } = Typography;
 
-// Интерфейс для эффективности оператора
+// Интерфейсы
+interface ActiveMachinesMonitorProps {
+  selectedOperation?: any; // Переданная операция из ProductionPage
+}
+
 interface OperatorEfficiency {
   operatorName: string;
   productivity: {
@@ -64,7 +77,6 @@ interface OperatorEfficiency {
   rating: number;
 }
 
-// Расширенный тип для текущих деталей операции с прогрессом
 interface ExtendedOperationDetails {
   id: number;
   operationNumber: number;
@@ -77,7 +89,6 @@ interface ExtendedOperationDetails {
   targetQuantity?: number;
 }
 
-// Тип активного станка с фильтрацией по операции
 interface ActiveMachine {
   id: string;
   machineName: string;
@@ -115,43 +126,140 @@ const getMachineTypeLabel = (type: string, t: (key: string) => string): string =
   return t('shifts.machine_generic');
 };
 
-export const ActiveMachinesMonitor: React.FC = () => {
+export const ActiveMachinesMonitor: React.FC<ActiveMachinesMonitorProps> = ({ selectedOperation: selectedOperationFromProduction }) => {
   const { t } = useTranslation();
   const [selectedMachineId, setSelectedMachineId] = useState<number | undefined>();
   const [showShiftForm, setShowShiftForm] = useState(false);
-  const [selectedOperation, setSelectedOperation] = useState<any>(null);
+  const [selectedOperationDetail, setSelectedOperationDetail] = useState<any>(null);
   const [showOperationDetail, setShowOperationDetail] = useState(false);
   
-  // ИСПРАВЛЕНО: Добавлен useQueryClient для инвалидации кэша
-  const queryClient = useQueryClient();
-
-  // Загружаем список станков (используем основной API)
-  const { data: machines, isLoading: machinesLoading, error: machinesError } = useQuery({
-    queryKey: ['machines-availability'],
-    queryFn: machinesApi.getAll,
-    refetchInterval: 30000, // Обновляем каждые 30 секунд
+  // 🆕 НОВОЕ: Состояние для операций из Производства через real-time события
+  const [realtimeAssignedOperation, setRealtimeAssignedOperation] = useState<any>(null);
+  
+  // 🆕 Обработчик событий для real-time обновлений
+  React.useEffect(() => {
+    const handleOperationAssigned = (event: CustomEvent) => {
+      console.log('📡 Получено событие о назначении операции:', event.detail);
+      setRealtimeAssignedOperation(event.detail);
+      
+      // Обновляем все данные для отображения актуальной информации
+      queryClient.invalidateQueries({ queryKey: ['machines'] });
+      queryClient.invalidateQueries({ queryKey: ['shifts', 'today'] });
+      
+      // Показываем уведомление
+      message.success(`🎉 Операция #${event.detail.operationNumber} синхронизирована!`);
+    };
+    
+    const handleOperationCleared = () => {
+      console.log('🗑️ Получено событие об очистке операции');
+      setRealtimeAssignedOperation(null);
+    };
+    
+    // Подписываемся на события
+    window.addEventListener('operationAssigned', handleOperationAssigned as EventListener);
+    window.addEventListener('operationCleared', handleOperationCleared);
+    
+    return () => {
+      window.removeEventListener('operationAssigned', handleOperationAssigned as EventListener);
+      window.removeEventListener('operationCleared', handleOperationCleared);
+    };
+  }, []);
+  
+  // 🆕 Определяем актуальную операцию (приоритет real-time событиям)
+  const currentSelectedOperation = realtimeAssignedOperation || selectedOperationFromProduction;
+  
+  // Проверяем localStorage при загрузке (для совместимости)
+  React.useEffect(() => {
+    if (!currentSelectedOperation) {
+      const savedOperation = localStorage.getItem('selectedOperation');
+      if (savedOperation) {
+        try {
+          const operation = JSON.parse(savedOperation);
+          setRealtimeAssignedOperation(operation);
+          console.log('💾 Загружена операция из localStorage (совместимость):', operation);
+        } catch (error) {
+          console.error('Ошибка парсинга операции из localStorage:', error);
+        }
+      }
+    }
+  }, [currentSelectedOperation]);
+  
+  // НОВОЕ: Система уведомлений о завершении операций
+  const {
+    pendingNotifications,
+    hasNotifications,
+    clearNotifications,
+    checkSpecificOperation
+  } = useOperationCompletionCheck({
+    enabled: true,
+    checkInterval: 10000, // Проверяем каждые 10 секунд
+    onOperationCompleted: (completedOps) => {
+      // Показываем системное уведомление
+      message.success(`🎉 Операция ${completedOps[0]?.operationInfo.operationNumber} завершена!`);
+    }
   });
 
-  // Загружаем активные операции
+  // НОВОЕ: Основная система завершения операций
+  const {
+    completionModalVisible,
+    currentCompletedOperation,
+    pendingCompletions,
+    handleCloseOperation,
+    handleContinueOperation,
+    handlePlanNewOperation,
+    handleCloseModal,
+    isClosing,
+    isContinuing,
+    isArchiving,
+  } = useOperationCompletion({
+    checkInterval: 8000, // Проверяем каждые 8 секунд (чуть чаще)
+    targetQuantity: 30,
+    onOperationClosed: (operation) => {
+      console.log('📋 Операция закрыта:', operation.operationNumber);
+      // Обновляем все данные
+      queryClient.invalidateQueries({ queryKey: ['machines'] }); // ИСПРАВЛЕНО
+      queryClient.invalidateQueries({ queryKey: ['shifts', 'today'] });
+    },
+    onOperationContinued: (operation) => {
+      console.log('▶️ Операция продолжена:', operation.operationNumber);
+    },
+    onNewOperationPlanned: (operation) => {
+      console.log('🚀 Планируем новую операцию для станка:', operation.machineName);
+      // Обновляем данные и открываем планирование
+      queryClient.invalidateQueries({ queryKey: ['machines'] }); // ИСПРАВЛЕНО
+      queryClient.invalidateQueries({ queryKey: ['shifts', 'today'] });
+      // Здесь можно добавить открытие модального окна планирования
+    },
+  });
+  
+  const queryClient = useQueryClient();
+
+  // Загрузка данных
+  const { data: machines, isLoading: machinesLoading, error: machinesError } = useQuery({
+    queryKey: ['machines'], // ИСПРАВЛЕНО: используем тот же ключ что и в ProductionPage
+    queryFn: machinesApi.getAllWithStatus, // Используем новый API
+    refetchInterval: 3000, // Уменьшаем до 3 секунд
+    staleTime: 1000, // Данные считаются свежими 1 секунду
+  });
+
   const { data: activeOperations, isLoading: operationsLoading } = useQuery({
     queryKey: ['operations', 'in-progress'],
     queryFn: () => operationsApi.getAll(OperationStatus.IN_PROGRESS),
-    refetchInterval: 30000,
+    refetchInterval: 5000,
   });
 
-  // Загружаем сегодняшние смены
-  const { data: todayShifts, isLoading: shiftsLoading } = useQuery({
+  const { data: todayShifts, isLoading: shiftsLoading, refetch: refetchShifts } = useQuery({
     queryKey: ['shifts', 'today'],
     queryFn: () => shiftsApi.getAll({
       startDate: dayjs().format('YYYY-MM-DD'),
       endDate: dayjs().format('YYYY-MM-DD'),
     }),
-    refetchInterval: 60000, // Обновляем каждую минуту
+    refetchInterval: 3000,
   });
 
   const isLoading = machinesLoading || operationsLoading || shiftsLoading;
 
-  // НОВАЯ ФУНКЦИЯ: Вычисление эффективности оператора
+  // Функция расчета эффективности оператора
   const calculateOperatorEfficiency = React.useCallback((
     operatorName: string, 
     shifts: any[], 
@@ -176,8 +284,6 @@ export const ActiveMachinesMonitor: React.FC = () => {
     let totalParts = 0;
     let totalTime = 0;
     let workingSessions = 0;
-    
-    console.log(`Вычисляем эффективность оператора ${operatorName}...`);
 
     operatorShifts.forEach(shift => {
       if (shift.dayShiftOperator === operatorName) {
@@ -199,7 +305,7 @@ export const ActiveMachinesMonitor: React.FC = () => {
     const deviation = planTimePerPart > 0 ? ((averageTimePerPart - planTimePerPart) / planTimePerPart * 100) : 0;
     const planVsFact = planTimePerPart > 0 ? (planTimePerPart / averageTimePerPart * 100) : 0;
 
-    // Стабильность (насколько постоянны показатели)
+    // Стабильность
     const timePerPartValues = operatorShifts.map(shift => {
       const dayTime = shift.dayShiftOperator === operatorName ? shift.dayShiftTimePerUnit : 0;
       const nightTime = shift.nightShiftOperator === operatorName ? shift.nightShiftTimePerUnit : 0;
@@ -210,11 +316,8 @@ export const ActiveMachinesMonitor: React.FC = () => {
     const variance = timePerPartValues.reduce((acc, time) => acc + Math.pow(time - avgTime, 2), 0) / timePerPartValues.length;
     const consistency = Math.max(0, 100 - (Math.sqrt(variance) / avgTime * 100));
 
-    // Эффективность использования времени
     const efficiency = Math.min(100, Math.max(0, planVsFact));
-    
-    // Общий рейтинг (0-10) с учетом количества рабочих сессий
-    const sessionBonus = Math.min(2, workingSessions * 0.1); // Бонус за стабильность работы
+    const sessionBonus = Math.min(2, workingSessions * 0.1);
     const rating = Math.round(
       (Math.min(10, partsPerHour) + 
        Math.min(10, efficiency / 10) + 
@@ -236,14 +339,14 @@ export const ActiveMachinesMonitor: React.FC = () => {
       },
       utilization: {
         workingTime: totalTime,
-        idleTime: 0, // Пока не реализовано
+        idleTime: 0,
         efficiency: Math.round(efficiency * 10) / 10
       },
       rating
     };
   }, []);
 
-  // ИСПРАВЛЕННАЯ ФУНКЦИЯ: Вычисляем прогресс операции на основе реальных данных смен
+  // Функция расчета прогресса операции
   const calculateProgress = React.useCallback((operation: any, operationShifts: any[]): number => {
     if (!operation || !operationShifts.length) return 0;
     
@@ -251,50 +354,50 @@ export const ActiveMachinesMonitor: React.FC = () => {
       sum + (shift.dayShiftQuantity || 0) + (shift.nightShiftQuantity || 0), 0
     );
     
-    // Получаем целевое количество из заказа
-    const targetQuantity = operation.order?.quantity || 100; // fallback значение
+    const targetQuantity = 30; // TODO: Получать из базы данных
     
     return Math.min((totalProduced / targetQuantity) * 100, 100);
   }, []);
 
-  // ИСПРАВЛЕННАЯ ФУНКЦИЯ: Фильтрация смен по текущей операции С УЧЕТОМ ВРЕМЕНИ НАЗНАЧЕНИЯ
+  // Фильтрация смен по операции
   const getOperationShifts = React.useCallback((
     machineId: string, 
     operationDetails: any, 
-    allShifts: any[],
-    operationAssignedAt?: string | Date
+    allShifts: any[]
   ) => {
-    if (!operationDetails || !allShifts) return [];
-    
-    // Если есть время назначения операции, фильтруем смены только после этого времени
-    if (operationAssignedAt) {
-      const operationStartTime = new Date(operationAssignedAt);
-      console.log(`🕒 Фильтруем смены для ${operationDetails.orderDrawingNumber} после ${operationStartTime.toISOString()}`);
-      
-      const filteredShifts = allShifts.filter(shift => {
-        const shiftTime = new Date(shift.createdAt);
-        const matchesMachine = shift.machineId === parseInt(machineId);
-        const matchesDrawing = shift.drawingNumber === operationDetails.orderDrawingNumber;
-        const isAfterAssignment = shiftTime >= operationStartTime;
-        
-        console.log(`📋 Смена ${shift.id}: машина=${matchesMachine}, чертеж=${matchesDrawing}, время=${isAfterAssignment}`);
-        
-        return matchesMachine && matchesDrawing && isAfterAssignment;
-      });
-      
-      console.log(`✅ Найдено ${filteredShifts.length} смен для текущей операции`);
-      return filteredShifts;
+    if (!operationDetails || !allShifts) {
+      console.log(`❌ Нет деталей операции или смен`);
+      return [];
     }
     
-    // Fallback: старая логика без учета времени
-    console.log(`⚠️ Используем старую логику фильтрации (нет времени назначения)`);
-    return allShifts.filter(shift => 
-      shift.machineId === parseInt(machineId) && 
-      shift.drawingNumber === operationDetails.orderDrawingNumber
-    );
+    console.log(`🔍 Фильтруем смены для станка ${machineId}, операция: ${operationDetails.orderDrawingNumber}`);
+    console.log(`📊 Всего смен для фильтрации: ${allShifts.length}`);
+    
+    const filteredShifts = allShifts.filter(shift => {
+      const matchesMachine = shift.machineId === parseInt(machineId);
+      
+      // Проверяем разные варианты поля с номером чертежа
+      const drawingNumberField = shift.drawingNumber || shift.drawingnumber || shift.orderDrawingNumber;
+      const matchesDrawing = drawingNumberField === operationDetails.orderDrawingNumber;
+      
+      console.log(`📋 Смена ${shift.id}:`, {
+        machineId: shift.machineId,
+        matchesMachine,
+        drawingNumber: drawingNumberField,
+        expectedDrawing: operationDetails.orderDrawingNumber,
+        matchesDrawing,
+        shiftDate: shift.date
+      });
+      
+      return matchesMachine && matchesDrawing;
+    });
+    
+    console.log(`✅ Найдено ${filteredShifts.length} смен для текущей операции`);
+    
+    return filteredShifts;
   }, []);
 
-  // ИСПРАВЛЕННАЯ ЛОГИКА: Объединяем данные станков с активными операциями и производством ПО ТЕКУЩЕЙ ОПЕРАЦИИ
+  // Основная логика объединения данных станков
   const activeMachines: ActiveMachine[] = React.useMemo(() => {
     if (!machines) return [];
 
@@ -304,13 +407,12 @@ export const ActiveMachinesMonitor: React.FC = () => {
         op => op.machineId === parseInt(machine.id)
       );
 
-      // ИСПРАВЛЕНО: Фильтруем смены только по ТЕКУЩЕЙ операции И времени назначения
+      // Фильтруем смены по текущей операции
       const operationShifts = machine.currentOperationDetails 
         ? getOperationShifts(
             machine.id, 
             machine.currentOperationDetails, 
-            todayShifts || [],
-            machine.lastFreedAt // ✅ Передаем время назначения операции
+            todayShifts || []
           )
         : [];
 
@@ -403,7 +505,7 @@ export const ActiveMachinesMonitor: React.FC = () => {
           ...machine.currentOperationDetails,
           progress: calculateProgress(assignedOperation, operationShifts),
           totalProduced,
-          targetQuantity: (assignedOperation as any)?.orderId ? 100 : 100 // ИСПРАВЛЕНО: убрана ссылка на order.quantity
+          targetQuantity: 30 // Пока фиксированное значение
         };
       }
 
@@ -416,28 +518,48 @@ export const ActiveMachinesMonitor: React.FC = () => {
     setShowShiftForm(true);
   };
 
+  const handleForceRefresh = async () => {
+    // 🆕 Используем новый API для принудительной синхронизации
+    try {
+      await synchronizationApi.syncAllActiveOperations();
+      message.success('🔄 Синхронизация завершена!');
+    } catch (error) {
+      console.error('Ошибка синхронизации:', error);
+      message.warning('Обновляем данные обычным способом...');
+    }
+    
+    // Обычное обновление
+    queryClient.invalidateQueries({ queryKey: ['shifts'] });
+    queryClient.invalidateQueries({ queryKey: ['shifts', 'today'] });
+    queryClient.invalidateQueries({ queryKey: ['machines'] }); // ИСПРАВЛЕНО
+    queryClient.invalidateQueries({ queryKey: ['operations'] });
+    message.info('Данные обновляются...');
+  };
+
   const handleShiftFormClose = () => {
     setShowShiftForm(false);
     setSelectedMachineId(undefined);
   };
 
-  // ИСПРАВЛЕНО: Добавлена инвалидация кэша для автообновления данных
   const handleShiftFormSuccess = () => {
     message.success(t('shifts.record_created'));
     
     // Инвалидируем все связанные запросы для обновления данных
     queryClient.invalidateQueries({ queryKey: ['shifts'] });
     queryClient.invalidateQueries({ queryKey: ['shifts', 'today'] });
-    queryClient.invalidateQueries({ queryKey: ['machines-availability'] });
+    queryClient.invalidateQueries({ queryKey: ['machines'] }); // ИСПРАВЛЕНО
     queryClient.invalidateQueries({ queryKey: ['operations'] });
     
-    console.log('🔄 Кэш инвалидирован, данные обновляются...');
+    // Принудительно обновляем данные смен
+    refetchShifts();
+    
+    console.log('🔄 Кэш инвалидирован и данные принудительно обновлены!');
     
     handleShiftFormClose();
   };
 
   const handleOperationClick = (operation: any) => {
-    setSelectedOperation(operation);
+    setSelectedOperationDetail(operation);
     setShowOperationDetail(true);
   };
 
@@ -458,8 +580,6 @@ export const ActiveMachinesMonitor: React.FC = () => {
       default: return t('shifts.idle');
     }
   };
-
-
 
   if (isLoading) {
     return (
@@ -496,46 +616,154 @@ export const ActiveMachinesMonitor: React.FC = () => {
 
   return (
     <div>
+      {/* ОТЛАДОЧНЫЕ КОМПОНЕНТЫ */}
+      <SimpleProductionView />
+      
+      {/* 🆕 НОВОЕ: Отображение выбранной операции с real-time обновлениями */}
+      {currentSelectedOperation && (
+        <Card 
+          style={{ 
+            marginBottom: 16,
+            borderColor: currentSelectedOperation.syncedWithShifts ? '#52c41a' : '#faad14',
+            backgroundColor: currentSelectedOperation.syncedWithShifts ? '#f6ffed' : '#fffbe6',
+            borderRadius: '12px',
+            borderWidth: 2
+          }}
+          size="small"
+          extra={
+            <Space>
+              {currentSelectedOperation.syncedWithShifts && (
+                <Tag color="green" style={{ fontSize: '10px' }}>
+                  ✅ Синхронизировано
+                </Tag>
+              )}
+              <Button 
+                type="link" 
+                size="small"
+                onClick={() => {
+                  setRealtimeAssignedOperation(null);
+                  localStorage.removeItem('selectedOperation');
+                  window.dispatchEvent(new CustomEvent('operationCleared'));
+                  console.log('🗑️ Операция очищена из мониторинга смен');
+                }}
+              >
+                Очистить
+              </Button>
+            </Space>
+          }
+        >
+          <Row justify="space-between" align="middle">
+            <Col>
+              <Space>
+                <Text strong style={{ color: currentSelectedOperation.syncedWithShifts ? '#52c41a' : '#faad14', fontSize: '16px' }}>
+                  🎆 Операция назначена в Производстве:
+                </Text>
+                <Text strong style={{ fontSize: '16px' }}>
+                  #{currentSelectedOperation.operationNumber}
+                </Text>
+                <Text type="secondary">
+                  для станка {currentSelectedOperation.machineName}
+                </Text>
+              </Space>
+            </Col>
+            <Col>
+              {currentSelectedOperation.syncedWithShifts ? (
+                <Tag color="success" style={{ fontSize: '12px' }}>
+                  ✅ Отображено в карточке станка
+                </Tag>
+              ) : (
+                <Tag color="warning" style={{ fontSize: '12px' }}>
+                  ⚠️ Требует синхронизации
+                </Tag>
+              )}
+            </Col>
+          </Row>
+          
+          {currentSelectedOperation.synchronizationStatus && (
+            <div style={{ marginTop: '8px', fontSize: '11px', color: '#666' }}>
+              Прогресс синхронизации: {currentSelectedOperation.synchronizationStatus.progress.toFixed(1)}% 
+              ({currentSelectedOperation.synchronizationStatus.totalProduced}/{currentSelectedOperation.synchronizationStatus.targetQuantity})
+            </div>
+          )}
+        </Card>
+      )}
+        
       <div style={{ marginBottom: 24 }}>
-        <Title level={3}>
-          <ToolOutlined /> {t('shifts.monitoring')}
-        </Title>
-        <Text type="secondary">
-          {t('shifts.active_machines_status')}
-        </Text>
+        <Row justify="space-between" align="middle">
+          <Col>
+            <Title level={3}>
+              <ToolOutlined /> {t('shifts.monitoring')}
+            </Title>
+            <Text type="secondary">
+              {t('shifts.active_machines_status')}
+            </Text>
+          </Col>
+          <Col>
+            <Space>
+              <Button
+                icon={<SyncOutlined />}
+                onClick={handleForceRefresh}
+                type="default"
+              >
+                🆕 Синхронизировать данные
+              </Button>
+              <Text type="secondary" style={{ fontSize: '12px' }}>
+                Автообновление: 3-5 сек
+              </Text>
+            </Space>
+          </Col>
+        </Row>
       </div>
 
       <Row gutter={[16, 16]}>
-        {activeMachines.map(machine => (
-          <Col xs={24} sm={12} lg={8} xl={6} key={machine.id}>
-            <Card
-              title={
-                <Space>
-                  <Badge 
-                    status={getMachineStatusColor(machine.status) as any} 
-                    text={machine.machineName}
-                  />
-                  <Tag color="blue">{getMachineTypeLabel(machine.machineType, t)}</Tag>
-                </Space>
-              }
-              extra={
-                <Tag color={getMachineStatusColor(machine.status)}>
-                  {getMachineStatusText(machine.status)}
-                </Tag>
-              }
-              actions={[
-                <Tooltip title={t('shifts.shift_record')}>
-                  <Button
-                    type="primary"
-                    icon={<FileTextOutlined />}
-                    onClick={() => handleCreateShiftRecord(machine.id)}
-                  >
-                    {t('shifts.shift_record')}
-                  </Button>
-                </Tooltip>
-              ]}
-              size="small"
-            >
+        {activeMachines.map(machine => {
+          // 🆕 Проверяем, соответствует ли станок выбранной операции (с поддержкой real-time)
+          const isSelectedMachine = currentSelectedOperation && 
+            machine.machineName === currentSelectedOperation.machineName;
+          
+          return (
+            <Col xs={24} sm={12} lg={8} xl={6} key={machine.id}>
+              <Card
+                title={
+                  <Space>
+                    <Badge 
+                      status={getMachineStatusColor(machine.status) as any} 
+                      text={machine.machineName}
+                    />
+                    <Tag color="blue">{getMachineTypeLabel(machine.machineType, t)}</Tag>
+                    {/* 🆕 НОВОЕ: Индикатор выбранной операции */}
+                    {isSelectedMachine && (
+                      <Tag color="success" style={{ fontSize: '10px' }}>
+                        🎆 ВЫБРАНО
+                      </Tag>
+                    )}
+                  </Space>
+                }
+                extra={
+                  <Tag color={getMachineStatusColor(machine.status)}>
+                    {getMachineStatusText(machine.status)}
+                  </Tag>
+                }
+                actions={[
+                  <Tooltip title={t('shifts.shift_record')}>
+                    <Button
+                      type="primary"
+                      icon={<FileTextOutlined />}
+                      onClick={() => handleCreateShiftRecord(machine.id)}
+                    >
+                      {t('shifts.shift_record')}
+                    </Button>
+                  </Tooltip>
+                ]}
+                size="small"
+                style={{
+                  // 🆕 НОВОЕ: Подсвечиваем карточку выбранного станка
+                  borderColor: isSelectedMachine ? '#52c41a' : undefined,
+                  borderWidth: isSelectedMachine ? 2 : 1,
+                  backgroundColor: isSelectedMachine ? '#f6ffed' : undefined,
+                  boxShadow: isSelectedMachine ? '0 4px 16px rgba(82, 196, 26, 0.3)' : undefined
+                }}
+              >
               {machine.currentOperationDetails ? (
                 <div>
                   <div 
@@ -562,15 +790,22 @@ export const ActiveMachinesMonitor: React.FC = () => {
                     </Text>
                   </div>
 
+                  {/* ИСПРАВЛЕННОЕ: Улучшенный индикатор прогресса с проверкой завершения */}
                   <div style={{ marginBottom: 12 }}>
                     <Text>{t('shifts.progress_execution')}:</Text>
                     <Progress 
                       percent={Math.round(machine.currentOperationDetails.progress || 0)} 
                       size="small"
-                      status={(machine.currentOperationDetails.progress || 0) > 80 ? 'success' : 'active'}
+                      status={(machine.currentOperationDetails.progress || 0) >= 100 ? 'success' : 'active'}
+                      strokeColor={(machine.currentOperationDetails.progress || 0) >= 100 ? '#52c41a' : undefined}
                     />
                     <Text type="secondary" style={{ fontSize: '11px' }}>
                       {machine.currentOperationDetails.totalProduced || 0} {t('shifts.of')} {machine.currentOperationDetails.targetQuantity || 0} {t('shifts.parts_suffix')}
+                      {(machine.currentOperationDetails.progress || 0) >= 100 && (
+                        <Tag color="green" style={{ marginLeft: 8, fontSize: '10px' }}>
+                          ✅ ВЫПОЛНЕНО
+                        </Tag>
+                      )}
                     </Text>
                   </div>
 
@@ -584,6 +819,10 @@ export const ActiveMachinesMonitor: React.FC = () => {
 
                   <div>
                     <Text strong>{t('shifts.production_by_operation')}:</Text>
+                    <br />
+                    <Tag color="purple" style={{ fontSize: '10px', marginBottom: '8px' }}>
+                      📋 {machine.currentOperationDetails.orderDrawingNumber}
+                    </Tag>
                     {/* НОВОЕ: Индикатор новой операции */}
                     {(machine.currentOperationProduction?.dayShift.quantity || 0) === 0 && 
                      (machine.currentOperationProduction?.nightShift.quantity || 0) === 0 && (
@@ -642,6 +881,42 @@ export const ActiveMachinesMonitor: React.FC = () => {
                           </div>
                         </Col>
                       </Row>
+                      
+                      {/* НОВОЕ: Общая сумма выполненного объема */}
+                      <div style={{ 
+                        marginTop: '12px', 
+                        padding: '10px', 
+                        backgroundColor: '#f0f9ff', 
+                        borderRadius: '8px',
+                        border: '2px solid #1890ff'
+                      }}>
+                        <div style={{ textAlign: 'center' }}>
+                          <Text strong style={{ fontSize: '14px', color: '#1890ff' }}>
+                            📊 ОБЩИЙ ОБЪЕМ
+                          </Text>
+                          <br />
+                          <Text strong style={{ fontSize: '24px', color: '#1890ff' }}>
+                            {((machine.currentOperationProduction?.dayShift.quantity || 0) + 
+                              (machine.currentOperationProduction?.nightShift.quantity || 0))}
+                          </Text>
+                          <Text type="secondary" style={{ fontSize: '12px', marginLeft: '4px' }}>
+                            деталей
+                          </Text>
+                          <br />
+                          <div style={{ marginTop: '4px' }}>
+                            <Text type="secondary" style={{ fontSize: '11px' }}>
+                              День: {machine.currentOperationProduction?.dayShift.quantity || 0} + 
+                              Ночь: {machine.currentOperationProduction?.nightShift.quantity || 0}
+                            </Text>
+                          </div>
+                          {/* 🆕 Индикатор синхронизации */}
+                          <div style={{ marginTop: '4px' }}>
+                            <Text type="secondary" style={{ fontSize: '10px', color: '#52c41a' }}>
+                              🔄 Синхронизируется автоматически
+                            </Text>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -659,7 +934,8 @@ export const ActiveMachinesMonitor: React.FC = () => {
               )}
             </Card>
           </Col>
-        ))}
+          );
+        })}
       </Row>
 
       <ShiftForm
@@ -671,9 +947,29 @@ export const ActiveMachinesMonitor: React.FC = () => {
 
       <OperationDetailModal
         visible={showOperationDetail}
-        operation={selectedOperation}
+        operation={selectedOperationDetail}
         onClose={() => setShowOperationDetail(false)}
+      />
+
+      {/* НОВОЕ: Система уведомлений о завершении операций */}
+      <OperationCompletionNotification
+        completedOperations={pendingNotifications}
+        onClearNotifications={clearNotifications}
+        machines={activeMachines || []}
+      />
+
+      {/* НОВОЕ: Модальное окно завершения операций */}
+      <OperationCompletionModal
+        visible={completionModalVisible}
+        completedOperation={currentCompletedOperation}
+        onClose={handleCloseModal}
+        onCloseOperation={handleCloseOperation}
+        onContinueOperation={handleContinueOperation}
+        onPlanNewOperation={handlePlanNewOperation}
+        loading={isClosing || isContinuing || isArchiving}
       />
     </div>
   );
 };
+
+export default ActiveMachinesMonitor;

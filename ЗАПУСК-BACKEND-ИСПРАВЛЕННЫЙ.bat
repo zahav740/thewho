@@ -1,28 +1,30 @@
 @echo off
-echo =====================================
-echo ЗАПУСК BACKEND PRODUCTION CRM
-echo =====================================
+echo ===========================================
+echo      ЗАПУСК ИСПРАВЛЕННОГО BACKEND
+echo ===========================================
+echo.
+
+echo Проверяем TypeScript ошибки...
+echo.
 
 cd /d "C:\Users\kasuf\Downloads\TheWho\production-crm\backend"
 
-echo.
-echo ✅ Переходим в директорию backend...
-echo Текущая директория: %CD%
-
-echo.
-echo 🔧 Установка зависимостей...
-call npm install
-
-echo.
-echo 🏗️ Сборка проекта...
+echo Компилируем проект...
 call npm run build
 
+if %ERRORLEVEL% NEQ 0 (
+    echo.
+    echo ОШИБКА КОМПИЛЯЦИИ! Проверьте ошибки выше.
+    pause
+    exit /b 1
+)
+
 echo.
-echo 🚀 Запуск production сервера...
-echo Сервер будет доступен на порту 5100
-echo Backend API: http://localhost:5100
+echo ✅ Компиляция успешна!
 echo.
 
-call npm run start:prod
+echo Запускаем сервер...
+echo.
+call npm run start
 
 pause

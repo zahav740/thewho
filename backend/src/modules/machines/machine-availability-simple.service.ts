@@ -59,7 +59,7 @@ export class MachineAvailabilitySimpleService {
         FROM machines m
         LEFT JOIN operations op ON (
           op."assignedMachine" = m.id 
-          AND op.status IN ('in_progress', 'assigned')
+          AND op.status IN ('IN_PROGRESS', 'ASSIGNED')
         )
         LEFT JOIN orders ord ON op."orderId" = ord.id
         WHERE m."isActive" = true
@@ -118,7 +118,7 @@ export class MachineAvailabilitySimpleService {
         FROM machines m
         LEFT JOIN operations op ON (
           op."assignedMachine" = m.id 
-          AND op.status IN ('in_progress', 'assigned')
+          AND op.status IN ('IN_PROGRESS', 'ASSIGNED')
         )
         LEFT JOIN orders ord ON op."orderId" = ord.id
         WHERE m.code = $1 AND m."isActive" = true
@@ -192,7 +192,7 @@ export class MachineAvailabilitySimpleService {
         FROM machines m
         LEFT JOIN operations op ON (
           op."assignedMachine" = m.id 
-          AND op.status IN ('in_progress', 'assigned')
+          AND op.status IN ('IN_PROGRESS', 'ASSIGNED')
         )
         LEFT JOIN orders ord ON op."orderId" = ord.id
         WHERE m."isActive" = true AND m."isOccupied" = false
@@ -249,7 +249,7 @@ export class MachineAvailabilitySimpleService {
         FROM operations op
         INNER JOIN machines m ON op."assignedMachine" = m.id
         LEFT JOIN orders ord ON op."orderId" = ord.id
-        WHERE op.status IN ('in_progress', 'assigned')
+        WHERE op.status IN ('IN_PROGRESS', 'ASSIGNED')
         ORDER BY op."assignedAt" DESC
       `);
       
@@ -295,7 +295,7 @@ export class MachineAvailabilitySimpleService {
         SET 
           "assignedMachine" = $1,
           "assignedAt" = NOW(),
-          status = 'assigned',
+          status = 'ASSIGNED',
           "updatedAt" = NOW()
         WHERE id = $2
       `, [machineId, operationIdInt]);
