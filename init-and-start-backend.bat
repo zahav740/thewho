@@ -1,9 +1,0 @@
-@echo off
-echo Initializing Production CRM Backend with database setup...
-cd backend
-call npm install
-echo Running database migrations...
-call npm run db:init
-echo Starting server...
-call npm run start:dev
-pause
