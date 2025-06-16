@@ -1,0 +1,305 @@
+/**
+ * @file: CalendarStyles.css
+ * @description: Стили для современного календаря производства
+ * @created: 2025-06-16
+ */
+
+/* Основные стили календаря */
+.modern-calendar-container {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Карточка станка */
+.machine-card {
+  transition: all 0.3s ease;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.machine-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.machine-card.busy {
+  border-left: 4px solid #ff4d4f;
+}
+
+.machine-card.moderate {
+  border-left: 4px solid #faad14;
+}
+
+.machine-card.available {
+  border-left: 4px solid #52c41a;
+}
+
+/* Мини-календарь загрузки */
+.mini-calendar {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  margin: 8px 0;
+}
+
+.mini-calendar-day {
+  aspect-ratio: 1;
+  border-radius: 3px;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.mini-calendar-day:hover {
+  transform: scale(1.1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.mini-calendar-day.today {
+  border: 2px solid #1890ff;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+}
+
+/* Цвета для статусов операций */
+.status-completed {
+  background: linear-gradient(135deg, #52c41a, #73d13d);
+}
+
+.status-finished {
+  background: linear-gradient(135deg, #13c2c2, #36cfc9);
+}
+
+.status-in-progress {
+  background: linear-gradient(135deg, #1890ff, #40a9ff);
+}
+
+.status-planned {
+  background: linear-gradient(135deg, #faad14, #ffc53d);
+}
+
+.status-free {
+  background: linear-gradient(135deg, #d9d9d9, #f0f0f0);
+}
+
+/* Анимации для прогресс-баров */
+.machine-progress {
+  transition: width 0.5s ease;
+}
+
+.machine-progress.high-utilization {
+  background: linear-gradient(90deg, #ff4d4f, #ff7875);
+}
+
+.machine-progress.medium-utilization {
+  background: linear-gradient(90deg, #faad14, #ffc53d);
+}
+
+.machine-progress.low-utilization {
+  background: linear-gradient(90deg, #52c41a, #73d13d);
+}
+
+/* Статистические карточки */
+.stats-card {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.7));
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  transition: all 0.3s ease;
+}
+
+.stats-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+/* Режим таймлайна */
+.timeline-container {
+  padding: 16px;
+}
+
+.timeline-item {
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 8px;
+  transition: all 0.2s ease;
+}
+
+.timeline-item:hover {
+  background-color: rgba(24, 144, 255, 0.05);
+  transform: translateX(4px);
+}
+
+/* Фильтры */
+.filter-bar {
+  background: linear-gradient(135deg, #f0f9ff, #e6f7ff);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+  border: 1px solid #d1e9ff;
+}
+
+/* Теги с улучшенным дизайном */
+.modern-tag {
+  border-radius: 16px;
+  padding: 4px 12px;
+  font-weight: 500;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
+}
+
+.modern-tag:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.modern-tag.shift-day {
+  background: linear-gradient(135deg, #ffa940, #ffb366);
+  color: #fff;
+}
+
+.modern-tag.shift-night {
+  background: linear-gradient(135deg, #722ed1, #9254de);
+  color: #fff;
+}
+
+.modern-tag.operation-planned {
+  background: linear-gradient(135deg, #1890ff, #40a9ff);
+  color: #fff;
+}
+
+.modern-tag.operation-completed {
+  background: linear-gradient(135deg, #52c41a, #73d13d);
+  color: #fff;
+}
+
+/* Всплывающие подсказки */
+.custom-tooltip {
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(10px);
+  border-radius: 8px;
+  border: none;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+.custom-tooltip .ant-tooltip-inner {
+  background: transparent;
+  color: #fff;
+}
+
+.custom-tooltip .ant-tooltip-arrow::before {
+  background: rgba(0, 0, 0, 0.85);
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  .machine-card {
+    margin-bottom: 16px;
+  }
+  
+  .mini-calendar {
+    grid-template-columns: repeat(5, 1fr);
+  }
+  
+  .stats-card {
+    margin-bottom: 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  .filter-bar {
+    padding: 12px;
+  }
+  
+  .machine-card .ant-card-head-title {
+    font-size: 14px;
+  }
+  
+  .mini-calendar {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* Тёмная тема */
+@media (prefers-color-scheme: dark) {
+  .machine-card {
+    background: #1f1f1f;
+    border-color: #303030;
+  }
+  
+  .stats-card {
+    background: linear-gradient(135deg, rgba(31, 31, 31, 0.9), rgba(31, 31, 31, 0.7));
+    border-color: #303030;
+  }
+  
+  .filter-bar {
+    background: linear-gradient(135deg, #1f1f1f, #262626);
+    border-color: #303030;
+  }
+}
+
+/* Кастомные цвета для типов станков */
+.machine-type-milling {
+  background: linear-gradient(135deg, #1890ff, #40a9ff);
+}
+
+.machine-type-turning {
+  background: linear-gradient(135deg, #52c41a, #73d13d);
+}
+
+.machine-type-drilling {
+  background: linear-gradient(135deg, #faad14, #ffc53d);
+}
+
+/* Анимация загрузки */
+.loading-shimmer {
+  animation: shimmer 2s infinite linear;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* Pulse анимация для активных операций */
+.operation-active {
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(24, 144, 255, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(24, 144, 255, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(24, 144, 255, 0);
+  }
+}
+
+/* Улучшенные прогресс-бары */
+.modern-progress .ant-progress-bg {
+  background: linear-gradient(90deg, #1890ff, #40a9ff);
+  border-radius: 4px;
+}
+
+.modern-progress.completed .ant-progress-bg {
+  background: linear-gradient(90deg, #52c41a, #73d13d);
+}
+
+.modern-progress.warning .ant-progress-bg {
+  background: linear-gradient(90deg, #faad14, #ffc53d);
+}
+
+.modern-progress.danger .ant-progress-bg {
+  background: linear-gradient(90deg, #ff4d4f, #ff7875);
+}

@@ -1,10 +1,9 @@
 /**
- * @file: OperationCompletionModal.tsx
- * @description: Модальное окно уведомления о завершении операции
- * @dependencies: antd, PlanningModal
- * @created: 2025-06-12
+ * @file: FixedOperationCompletionModal.tsx
+ * @description: ИСПРАВЛЕННОЕ модальное окно завершения операции с правильными данными
+ * @created: 2025-06-16
  */
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Modal,
   Button,
@@ -16,14 +15,16 @@ import {
   Space,
   Typography,
   Tag,
-  Alert
+  Alert,
+  Progress
 } from 'antd';
 import {
   CheckCircleOutlined,
   PlayCircleOutlined,
   StopOutlined,
   ToolOutlined,
-  ClockCircleOutlined
+  ClockCircleOutlined,
+  WarningOutlined
 } from '@ant-design/icons';
 import PlanningModal from '../../../components/PlanningModal/PlanningModal';
 
@@ -68,11 +69,47 @@ export const OperationCompletionModal: React.FC<OperationCompletionModalProps> =
   onPlanNewOperation
 }) => {
   const [showPlanningModal, setShowPlanningModal] = useState(false);
+  const [isDataValid, setIsDataValid] = useState(true);
+
+  // Проверяем данные при открытии модального окна
+  useEffect(() => {
+    if (data && visible) {
+      console.log('🔍 ПРОВЕРКА ДАННЫХ МОДАЛЬНОГО ОКНА:', {
+        original: data,
+        targetQuantity: data.operationDetails.targetQuantity,
+        completedQuantity: data.operationDetails.completedQuantity,
+        dayShift: data.dayShift.quantity,
+        nightShift: data.nightShift.quantity,
+        totalCalculated: data.dayShift.quantity + data.nightShift.quantity
+      });
+
+      // Проверяем корректность данных
+      const totalCalculated = data.dayShift.quantity + data.nightShift.quantity;
+      const isValid = totalCalculated === data.operationDetails.completedQuantity;
+      
+      if (!isValid) {
+        console.warn('❌ ОБНАРУЖЕНА ОШИБКА В ДАННЫХ:', {
+          'Указано выполнено': data.operationDetails.completedQuantity,
+          'Расчетное выполнено': totalCalculated,
+          'День': data.dayShift.quantity,
+          'Ночь': data.nightShift.quantity
+        });
+      }
+      
+      setIsDataValid(isValid);
+    }
+  }, [data, visible]);
 
   if (!data) return null;
 
+  // ИСПРАВЛЕННЫЕ РАСЧЕТЫ
   const totalCompleted = data.dayShift.quantity + data.nightShift.quantity;
-  const progressPercent = Math.round((totalCompleted / data.operationDetails.targetQuantity) * 100);
+  const correctedCompletedQuantity = totalCompleted; // Используем реальные данные смен
+  const progressPercent = Math.round((correctedCompletedQuantity / data.operationDetails.targetQuantity) * 100);
+  
+  // Проверяем достижение цели
+  const isTargetReached = correctedCompletedQuantity >= data.operationDetails.targetQuantity;
+  const isOverproduced = correctedCompletedQuantity > data.operationDetails.targetQuantity;
 
   const handlePlanNewOperation = () => {
     onClose();
@@ -87,16 +124,16 @@ export const OperationCompletionModal: React.FC<OperationCompletionModalProps> =
     lastFreedAt: new Date().toISOString(),
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
-  } as any; // Используем any для совместимости с PlanningModal
+  } as any;
 
   return (
     <>
       <Modal
         title={
           <Space>
-            <CheckCircleOutlined style={{ color: '#52c41a', fontSize: '24px' }} />
+            <CheckCircleOutlined style={{ color: isTargetReached ? '#52c41a' : '#faad14', fontSize: '24px' }} />
             <span style={{ fontSize: '20px', fontWeight: 'bold' }}>
-              Операция выполнена!
+              {isTargetReached ? '🎉 Операция завершена!' : '⚠️ Операция в процессе'}
             </span>
           </Space>
         }
@@ -106,34 +143,88 @@ export const OperationCompletionModal: React.FC<OperationCompletionModalProps> =
         footer={null}
         centered
       >
+        {/* Предупреждение о неточных данных */}
+        {!isDataValid && (
+          <Alert
+            message="⚠️ Обнаружена ошибка в данных!"
+            description={
+              <div>
+                <Text>Данные из БД содержат ошибки. Используются исправленные расчеты:</Text>
+                <ul style={{ marginTop: 8, marginBottom: 0 }}>
+                  <li>Исходные данные: {data.operationDetails.completedQuantity} деталей</li>
+                  <li>Исправленные данные: {correctedCompletedQuantity} деталей</li>
+                  <li>Расчет: День ({data.dayShift.quantity}) + Ночь ({data.nightShift.quantity}) = {correctedCompletedQuantity}</li>
+                </ul>
+              </div>
+            }
+            type="warning"
+            showIcon
+            style={{ marginBottom: 16 }}
+          />
+        )}
+
         <Result
-          status="success"
-          title={`Операция ${data.operationDetails.operationNumber} завершена`}
-          subTitle={`На станке ${data.machineName} выполнено ${totalCompleted} из ${data.operationDetails.targetQuantity} деталей`}
+          status={isTargetReached ? "success" : "info"}
+          title={
+            isTargetReached 
+              ? `Операция ${data.operationDetails.operationNumber} завершена` 
+              : `Операция ${data.operationDetails.operationNumber} в процессе`
+          }
+          subTitle={
+            <div>
+              <Text>На станке {data.machineName} выполнено </Text>
+              <Text strong style={{ color: isTargetReached ? '#52c41a' : '#faad14' }}>
+                {correctedCompletedQuantity} из {data.operationDetails.targetQuantity}
+              </Text>
+              <Text> деталей</Text>
+              {isOverproduced && (
+                <div style={{ marginTop: 4 }}>
+                  <Tag color="blue">Перевыполнение на {correctedCompletedQuantity - data.operationDetails.targetQuantity} деталей</Tag>
+                </div>
+              )}
+            </div>
+          }
           style={{ padding: '20px 0' }}
         />
 
-        <Alert
-          message="🎉 Поздравляем с завершением операции!"
-          description={`Чертеж ${data.operationDetails.orderDrawingNumber} - операция ${data.operationDetails.operationNumber} достигла целевого количества деталей.`}
-          type="success"
-          showIcon
-          style={{ marginBottom: 24, borderRadius: '8px' }}
-        />
+        {isTargetReached && (
+          <Alert
+            message="🎉 Поздравляем с завершением операции!"
+            description={`Чертеж ${data.operationDetails.orderDrawingNumber} - операция ${data.operationDetails.operationNumber} достигла целевого количества деталей.`}
+            type="success"
+            showIcon
+            style={{ marginBottom: 24, borderRadius: '8px' }}
+          />
+        )}
 
         <Row gutter={[16, 16]} style={{ marginBottom: 32 }}>
           <Col span={8}>
-            <Card size="small" style={{ textAlign: 'center', borderRadius: '8px', backgroundColor: '#f6ffed' }}>
+            <Card size="small" style={{ 
+              textAlign: 'center', 
+              borderRadius: '8px', 
+              backgroundColor: isTargetReached ? '#f6ffed' : '#fff7e6' 
+            }}>
               <Statistic
                 title="Выполнено деталей"
-                value={totalCompleted}
+                value={correctedCompletedQuantity}
                 suffix={`/ ${data.operationDetails.targetQuantity}`}
-                valueStyle={{ color: '#52c41a', fontSize: '24px' }}
-                prefix={<CheckCircleOutlined />}
+                valueStyle={{ 
+                  color: isTargetReached ? '#52c41a' : '#faad14', 
+                  fontSize: '24px' 
+                }}
+                prefix={isTargetReached ? <CheckCircleOutlined /> : <ClockCircleOutlined />}
               />
-              <Tag color="green" style={{ marginTop: 8 }}>
+              <Tag color={isTargetReached ? 'green' : 'orange'} style={{ marginTop: 8 }}>
                 {progressPercent}% выполнено
               </Tag>
+              <div style={{ marginTop: 8 }}>
+                <Progress
+                  percent={Math.min(progressPercent, 100)}
+                  size="small"
+                  strokeColor={isTargetReached ? '#52c41a' : '#faad14'}
+                  showInfo={false}
+                />
+              </div>
             </Card>
           </Col>
           <Col span={8}>
@@ -161,43 +252,58 @@ export const OperationCompletionModal: React.FC<OperationCompletionModalProps> =
         </Row>
 
         <Card 
-          title="Что делать дальше?"
+          title={
+            <Space>
+              <ToolOutlined />
+              {isTargetReached ? "Операция завершена! Что делать дальше?" : "Операция в процессе. Доступные действия:"}
+            </Space>
+          }
           style={{ borderRadius: '12px', backgroundColor: '#fafafa' }}
         >
           <Text style={{ fontSize: '16px', marginBottom: 24, display: 'block' }}>
-            Операция завершена успешно. Выберите дальнейшие действия:
+            {isTargetReached 
+              ? "Целевое количество достигнуто. Выберите дальнейшие действия:"
+              : `Осталось выполнить: ${data.operationDetails.targetQuantity - correctedCompletedQuantity} деталей`
+            }
           </Text>
 
           <Space direction="vertical" size="large" style={{ width: '100%' }}>
-            <Button
-              type="primary"
-              size="large"
-              icon={<StopOutlined />}
-              onClick={() => {
-                onCloseOperation();
-                onClose();
-              }}
-              block
-              style={{ 
-                height: '60px', 
-                fontSize: '16px', 
-                borderRadius: '8px',
-                backgroundColor: '#52c41a',
-                borderColor: '#52c41a'
-              }}
-            >
-              <div style={{ textAlign: 'left' }}>
-                <div style={{ fontWeight: 'bold' }}>Закрыть операцию</div>
-                <div style={{ fontSize: '12px', opacity: 0.9 }}>
-                  Операция завершена, станок освобожден, результат сохранен
+            {isTargetReached && (
+              <Button
+                type="primary"
+                size="large"
+                icon={<StopOutlined />}
+                onClick={() => {
+                  console.log('✅ Закрытие операции с исправленными данными:', {
+                    targetQuantity: data.operationDetails.targetQuantity,
+                    completedQuantity: correctedCompletedQuantity
+                  });
+                  onCloseOperation();
+                  onClose();
+                }}
+                block
+                style={{ 
+                  height: '60px', 
+                  fontSize: '16px', 
+                  borderRadius: '8px',
+                  backgroundColor: '#52c41a',
+                  borderColor: '#52c41a'
+                }}
+              >
+                <div style={{ textAlign: 'left' }}>
+                  <div style={{ fontWeight: 'bold' }}>Закрыть операцию</div>
+                  <div style={{ fontSize: '12px', opacity: 0.9 }}>
+                    Операция завершена, станок освобожден, результат сохранен
+                  </div>
                 </div>
-              </div>
-            </Button>
+              </Button>
+            )}
 
             <Button
               size="large"
               icon={<PlayCircleOutlined />}
               onClick={() => {
+                console.log('🔄 Продолжение операции:', { correctedCompletedQuantity });
                 onContinueOperation();
                 onClose();
               }}
@@ -211,30 +317,47 @@ export const OperationCompletionModal: React.FC<OperationCompletionModalProps> =
               <div style={{ textAlign: 'left' }}>
                 <div style={{ fontWeight: 'bold' }}>Продолжить операцию</div>
                 <div style={{ fontSize: '12px', opacity: 0.7 }}>
-                  Продолжить накапливать результат (перевыполнение плана)
+                  {isTargetReached 
+                    ? "Продолжить накапливать результат (перевыполнение плана)"
+                    : "Продолжить работу до достижения целевого количества"
+                  }
                 </div>
               </div>
             </Button>
 
-            <Button
-              size="large"
-              icon={<ToolOutlined />}
-              onClick={handlePlanNewOperation}
-              block
-              style={{ 
-                height: '60px', 
-                fontSize: '16px', 
-                borderRadius: '8px'
-              }}
-            >
-              <div style={{ textAlign: 'left' }}>
-                <div style={{ fontWeight: 'bold' }}>Спланировать новую операцию</div>
-                <div style={{ fontSize: '12px', opacity: 0.7 }}>
-                  Завершить текущую и назначить следующую операцию
+            {isTargetReached && (
+              <Button
+                size="large"
+                icon={<ToolOutlined />}
+                onClick={handlePlanNewOperation}
+                block
+                style={{ 
+                  height: '60px', 
+                  fontSize: '16px', 
+                  borderRadius: '8px'
+                }}
+              >
+                <div style={{ textAlign: 'left' }}>
+                  <div style={{ fontWeight: 'bold' }}>Спланировать новую операцию</div>
+                  <div style={{ fontSize: '12px', opacity: 0.7 }}>
+                    Завершить текущую и назначить следующую операцию
+                  </div>
                 </div>
-              </div>
-            </Button>
+              </Button>
+            )}
           </Space>
+
+          {/* Кнопка отладки */}
+          <div style={{ marginTop: 16, padding: 8, backgroundColor: '#f5f5f5', borderRadius: 4 }}>
+            <Text type="secondary" style={{ fontSize: '12px' }}>
+              <strong>Отладочная информация:</strong><br/>
+              • Цель: {data.operationDetails.targetQuantity} деталей<br/>
+              • Выполнено (исправлено): {correctedCompletedQuantity} деталей<br/>
+              • Исходные данные БД: {data.operationDetails.completedQuantity} деталей<br/>
+              • Прогресс: {progressPercent}%<br/>
+              • Достигнута цель: {isTargetReached ? 'Да' : 'Нет'}
+            </Text>
+          </div>
         </Card>
       </Modal>
 

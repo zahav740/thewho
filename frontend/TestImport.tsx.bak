@@ -1,0 +1,22 @@
+// Тестовый файл для проверки импорта OperationCompletionModal
+import React from 'react';
+import { OperationCompletionModal } from '../../../components/OperationCompletion';
+
+// Тест 1: Проверяем, что компонент можно импортировать
+console.log('✅ OperationCompletionModal импортирован успешно:', OperationCompletionModal);
+
+// Тест 2: Проверяем тип компонента
+const TestComponent: React.FC = () => {
+  return (
+    <OperationCompletionModal
+      visible={false}
+      completedOperation={null}
+      onClose={() => {}}
+      onCloseOperation={() => {}}
+      onContinueOperation={() => {}}
+      onPlanNewOperation={() => {}}
+    />
+  );
+};
+
+export default TestComponent;

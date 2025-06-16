@@ -90,7 +90,7 @@ export const useOperationCompletion = (options: OperationCompletionOptions = {})
     onOperationClosed,
     onOperationContinued,
     onNewOperationPlanned,
-    checkInterval = 10000,
+    checkInterval = 15000, // ИСПРАВЛЕНО: Увеличили интервал проверки до 15 секунд
     targetQuantity = 30,
   } = options;
 
@@ -177,44 +177,7 @@ export const useOperationCompletion = (options: OperationCompletionOptions = {})
     },
   });
 
-  // Обработка новых завершенных операций
-  useEffect(() => {
-    if (completedOperations && completedOperations.length > 0) {
-      // Фильтруем только действительно завершённые операции
-      const reallyCompletedOperations = completedOperations.filter(
-        op => op.progressPercentage >= 100 && op.completedQuantity >= op.targetQuantity
-      );
-      
-      const newCompletions = reallyCompletedOperations.filter(
-        op => !pendingCompletions.some(p => p.id === op.id)
-      );
-      
-      if (newCompletions.length > 0) {
-        // Обновляем список ожидающих
-        setPendingCompletions(prev => [...prev, ...newCompletions]);
-        
-        // Показываем системное уведомление
-        newCompletions.forEach(op => {
-          notification.success({
-            message: '🎉 Операция завершена!',
-            description: `Операция ${op.operationNumber} на станке ${op.machineName} достигла планового количества`,
-            placement: 'topRight',
-            duration: 6,
-            onClick: () => {
-              handleShowCompletion(op);
-            },
-          });
-        });
-        
-        // Автоматически показываем модальное окно для первой операции
-        if (!completionModalVisible && newCompletions.length > 0) {
-          handleShowCompletion(newCompletions[0]);
-        }
-      }
-    }
-  }, [completedOperations, pendingCompletions, completionModalVisible]);
-
-  // Обработчики действий
+  // Обработчики действий (ИСПРАВЛЕНО: перемещены перед useEffect)
   const handleShowCompletion = useCallback(async (operation: CompletedOperation) => {
     try {
       // Получаем детальную информацию об операции
@@ -227,6 +190,61 @@ export const useOperationCompletion = (options: OperationCompletionOptions = {})
       setCompletionModalVisible(true);
     }
   }, []);
+
+  // ИСПРАВЛЕНО: Более строгая обработка завершенных операций
+  useEffect(() => {
+    if (completedOperations && completedOperations.length > 0) {
+      console.log('🔍 Проверяем завершенные операции:', completedOperations);
+      
+      // ИСПРАВЛЕНО: Более строгая фильтрация
+      const reallyCompletedOperations = completedOperations.filter(op => {
+        const isCompleted = (
+          op.progressPercentage >= 100 && 
+          op.completedQuantity >= op.targetQuantity &&
+          op.completedQuantity > 0 && // Должно быть больше нуля
+          op.targetQuantity > 0       // Целевое количество должно быть задано
+        );
+        
+        console.log(`📊 Проверка операции ${op.operationNumber}:`, {
+          progressPercentage: op.progressPercentage,
+          completedQuantity: op.completedQuantity,
+          targetQuantity: op.targetQuantity,
+          isCompleted
+        });
+        
+        return isCompleted;
+      });
+      
+      const newCompletions = reallyCompletedOperations.filter(
+        op => !pendingCompletions.some(p => p.id === op.id)
+      );
+      
+      console.log(`✅ Найдено ${newCompletions.length} новых завершенных операций`);
+      
+      if (newCompletions.length > 0) {
+        // Обновляем список ожидающих
+        setPendingCompletions(prev => [...prev, ...newCompletions]);
+        
+        // Показываем системное уведомление
+        newCompletions.forEach(op => {
+          console.log(`🎉 Показываем уведомление о завершении операции ${op.operationNumber}`);
+          notification.success({
+            message: '🎉 Операция завершена!',
+            description: `Операция ${op.operationNumber} на станке ${op.machineName} достигла планового количества (${op.completedQuantity}/${op.targetQuantity})`,
+            placement: 'topRight',
+            duration: 8,
+            onClick: () => {
+              handleShowCompletion(op);
+            },
+          });
+        });
+        
+        // НЕ показываем модальное окно автоматически - только уведомления
+        // Пользователь сам решит, когда открыть модальное окно
+        console.log('ℹ️ Автоматическое открытие модального окна отключено');
+      }
+    }
+  }, [completedOperations, pendingCompletions, handleShowCompletion]);
 
   const handleCloseOperation = useCallback(() => {
     if (currentCompletedOperation) {
@@ -254,23 +272,46 @@ export const useOperationCompletion = (options: OperationCompletionOptions = {})
     setCurrentCompletedOperation(null);
   }, []);
 
-  // Функция для ручной проверки конкретной операции
+  // ИСПРАВЛЕНО: Более строгая проверка конкретной операции
   const checkSpecificOperation = useCallback(async (operationId: string) => {
     try {
+      console.log(`🔍 Проверяем завершение операции: ${operationId}`);
       const details = await operationCompletionApi.getCompletionDetails(operationId);
-      // Проверяем, что операция действительно завершена
-      if (details && details.progressPercentage >= 100 && details.completedQuantity >= details.targetQuantity) {
-        handleShowCompletion(details);
-      } else {
-        console.log('🚫 Операция ещё не завершена:', {
+      
+      if (details) {
+        console.log('📊 Детали операции:', {
           operationId,
-          progress: details?.progressPercentage,
-          completed: details?.completedQuantity,
-          target: details?.targetQuantity
+          operationNumber: details.operationNumber,
+          progress: details.progressPercentage,
+          completed: details.completedQuantity,
+          target: details.targetQuantity,
+          dayShift: details.dayShiftQuantity,
+          nightShift: details.nightShiftQuantity
         });
+        
+        // ИСПРАВЛЕНО: Более строгие критерии завершения
+        const isReallyCompleted = (
+          details.progressPercentage >= 100 && 
+          details.completedQuantity >= details.targetQuantity &&
+          details.completedQuantity > 0 &&
+          details.targetQuantity > 0 &&
+          (details.dayShiftQuantity + details.nightShiftQuantity) >= details.targetQuantity
+        );
+        
+        if (isReallyCompleted) {
+          console.log('✅ Операция действительно завершена, показываем модальное окно');
+          handleShowCompletion(details);
+        } else {
+          console.log('🚫 Операция ещё не завершена или данные некорректны');
+          message.info(`Операция ${details.operationNumber} в процессе: ${details.completedQuantity}/${details.targetQuantity} деталей`);
+        }
+      } else {
+        console.log('❌ Не удалось получить детали операции');
+        message.warning('Не удалось получить информацию об операции');
       }
     } catch (error) {
       console.error('Ошибка при проверке операции:', error);
+      message.error('Ошибка при проверке операции');
     }
   }, [handleShowCompletion]);
 

@@ -176,27 +176,80 @@ export const MachineCard: React.FC<MachineCardProps> = ({
       console.log(`     день: ${shift.dayShiftQuantity}, ночь: ${shift.nightShiftQuantity}`);
     });
 
-    // УПРОЩЕННЫЙ алгоритм сопоставления (ИСПРАВЛЕНИЕ)
-    console.log(`🎯 УПРОЩЕННЫЙ поиск смен для операции ${machine.currentOperationDetails.orderDrawingNumber}`);
+    // ИСПРАВЛЕННЫЙ алгоритм сопоставления - ищем смены ТОЛЬКО для ТЕКУЩЕЙ операции
+    console.log(`🎯 ИСПРАВЛЕННЫЙ поиск смен для операции ${machine.currentOperationDetails.orderDrawingNumber}`);
     
     let matchedShifts: any[] = [];
     let usedAlgorithm = 'none';
     
-    // Алгоритм 1: Поиск по ID станка
-    const algorithm1Results = todayShifts.filter((shift: any) => {
-      const shiftMachineId = parseInt(shift.machineId?.toString() || '0');
-      const currentMachineId = parseInt(machine.id?.toString() || '0');
-      const matches = shiftMachineId === currentMachineId;
+    // Получаем время начала операции (если доступно)
+    const operationStartTime = (machine.currentOperationDetails as any)?.createdAt || (machine.currentOperationDetails as any)?.startedAt;
+    console.log(`📅 Время начала операции: ${operationStartTime}`);
+    
+    // Алгоритм 1: ТОЧНЫЙ поиск по ID операции (если доступен)
+    if (machine.currentOperationId) {
+      const algorithm1Results = todayShifts.filter((shift: any) => {
+        const matchesOperationId = shift.operationId === machine.currentOperationId;
+        console.log(`   🔧 Алгоритм 1 - Смена ${shift.id}: operationId ${shift.operationId} === ${machine.currentOperationId} → ${matchesOperationId}`);
+        return matchesOperationId;
+      });
       
-      console.log(`   🔧 Алгоритм 1 - Смена ${shift.id}: станок ${shiftMachineId} === ${currentMachineId} → ${matches}`);
-      return matches;
-    });
+      console.log(`📈 Алгоритм 1 (по ID операции): ${algorithm1Results.length} смен`);
+      
+      if (algorithm1Results.length > 0) {
+        matchedShifts = algorithm1Results;
+        usedAlgorithm = 'точный поиск по ID операции';
+      }
+    }
     
-    console.log(`📈 Алгоритм 1 (только станок): ${algorithm1Results.length} смен`);
+    // Алгоритм 2: Поиск по станку + чертежу + временному фильтру (если нет точного ID)
+    if (matchedShifts.length === 0) {
+      const algorithm2Results = todayShifts.filter((shift: any) => {
+        const shiftMachineId = parseInt(shift.machineId?.toString() || '0');
+        const currentMachineId = parseInt(machine.id?.toString() || '0');
+        const matchesMachine = shiftMachineId === currentMachineId;
+        
+        // Проверяем номер чертежа
+        const drawingNumberField = shift.drawingNumber || shift.orderDrawingNumber;
+        const matchesDrawing = drawingNumberField === machine.currentOperationDetails?.orderDrawingNumber;
+        
+        // НОВОЕ: Временной фильтр - берем только смены за последние 24 часа
+        const shiftDate = dayjs(shift.date || shift.createdAt);
+        const isRecent = shiftDate.isAfter(dayjs().subtract(1, 'day'));
+        
+        const matches = matchesMachine && matchesDrawing && isRecent;
+        
+        console.log(`   🔧 Алгоритм 2 - Смена ${shift.id}:`);
+        console.log(`      станок: ${shiftMachineId} === ${currentMachineId} → ${matchesMachine}`);
+        console.log(`      чертеж: "${drawingNumberField}" === "${machine.currentOperationDetails?.orderDrawingNumber}" → ${matchesDrawing}`);
+        console.log(`      недавняя: ${shiftDate.format('YYYY-MM-DD HH:mm')} (последние 24ч) → ${isRecent}`);
+        console.log(`      итого: ${matches}`);
+        
+        return matches;
+      });
+      
+      console.log(`📈 Алгоритм 2 (станок + чертеж + время): ${algorithm2Results.length} смен`);
+      
+      if (algorithm2Results.length > 0) {
+        matchedShifts = algorithm2Results;
+        usedAlgorithm = 'поиск по станку + чертежу + времени';
+      }
+    }
     
-    if (algorithm1Results.length > 0) {
-      matchedShifts = algorithm1Results;
-      usedAlgorithm = 'только по ID станка';
+    // Алгоритм 3: Только станок (с предупреждением)
+    if (matchedShifts.length === 0) {
+      const algorithm3Results = todayShifts.filter((shift: any) => {
+        const shiftMachineId = parseInt(shift.machineId?.toString() || '0');
+        const currentMachineId = parseInt(machine.id?.toString() || '0');
+        return shiftMachineId === currentMachineId;
+      });
+      
+      console.log(`⚠️ Алгоритм 3 (РЕЗЕРВНЫЙ - только станок): ${algorithm3Results.length} смен`);
+      console.log(`⚠️ ВНИМАНИЕ: Могут быть данные от предыдущих операций!`);
+      
+      // Берем только последние 2 смены чтобы минимизировать ошибки
+      matchedShifts = algorithm3Results.slice(-2);
+      usedAlgorithm = 'резервный поиск только по станку (последние 2 смены)';
     }
 
     console.log(`🎯 Использован алгоритм: "${usedAlgorithm}"`);
@@ -220,19 +273,30 @@ export const MachineCard: React.FC<MachineCardProps> = ({
       return sum + total;
     }, 0);
 
-    const targetQuantity = 30;
+    // ИСПРАВЛЕНО: Получаем целевое количество из операции, а не жестко задаем
+    const targetQuantity = (machine.currentOperationDetails as any)?.targetQuantity || 
+                          (machine.currentOperationDetails as any)?.plannedQuantity || 
+                          (machine.currentOperationDetails as any)?.quantity || 
+                          30; // Резервное значение
+    
+    console.log(`🎯 Целевое количество для операции: ${targetQuantity} деталей`);
     const percentage = Math.min((totalProduced / targetQuantity) * 100, 100);
 
+    // ИСПРАВЛЕНО: Более консервативная проверка завершения
+    const isCompleted = totalProduced >= targetQuantity && totalProduced > 0;
+    
     const result = {
       completedParts: totalProduced,
       totalParts: targetQuantity,
       percentage: Math.round(percentage),
-      isCompleted: totalProduced >= targetQuantity,
+      isCompleted: isCompleted,
       startedAt: matchedShifts.length > 0 ? new Date(matchedShifts[0].date) : null,
       dayShiftQuantity: matchedShifts.reduce((sum: number, shift: any) => sum + (shift.dayShiftQuantity || 0), 0),
       nightShiftQuantity: matchedShifts.reduce((sum: number, shift: any) => sum + (shift.nightShiftQuantity || 0), 0),
       dayShiftOperator: matchedShifts.find((shift: any) => shift.dayShiftOperator)?.dayShiftOperator || '-',
       nightShiftOperator: matchedShifts.find((shift: any) => shift.nightShiftOperator)?.nightShiftOperator || 'Аркадий',
+      matchingAlgorithm: usedAlgorithm, // Для отладки
+      shiftsUsed: matchedShifts.length, // Для отладки
     };
 
     console.log(`🏁 Финальный результат:`, result);
@@ -241,38 +305,60 @@ export const MachineCard: React.FC<MachineCardProps> = ({
     return result;
   }, [machine.currentOperationDetails, machine.id, todayShifts]);
 
-  const updateAvailabilityMutation = useMutation({
-    mutationFn: async (isAvailable: boolean) => {
-      console.log(`🔄 Смена статуса станка ${machine.machineName} на ${isAvailable}`);
+  // ИСПРАВЛЕНО: Освобождение станка с отменой операции
+  const freeAndClearOperationMutation = useMutation({
+    mutationFn: async () => {
+      console.log(`🛠️ Освобождаем станок ${machine.machineName} с отменой операции`);
       
-      // Используем реальный API
-      return await machinesApi.updateAvailability(machine.machineName, isAvailable);
+      // Сначала отменяем операцию (если есть)
+      if (machine.currentOperationId) {
+        console.log(`📋 Отменяем операцию: ${machine.currentOperationId}`);
+        await machinesApi.unassignOperation(machine.machineName);
+      }
+      
+      // Затем освобождаем станок
+      return await machinesApi.updateAvailability(machine.machineName, true);
     },
     onSuccess: (updatedMachine) => {
       queryClient.invalidateQueries({ queryKey: ['machines'] });
-      const status = updatedMachine.isAvailable ? t('machine.message.freed') : t('machine.message.marked_busy');
-      message.success(`${t('machine.message.machine')} "${machine.machineName}" ${status}`);
+      queryClient.invalidateQueries({ queryKey: ['operations'] });
+      queryClient.invalidateQueries({ queryKey: ['shifts'] });
       
-      // Если станок освободился, открываем модальное окно планирования
-      if (!machine.isAvailable && updatedMachine.isAvailable && onOpenPlanningModal) {
-        console.log('🎉 Станок освободился! Открываем модальное окно планирования');
-        // Небольшая задержка чтобы пользователь увидел сообщение об успешном освобождении
+      message.success(`Станок "${machine.machineName}" освобожден, операция отменена`);
+      
+      // Открываем модальное окно планирования
+      if (onOpenPlanningModal) {
+        console.log('🎉 Станок освобожден! Открываем модальное окно планирования');
         setTimeout(() => {
           onOpenPlanningModal(updatedMachine);
         }, 1000);
       }
       
-      if (!machine.isAvailable && updatedMachine.isAvailable) {
-        // Если станок освободился, автоматически выбираем его
-        onSelect();
-      }
+      // Автоматически выбираем станок
+      onSelect();
     },
     onError: (error) => {
-      console.error('Ошибка обновления доступности станка:', error);
-      message.error(t('machine.message.update_error'));
+      console.error('Ошибка освобождения станка:', error);
+      message.error('Ошибка при освобождении станка');
     },
   });
 
+  // Мутация для простого изменения статуса (без отмены операции)
+  const updateAvailabilityMutation = useMutation({
+    mutationFn: async (isAvailable: boolean) => {
+      console.log(`🔄 Простое изменение статуса станка ${machine.machineName} на ${isAvailable}`);
+      return await machinesApi.updateAvailability(machine.machineName, isAvailable);
+    },
+    onSuccess: (updatedMachine) => {
+      queryClient.invalidateQueries({ queryKey: ['machines'] });
+      const status = updatedMachine.isAvailable ? 'освобожден' : 'отмечен как занятый';
+      message.success(`Станок "${machine.machineName}" ${status}`);
+    },
+    onError: (error) => {
+      console.error('Ошибка изменения статуса:', error);
+      message.error('Ошибка при изменении статуса станка');
+    },
+  });
   const unassignOperationMutation = useMutation({
     mutationFn: () => machinesApi.unassignOperation(machine.machineName),
     onSuccess: () => {
@@ -370,26 +456,66 @@ export const MachineCard: React.FC<MachineCardProps> = ({
     setProgressModalVisible(true);
   };
 
+  // ИСПРАВЛЕНО: Обработчик с выбором действия
   const handleAvailabilityChange = (checked: boolean) => {
     console.log('=== AVAILABILITY CHANGE ===');
     console.log('checked:', checked);
     console.log('machine.machineName:', machine.machineName);
+    console.log('machine.currentOperationId:', machine.currentOperationId);
     
     if (checked && machine.isAvailable && onOpenPlanningModal) {
       // Если станок уже свободен и мы ставим галочку, открываем планирование
       onOpenPlanningModal(machine);
       console.log('🎯 Opening planning modal');
+    } else if (checked && !machine.isAvailable && machine.currentOperationId) {
+      // ИСПРАВЛЕНО: Освобождение занятого станка с операцией
+      confirm({
+        title: 'Освобождение станка',
+        icon: <ExclamationCircleOutlined />,
+        content: (
+          <div>
+            <p>Что вы хотите сделать с операцией на станке "{machine.machineName}"?</p>
+            <div style={{ marginTop: 16 }}>
+              <Button 
+                type="primary" 
+                danger
+                block
+                style={{ marginBottom: 8 }}
+                onClick={() => {
+                  Modal.destroyAll();
+                  freeAndClearOperationMutation.mutate();
+                }}
+                loading={freeAndClearOperationMutation.isPending}
+              >
+                🗑️ Отменить операцию и освободить станок
+              </Button>
+              <Button 
+                block
+                onClick={() => {
+                  Modal.destroyAll();
+                  updateAvailabilityMutation.mutate(true);
+                }}
+                loading={updateAvailabilityMutation.isPending}
+              >
+                💹 Просто освободить (оставить операцию)
+              </Button>
+            </div>
+          </div>
+        ),
+        footer: null,
+        width: 400,
+      });
     } else {
-      // Для изменения доступности станка показываем подтверждение
-      const action = checked ? t('machine.dialog.free') : t('machine.dialog.mark_busy');
-      const title = checked ? t('machine.dialog.free_title') : t('machine.dialog.mark_busy_title');
+      // Обычное изменение статуса
+      const action = checked ? 'освободить' : 'отметить как занятый';
+      const title = checked ? 'Освобождение станка' : 'Отметка станка как занятого';
       
       confirm({
         title,
         icon: <ExclamationCircleOutlined />,
-        content: `${t('machine.dialog.confirm')} ${action} ${t('machine.dialog.machine')} "${machine.machineName}"?`,
-        okText: t('button.confirm'),
-        cancelText: t('button.cancel'),
+        content: `Вы уверены, что хотите ${action} станок "${machine.machineName}"?`,
+        okText: 'Да',
+        cancelText: 'Отмена',
         onOk() {
           console.log(checked ? '✅ Making machine available' : '❌ Making machine unavailable');
           updateAvailabilityMutation.mutate(checked);
@@ -584,7 +710,7 @@ export const MachineCard: React.FC<MachineCardProps> = ({
                       e.stopPropagation();
                       handleAvailabilityChange(true);
                     }}
-                    loading={updateAvailabilityMutation.isPending}
+                    loading={freeAndClearOperationMutation.isPending || updateAvailabilityMutation.isPending}
                     style={{ 
                       borderRadius: '6px',
                       height: '40px',
@@ -711,7 +837,8 @@ export const MachineCard: React.FC<MachineCardProps> = ({
                             icon={<CheckCircleOutlined />}
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleAvailabilityChange(true);
+                              // ИСПРАВЛЕНО: Используем правильную логику завершения
+                              freeAndClearOperationMutation.mutate();
                             }}
                             style={{ fontSize: '11px', backgroundColor: '#52c41a', borderColor: '#52c41a' }}
                           >

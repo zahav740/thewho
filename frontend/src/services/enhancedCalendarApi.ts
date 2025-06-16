@@ -3,6 +3,7 @@
  * @description: API для работы с улучшенным производственным календарем
  * @dependencies: api
  * @created: 2025-06-11
+ * @updated: 2025-06-16 - Исправлены API запросы для работы с исправленным backend
  */
 import api from './api';
 
@@ -20,6 +21,7 @@ export interface MachineSchedule {
   machineId: number;
   machineName: string;
   machineType: string;
+  currentOperation?: any;
   days: CalendarDay[];
 }
 
@@ -122,29 +124,45 @@ class EnhancedCalendarApi {
    */
   async getEnhancedCalendarView(startDate: string, endDate: string): Promise<EnhancedCalendarData> {
     try {
-      console.log('Запрос календаря из БД:', { startDate, endDate });
+      console.log('📅 Запрос календаря из БД:', { startDate, endDate });
       
-      // Используем основной calendar API, который работает с БД
+      // Используем исправленный calendar API
       const response = await api.get('/calendar', {
         params: { startDate, endDate },
       });
       
-      console.log('Ответ от backend:', response.data);
+      console.log('✅ Ответ от backend:', response.data);
       
-      // Проверяем, что получили валидные данные
-      if (response.data && !response.data.error && response.data.machineSchedules) {
+      // Проверяем успешность ответа
+      if (response.data && response.data.success && response.data.machineSchedules) {
         return {
           period: response.data.period || { startDate, endDate },
-          totalWorkingDays: response.data.totalWorkingDays || 10,
+          totalWorkingDays: response.data.totalWorkingDays || 0,
           machineSchedules: response.data.machineSchedules || []
         };
+      }
+      
+      // Если данные не успешные, но есть машины (fallback)
+      if (response.data && response.data.machineSchedules) {
+        console.warn('⚠️ Backend вернул данные без success флага, используем как есть');
+        return {
+          period: response.data.period || { startDate, endDate },
+          totalWorkingDays: response.data.totalWorkingDays || this.calculateWorkingDaysLocally(startDate, endDate).workingDays,
+          machineSchedules: response.data.machineSchedules || []
+        };
+      }
+      
+      // Если есть ошибка в ответе
+      if (response.data && response.data.error) {
+        console.error('❌ Backend вернул ошибку:', response.data.error);
+        throw new Error(response.data.error);
       }
       
       // Если данные не валидные, выбрасываем ошибку
       throw new Error('Невалидные данные от backend');
       
     } catch (error) {
-      console.error('Ошибка получения календаря из БД:', error);
+      console.error('❌ Ошибка получения календаря из БД:', error);
       
       // В случае ошибки показываем пустой календарь вместо моков
       return {
@@ -152,6 +170,67 @@ class EnhancedCalendarApi {
         totalWorkingDays: this.calculateWorkingDaysLocally(startDate, endDate).workingDays,
         machineSchedules: []
       };
+    }
+  }
+
+  /**
+   * Получить сводку по станкам из исправленного API
+   */
+  async getMachineSummary(startDate: string, endDate: string): Promise<MachineSummary> {
+    try {
+      console.log('📊 Запрос сводки по станкам:', { startDate, endDate });
+      
+      const response = await api.get('/calendar/machine-summary', {
+        params: { startDate, endDate },
+      });
+      
+      console.log('✅ Сводка получена:', response.data);
+      
+      if (response.data && response.data.success) {
+        return response.data;
+      }
+      
+      // Fallback если нет success флага
+      if (response.data && response.data.machines) {
+        return response.data;
+      }
+      
+      throw new Error('Невалидный ответ от API');
+    } catch (error) {
+      console.error('❌ Ошибка получения сводки по станкам:', error);
+      
+      // Возвращаем пустую сводку
+      return {
+        period: { startDate, endDate },
+        totalWorkingDays: this.calculateWorkingDaysLocally(startDate, endDate).workingDays,
+        summary: {
+          totalMachines: 0,
+          activeMachines: 0,
+          averageUtilization: 0
+        },
+        machines: []
+      };
+    }
+  }
+
+  /**
+   * Получить предстоящие дедлайны
+   */
+  async getUpcomingDeadlines(days: number = 14) {
+    try {
+      console.log('⏰ Запрос дедлайнов на', days, 'дней');
+      
+      const response = await api.get('/calendar/upcoming-deadlines', {
+        params: { days },
+      });
+      
+      console.log('✅ Дедлайны получены:', response.data);
+      
+      // API возвращает массив напрямую
+      return Array.isArray(response.data) ? response.data : [];
+    } catch (error) {
+      console.error('❌ Ошибка получения дедлайнов:', error);
+      return [];
     }
   }
 
@@ -204,26 +283,6 @@ class EnhancedCalendarApi {
       
       // Локальный расчет в случае ошибки
       return this.calculateOperationDurationLocally(timePerPart, quantity, setupTime || 0);
-    }
-  }
-
-  /**
-   * Получить сводку по станкам
-   */
-  async getMachineSummary(startDate: string, endDate: string): Promise<MachineSummary> {
-    try {
-      const response = await api.get('/enhanced-calendar/machine-summary', {
-        params: { startDate, endDate },
-      });
-      
-      if (!response.data.success) {
-        throw new Error(response.data.message || 'Ошибка получения сводки');
-      }
-      
-      return response.data.data;
-    } catch (error) {
-      console.error('Ошибка получения сводки по станкам:', error);
-      throw error;
     }
   }
 
@@ -307,8 +366,6 @@ class EnhancedCalendarApi {
       }
     };
   }
-
-
 }
 
 export const enhancedCalendarApi = new EnhancedCalendarApi();

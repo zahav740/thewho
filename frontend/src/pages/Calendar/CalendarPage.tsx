@@ -10,6 +10,7 @@ import { CalendarOutlined, BarChartOutlined, AlertOutlined, SettingOutlined, Inf
 import dayjs, { Dayjs } from 'dayjs';
 import { ProductionCalendar } from './components/ProductionCalendar';
 import { EnhancedProductionCalendar } from './components/EnhancedProductionCalendar';
+import { ModernProductionCalendar } from './components/ModernProductionCalendar';
 import { MachineUtilization } from './components/MachineUtilization';
 import { UpcomingDeadlines } from './components/UpcomingDeadlines';
 
@@ -22,7 +23,7 @@ export const CalendarPage: React.FC = () => {
     dayjs().endOf('week').add(2, 'week'), // Увеличено до 3 недель
   ]);
 
-  const [useEnhancedCalendar, setUseEnhancedCalendar] = useState(true); // По умолчанию используем Enhanced
+  const [calendarType, setCalendarType] = useState<'classic' | 'enhanced' | 'modern'>('modern'); // По умолчанию используем Modern
 
   const handleDateRangeChange = (dates: [Dayjs | null, Dayjs | null] | null) => {
     if (dates && dates[0] && dates[1]) {
@@ -43,17 +44,30 @@ export const CalendarPage: React.FC = () => {
     <div className="page-container">
       {/* Переключатель версий календаря */}
       <Alert
-        message="Улучшенный календарь доступен!"
+        message="🚀 Новый современный календарь!"
         description={
           <Space>
-            <Text>Попробуйте новую версию календаря с детализацией смен и расчетом рабочих дней.</Text>
-            <Button 
-              type="link" 
-              size="small"
-              onClick={() => setUseEnhancedCalendar(!useEnhancedCalendar)}
-            >
-              {useEnhancedCalendar ? 'Переключиться на старую версию' : 'Переключиться на новую версию'}
-            </Button>
+            <Text>Доступны три версии календаря: классический, улучшенный и современный с продвинутым интерфейсом.</Text>
+            <Button.Group size="small">
+              <Button 
+                type={calendarType === 'classic' ? 'primary' : 'default'}
+                onClick={() => setCalendarType('classic')}
+              >
+                Классический
+              </Button>
+              <Button 
+                type={calendarType === 'enhanced' ? 'primary' : 'default'}
+                onClick={() => setCalendarType('enhanced')}
+              >
+                Улучшенный
+              </Button>
+              <Button 
+                type={calendarType === 'modern' ? 'primary' : 'default'}
+                onClick={() => setCalendarType('modern')}
+              >
+                🔥 Современный
+              </Button>
+            </Button.Group>
           </Space>
         }
         type="info"
@@ -78,12 +92,29 @@ export const CalendarPage: React.FC = () => {
                 { label: 'Текущий месяц', value: [dayjs().startOf('month'), dayjs().endOf('month')] },
               ]}
             />
-            <Button 
-              icon={<SettingOutlined />}
-              onClick={() => setUseEnhancedCalendar(!useEnhancedCalendar)}
-            >
-              {useEnhancedCalendar ? 'Базовый календарь' : 'Улучшенный календарь'}
-            </Button>
+            <Button.Group>
+              <Button 
+                type={calendarType === 'classic' ? 'primary' : 'default'}
+                icon={<CalendarOutlined />}
+                onClick={() => setCalendarType('classic')}
+              >
+                Классический
+              </Button>
+              <Button 
+                type={calendarType === 'enhanced' ? 'primary' : 'default'}
+                icon={<BarChartOutlined />}
+                onClick={() => setCalendarType('enhanced')}
+              >
+                Улучшенный
+              </Button>
+              <Button 
+                type={calendarType === 'modern' ? 'primary' : 'default'}
+                icon={<SettingOutlined />}
+                onClick={() => setCalendarType('modern')}
+              >
+                🔥 Современный
+              </Button>
+            </Button.Group>
           </Space>
         </Col>
       </Row>
@@ -98,12 +129,18 @@ export const CalendarPage: React.FC = () => {
                 label: (
                   <span>
                     <CalendarOutlined />
-                    {useEnhancedCalendar ? 'Улучшенный календарь производства' : 'Календарь производства'}
+                    {calendarType === 'classic' && 'Классический календарь'}
+                    {calendarType === 'enhanced' && 'Улучшенный календарь'}
+                    {calendarType === 'modern' && '🔥 Современный календарь'}
                   </span>
                 ),
-                children: useEnhancedCalendar ? 
-                  <EnhancedProductionCalendar filter={filter} /> : 
-                  <ProductionCalendar filter={filter} />
+                children: (
+                  <>
+                    {calendarType === 'classic' && <ProductionCalendar filter={filter} />}
+                    {calendarType === 'enhanced' && <EnhancedProductionCalendar filter={filter} />}
+                    {calendarType === 'modern' && <ModernProductionCalendar filter={filter} />}
+                  </>
+                )
               },
               {
                 key: 'utilization',
@@ -130,8 +167,8 @@ export const CalendarPage: React.FC = () => {
         </Col>
       </Row>
 
-      {/* Информационное сообщение для Enhanced календаря */}
-      {useEnhancedCalendar && (
+      {/* Информационные сообщения для разных типов календарей */}
+      {calendarType === 'enhanced' && (
         <Alert
           message="📅 Особенности улучшенного календаря"
           description={
@@ -143,6 +180,25 @@ export const CalendarPage: React.FC = () => {
             </div>
           }
           type="info"
+          showIcon
+          style={{ marginTop: 16 }}
+          icon={<InfoCircleOutlined />}
+        />
+      )}
+      
+      {calendarType === 'modern' && (
+        <Alert
+          message="🚀 Особенности современного календаря"
+          description={
+            <div>
+              <Text>• Современный дизайн с карточками станков</Text><br/>
+              <Text>• Режимы просмотра: сетка и таймлайн</Text><br/>
+              <Text>• Фильтрация по типу станков и статусу операций</Text><br/>
+              <Text>• Мини-календарь загрузки для каждого станка</Text><br/>
+              <Text>• Реальные данные из базы данных производства</Text>
+            </div>
+          }
+          type="success"
           showIcon
           style={{ marginTop: 16 }}
           icon={<InfoCircleOutlined />}

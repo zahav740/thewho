@@ -546,7 +546,7 @@ export const EnhancedProductionCalendar: React.FC<EnhancedProductionCalendarProp
         // Рассчитываем статистику по станку
         const workingDays = record.days?.filter((d: CalendarDay) => d.isWorkingDay).length || 0;
         const daysWithWork = record.days?.filter((d: CalendarDay) => 
-          d.completedShifts?.length || d.plannedOperation
+          (d.completedShifts && d.completedShifts.length > 0) || d.plannedOperation
         ).length || 0;
         const utilization = workingDays > 0 ? (daysWithWork / workingDays) * 100 : 0;
 
@@ -585,7 +585,7 @@ export const EnhancedProductionCalendar: React.FC<EnhancedProductionCalendarProp
   // Статистика периода
   const totalMachines = enhancedCalendarData.machineSchedules.length;
   const activeMachines = enhancedCalendarData.machineSchedules.filter((m: MachineSchedule) => 
-    m.days.some((d: CalendarDay) => d.completedShifts?.length || d.plannedOperation)
+    m.days.some((d: CalendarDay) => (d.completedShifts && d.completedShifts.length > 0) || d.plannedOperation)
   ).length;
 
   return (

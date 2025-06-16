@@ -9,14 +9,14 @@ import { Card, Table, Tag, Progress, InputNumber, Space, Alert, Spin, Badge } fr
 import { ExclamationCircleOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
 import dayjs from 'dayjs';
-import { calendarApi } from '../../../services/calendarApi';
+import { enhancedCalendarApi } from '../../../services/enhancedCalendarApi';
 
 export const UpcomingDeadlines: React.FC = () => {
   const [daysAhead, setDaysAhead] = useState(14);
 
   const { data: deadlines, isLoading, error } = useQuery({
     queryKey: ['upcoming-deadlines', daysAhead],
-    queryFn: () => calendarApi.getUpcomingDeadlines(daysAhead),
+    queryFn: () => enhancedCalendarApi.getUpcomingDeadlines(daysAhead),
   });
 
   if (isLoading) {

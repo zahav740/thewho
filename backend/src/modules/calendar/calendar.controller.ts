@@ -1,13 +1,12 @@
 /**
- * @file: calendar.controller.ts (Временная диагностическая версия)
- * @description: Упрощенный контроллер для диагностики проблем
- * @created: 2025-05-28
+ * @file: calendar.controller.fixed.ts
+ * @description: Исправленный контроллер календаря с правильными SQL запросами
+ * @created: 2025-06-16
  */
 import { Controller, Get, Query } from '@nestjs/common';
-import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
-import { InjectDataSource } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { Machine } from '../../database/entities/machine.entity';
 import { Operation } from '../../database/entities/operation.entity';
 import { Order } from '../../database/entities/order.entity';
@@ -18,6 +17,14 @@ interface CalendarDay {
   dayType: string;
   completedShifts?: any[];
   plannedOperation?: any;
+}
+
+interface MachineSchedule {
+  machineId: number;
+  machineName: string;
+  machineType: string;
+  currentOperation?: any;
+  days: CalendarDay[];
 }
 
 @ApiTags('calendar')
@@ -32,58 +39,21 @@ export class CalendarController {
     private readonly orderRepository: Repository<Order>,
   ) {}
 
-  @Get('test')
-  @ApiOperation({ summary: 'Тестовый endpoint' })
-  async test() {
-    return {
-      status: 'ok',
-      message: 'Calendar controller is working',
-      timestamp: new Date().toISOString(),
-    };
-  }
-
-  @Get('debug')
-  @ApiOperation({ summary: 'Отладочная информация' })
-  async debug() {
-    try {
-      const machineCount = await this.machineRepository.count();
-      const operationCount = await this.operationRepository.count();
-      const orderCount = await this.orderRepository.count();
-
-      // Получим несколько записей для проверки структуры
-      const sampleMachine = await this.machineRepository.findOne({ where: {} });
-      const sampleOperation = await this.operationRepository.findOne({ where: {} });
-      const sampleOrder = await this.orderRepository.findOne({ where: {} });
-
-      return {
-        status: 'ok',
-        counts: {
-          machines: machineCount,
-          operations: operationCount,
-          orders: orderCount,
-        },
-        samples: {
-          machine: sampleMachine,
-          operation: sampleOperation,
-          order: sampleOrder,
-        },
-        timestamp: new Date().toISOString(),
-      };
-    } catch (error) {
-      return {
-        status: 'error',
-        error: error.message,
-        stack: error.stack,
-        timestamp: new Date().toISOString(),
-      };
-    }
-  }
-
   @Get()
-  @ApiOperation({ summary: 'Производственный календарь с данными из БД' })
-  async getCalendarView(@Query('startDate') startDate: string, @Query('endDate') endDate: string) {
+  @ApiOperation({ summary: 'Производственный календарь с реальными данными из БД' })
+  @ApiQuery({ name: 'startDate', description: 'Дата начала (YYYY-MM-DD)', example: '2025-06-16' })
+  @ApiQuery({ name: 'endDate', description: 'Дата окончания (YYYY-MM-DD)', example: '2025-06-30' })
+  async getCalendarView(
+    @Query('startDate') startDate: string, 
+    @Query('endDate') endDate: string
+  ) {
     try {
-      console.log('Calendar request:', { startDate, endDate });
+      console.log('📅 Calendar request:', { startDate, endDate });
+
+      // Проверяем валидность дат
+      if (!startDate || !endDate) {
+        throw new Error('startDate и endDate обязательны');
+      }
 
       // Получаем активные станки
       const machines = await this.machineRepository.find({
@@ -91,37 +61,47 @@ export class CalendarController {
         order: { code: 'ASC' },
       });
 
-      console.log(`Found ${machines.length} machines`);
+      console.log(`🔧 Найдено ${machines.length} активных станков`);
 
       // Рассчитываем рабочие дни
       const totalWorkingDays = this.calculateWorkingDays(startDate, endDate);
 
-      // Для каждого станка получаем данные по дням
-      const machineSchedules = [];
+      // Для каждого станка получаем данные
+      const machineSchedules: MachineSchedule[] = [];
       
       for (const machine of machines) {
+        // Получаем текущую активную операцию
+        const currentOperation = await this.getCurrentOperation(machine.id);
+        
+        // Генерируем дни для станка
         const days = await this.generateDaysForMachine(machine.id, startDate, endDate);
         
         machineSchedules.push({
           machineId: machine.id,
           machineName: machine.code,
           machineType: machine.type,
+          currentOperation,
           days: days
         });
       }
 
+      console.log(`📊 Сгенерировано календарей для ${machineSchedules.length} станков`);
+
       return {
+        success: true,
         period: { startDate, endDate },
         totalWorkingDays,
         machineSchedules,
         timestamp: new Date().toISOString(),
       };
     } catch (error) {
-      console.error('Calendar error:', error);
+      console.error('❌ Calendar error:', error);
       return {
-        status: 'error',
+        success: false,
         error: error.message,
-        stack: error.stack,
+        period: { startDate, endDate },
+        totalWorkingDays: 0,
+        machineSchedules: [],
         timestamp: new Date().toISOString(),
       };
     }
@@ -144,8 +124,69 @@ export class CalendarController {
     return workingDays;
   }
 
+  private async getCurrentOperation(machineId: number) {
+    try {
+      // Получаем текущую операцию на станке с правильными названиями полей
+      const operation = await this.operationRepository
+        .createQueryBuilder('operation')
+        .leftJoinAndSelect('operation.order', 'order')
+        .where('operation.assignedMachine = :machineId', { machineId })
+        .andWhere('operation.status IN (:...statuses)', { statuses: ['ASSIGNED', 'IN_PROGRESS'] })
+        .orderBy('operation.assignedAt', 'ASC')
+        .getOne();
+
+      if (!operation) return null;
+
+      // Получаем прогресс выполнения операции
+      const progress = await this.getOperationProgress(operation.id);
+
+      return {
+        operationId: operation.id,
+        drawingNumber: operation.order?.drawing_number || 'Не указан',
+        operationNumber: operation.operationNumber,
+        estimatedTime: operation.estimatedTime,
+        totalQuantity: operation.order?.quantity || 0,
+        status: operation.status,
+        assignedAt: operation.assignedAt,
+        ...progress
+      };
+    } catch (error) {
+      console.error(`Ошибка получения операции для станка ${machineId}:`, error);
+      return null;
+    }
+  }
+
+  private async getOperationProgress(operationId: number) {
+    try {
+      // Суммируем выполненные объемы из shift_records
+      const result = await this.machineRepository.query(`
+        SELECT 
+          COALESCE(SUM(COALESCE("dayShiftQuantity", 0) + COALESCE("nightShiftQuantity", 0)), 0) as completed_quantity,
+          COUNT(*) as shift_count
+        FROM shift_records 
+        WHERE "operationId" = $1 AND archived = false
+      `, [operationId]);
+
+      const completedQuantity = parseInt(result[0]?.completed_quantity || '0');
+      const shiftCount = parseInt(result[0]?.shift_count || '0');
+
+      return {
+        completedQuantity,
+        shiftCount,
+        progressPercent: 0 // Будет рассчитан в frontend
+      };
+    } catch (error) {
+      console.error(`Ошибка получения прогресса операции ${operationId}:`, error);
+      return {
+        completedQuantity: 0,
+        shiftCount: 0,
+        progressPercent: 0
+      };
+    }
+  }
+
   private async generateDaysForMachine(machineId: number, startDate: string, endDate: string) {
-    const days = [];
+    const days: CalendarDay[] = [];
     const start = new Date(startDate);
     const end = new Date(endDate);
     const current = new Date(start);
@@ -163,12 +204,19 @@ export class CalendarController {
       };
 
       if (isWorkingDay) {
-        if (isPast) {
-          // Для прошедших дней загружаем выполненные смены
-          day.completedShifts = await this.getCompletedShifts(machineId, dateStr);
-        } else {
-          // Для будущих дней загружаем запланированные операции
-          day.plannedOperation = await this.getPlannedOperation(machineId, dateStr);
+        // Получаем выполненные смены для этого дня
+        const completedShifts = await this.getCompletedShifts(machineId, dateStr);
+        
+        if (completedShifts.length > 0) {
+          day.completedShifts = completedShifts;
+        }
+
+        // Если нет выполненных смен, получаем запланированную операцию
+        if (!isPast || completedShifts.length === 0) {
+          const plannedOperation = await this.getPlannedOperationForDay(machineId, dateStr);
+          if (plannedOperation) {
+            day.plannedOperation = plannedOperation;
+          }
         }
       }
 
@@ -191,11 +239,11 @@ export class CalendarController {
           sr."dayShiftTimePerUnit",
           sr."nightShiftTimePerUnit",
           sr."setupTime",
-          sr."drawingNumber" as drawing_number,
-          COALESCE(o."operationNumber", 1) as operation_number
+          sr.drawingnumber as drawing_number,
+          o."operationNumber" as operation_number
         FROM shift_records sr
         LEFT JOIN operations o ON sr."operationId" = o.id
-        WHERE sr."machineId" = $1 AND sr.date = $2
+        WHERE sr."machineId" = $1 AND sr.date = $2 AND sr.archived = false
       `, [machineId, date]);
 
       const completedShifts = [];
@@ -203,10 +251,10 @@ export class CalendarController {
       for (const shift of shifts) {
         // Дневная смена
         if (shift.dayShiftQuantity > 0) {
-          const totalTime = shift.dayShiftQuantity * shift.dayShiftTimePerUnit;
+          const totalTime = shift.dayShiftQuantity * (shift.dayShiftTimePerUnit || 0);
           const planTime = 15; // Плановое время на деталь (минут)
           const efficiency = shift.dayShiftTimePerUnit > 0 
-            ? (planTime / shift.dayShiftTimePerUnit) * 100 
+            ? Math.min(100, Math.max(0, (planTime / shift.dayShiftTimePerUnit) * 100))
             : 0;
 
           completedShifts.push({
@@ -215,19 +263,19 @@ export class CalendarController {
             drawingNumber: shift.drawing_number || 'Не указан',
             operationNumber: shift.operation_number || 1,
             quantityProduced: shift.dayShiftQuantity,
-            timePerPart: shift.dayShiftTimePerUnit,
+            timePerPart: shift.dayShiftTimePerUnit || 0,
             setupTime: shift.setupTime || 0,
             totalTime: totalTime + (shift.setupTime || 0),
-            efficiency: Math.min(100, Math.max(0, efficiency))
+            efficiency: Math.round(efficiency * 10) / 10
           });
         }
 
         // Ночная смена
         if (shift.nightShiftQuantity > 0) {
-          const totalTime = shift.nightShiftQuantity * shift.nightShiftTimePerUnit;
+          const totalTime = shift.nightShiftQuantity * (shift.nightShiftTimePerUnit || 0);
           const planTime = 15;
           const efficiency = shift.nightShiftTimePerUnit > 0 
-            ? (planTime / shift.nightShiftTimePerUnit) * 100 
+            ? Math.min(100, Math.max(0, (planTime / shift.nightShiftTimePerUnit) * 100))
             : 0;
 
           completedShifts.push({
@@ -236,9 +284,9 @@ export class CalendarController {
             drawingNumber: shift.drawing_number || 'Не указан',
             operationNumber: shift.operation_number || 1,
             quantityProduced: shift.nightShiftQuantity,
-            timePerPart: shift.nightShiftTimePerUnit,
+            timePerPart: shift.nightShiftTimePerUnit || 0,
             totalTime: totalTime,
-            efficiency: Math.min(100, Math.max(0, efficiency))
+            efficiency: Math.round(efficiency * 10) / 10
           });
         }
       }
@@ -250,60 +298,52 @@ export class CalendarController {
     }
   }
 
-  private async getPlannedOperation(machineId: number, date: string) {
+  private async getPlannedOperationForDay(machineId: number, date: string) {
     try {
-      // Получаем текущую операцию на станке
-      const current = await this.machineRepository.query(`
-        SELECT 
-          o.id as operation_id,
-          ord."drawingNumber" as drawing_number,
-          o."operationNumber" as operation_number,
-          o."estimatedTime" as time_per_part,
-          ord.quantity as total_quantity,
-          o.status,
-          o."createdAt" as created_at,
-          COALESCE(SUM(sr."dayShiftQuantity" + sr."nightShiftQuantity"), 0) as completed_quantity
-        FROM operations o
-        JOIN orders ord ON o."orderId" = ord.id
-        LEFT JOIN shift_records sr ON sr."operationId" = o.id
-        WHERE o."machineId" = $1 AND o.status IN ('PENDING', 'IN_PROGRESS')
-        GROUP BY o.id, ord.id
-        ORDER BY o."createdAt" ASC
-        LIMIT 1
-      `, [machineId]);
+      // Получаем активную операцию на станке
+      const operation = await this.operationRepository
+        .createQueryBuilder('operation')
+        .leftJoinAndSelect('operation.order', 'order')
+        .where('operation.assignedMachine = :machineId', { machineId })
+        .andWhere('operation.status IN (:...statuses)', { statuses: ['ASSIGNED', 'IN_PROGRESS'] })
+        .orderBy('operation.assignedAt', 'ASC')
+        .getOne();
 
-      if (current.length === 0) return undefined;
+      if (!operation || !operation.order) return null;
 
-      const op = current[0];
-      const estimatedDurationDays = this.calculateOperationDuration(op.time_per_part, op.total_quantity);
-      
-      // Проверяем, завершена ли операция
-      const remainingQuantity = Math.max(0, op.total_quantity - op.completed_quantity);
+      // Получаем прогресс операции
+      const progress = await this.getOperationProgress(operation.id);
+      const totalQuantity = operation.order.quantity;
+      const remainingQuantity = Math.max(0, totalQuantity - progress.completedQuantity);
       
       if (remainingQuantity === 0) {
-        // Операция завершена - станок свободен
-        console.log(`Операция ${op.operation_id} завершена на станке ${machineId}`);
-        return undefined; // Станок свободен
+        return null; // Операция завершена
       }
+
+      const estimatedDurationDays = this.calculateOperationDuration(
+        operation.estimatedTime, 
+        remainingQuantity
+      );
       
       return {
-        operationId: op.operation_id,
-        drawingNumber: op.drawing_number,
-        operationNumber: op.operation_number,
-        estimatedTimePerPart: op.time_per_part,
-        totalQuantity: op.total_quantity,
+        operationId: operation.id,
+        drawingNumber: operation.order.drawing_number,
+        operationNumber: operation.operationNumber,
+        estimatedTimePerPart: operation.estimatedTime,
+        totalQuantity: totalQuantity,
         estimatedDurationDays,
         startDate: date,
-        endDate: new Date(new Date(date).getTime() + estimatedDurationDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        endDate: new Date(new Date(date).getTime() + estimatedDurationDays * 24 * 60 * 60 * 1000)
+          .toISOString().split('T')[0],
         currentProgress: {
-          completedQuantity: op.completed_quantity,
+          completedQuantity: progress.completedQuantity,
           remainingQuantity: remainingQuantity,
-          progressPercent: (op.completed_quantity / op.total_quantity) * 100
+          progressPercent: totalQuantity > 0 ? Math.round((progress.completedQuantity / totalQuantity) * 100) : 0
         }
       };
     } catch (error) {
       console.error(`Ошибка получения операции для станка ${machineId}:`, error);
-      return undefined;
+      return null;
     }
   }
 
@@ -315,64 +355,111 @@ export class CalendarController {
     return Math.max(1, baseDays);
   }
 
-  @Get('upcoming-deadlines')
-  @ApiOperation({ summary: 'Упрощенные дедлайны' })
-  async getUpcomingDeadlines(@Query('days') days: number = 7) {
+  // Дополнительные endpoints для календаря
+  @Get('machine-summary')
+  @ApiOperation({ summary: 'Сводка по станкам' })
+  async getMachineSummary(
+    @Query('startDate') startDate: string, 
+    @Query('endDate') endDate: string
+  ) {
     try {
-      console.log('Upcoming deadlines request:', { days });
-
-      // Получим несколько заказов
-      const orders = await this.orderRepository.find({
-        take: 5,
-        relations: ['operations'],
+      const machines = await this.machineRepository.find({
+        where: { isActive: true },
+        order: { code: 'ASC' },
       });
 
-      console.log(`Found ${orders.length} orders`);
+      const summary = [];
+      
+      for (const machine of machines) {
+        const currentOperation = await this.getCurrentOperation(machine.id);
+        const workingDays = this.calculateWorkingDays(startDate, endDate);
+        
+        // Подсчитываем дни с операциями
+        const shiftsCount = await this.machineRepository.query(`
+          SELECT COUNT(DISTINCT date) as days_with_shifts
+          FROM shift_records 
+          WHERE "machineId" = $1 
+            AND date BETWEEN $2 AND $3 
+            AND archived = false
+        `, [machine.id, startDate, endDate]);
 
-      // Возвращаем массив, как ожидает фронтенд
-      const deadlines = orders.map(order => ({
-        orderId: String(order.id),
-        drawingNumber: order.drawingNumber,
-        deadline: order.deadline,
-        daysUntilDeadline: 5,
-        completedOperations: 0,
-        totalOperations: order.operations?.length || 0,
-        isAtRisk: false,
-      }));
+        const daysWithOperations = parseInt(shiftsCount[0]?.days_with_shifts || '0');
+        const utilizationPercent = workingDays > 0 ? Math.round((daysWithOperations / workingDays) * 100) : 0;
 
-      return deadlines; // Возвращаем массив напрямую
+        summary.push({
+          machineId: machine.id,
+          machineName: machine.code,
+          machineType: machine.type,
+          isOccupied: machine.isOccupied,
+          currentOperation: currentOperation,
+          workingDays,
+          daysWithOperations,
+          utilizationPercent,
+          status: currentOperation ? 'busy' : utilizationPercent > 50 ? 'moderate' : 'available'
+        });
+      }
+
+      return {
+        success: true,
+        period: { startDate, endDate },
+        totalWorkingDays: this.calculateWorkingDays(startDate, endDate),
+        summary: {
+          totalMachines: machines.length,
+          activeMachines: summary.filter(m => m.status === 'busy').length,
+          averageUtilization: Math.round(summary.reduce((acc, m) => acc + m.utilizationPercent, 0) / machines.length)
+        },
+        machines: summary
+      };
     } catch (error) {
-      console.error('Upcoming deadlines error:', error);
-      return []; // В случае ошибки возвращаем пустой массив
+      console.error('Ошибка получения сводки по станкам:', error);
+      return {
+        success: false,
+        error: error.message,
+        machines: []
+      };
     }
   }
 
-  @Get('machine-utilization')
-  @ApiOperation({ summary: 'Упрощенная загруженность станков' })
-  async getMachineUtilization(@Query('startDate') startDate: string, @Query('endDate') endDate: string) {
+  @Get('upcoming-deadlines')
+  @ApiOperation({ summary: 'Предстоящие дедлайны' })
+  async getUpcomingDeadlines(@Query('days') days: number = 14) {
     try {
-      console.log('Machine utilization request:', { startDate, endDate });
+      const futureDate = new Date();
+      futureDate.setDate(futureDate.getDate() + days);
 
-      // Получим машины
-      const machines = await this.machineRepository.find({
-        where: { isActive: true },
-        take: 10,
-      });
+      const orders = await this.orderRepository
+        .createQueryBuilder('order')
+        .leftJoinAndSelect('order.operations', 'operation')
+        .where('order.deadline <= :futureDate', { futureDate })
+        .andWhere('order.deadline >= :today', { today: new Date() })
+        .orderBy('order.deadline', 'ASC')
+        .take(20)
+        .getMany();
 
-      console.log(`Found ${machines.length} machines`);
+      const deadlines = [];
 
-      // Создаем моковые данные для загруженности
-      const utilization = machines.map(machine => ({
-        machineId: String(machine.id),
-        machineCode: machine.code,
-        totalCapacityMinutes: 9600, // 2 смены по 8 часов * 10 дней
-        usedMinutes: Math.floor(Math.random() * 8000), // Случайное использование
-        utilizationPercent: Math.floor(Math.random() * 100),
-      }));
+      for (const order of orders) {
+        const totalOperations = order.operations?.length || 0;
+        const completedOperations = order.operations?.filter(op => op.status === 'COMPLETED').length || 0;
+        
+        const daysUntil = Math.ceil((new Date(order.deadline).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+        const isAtRisk = daysUntil <= 3 && completedOperations < totalOperations;
 
-      return utilization;
+        deadlines.push({
+          orderId: order.id.toString(),
+          drawingNumber: order.drawing_number,
+          deadline: order.deadline,
+          daysUntilDeadline: daysUntil,
+          completedOperations,
+          totalOperations,
+          isAtRisk,
+          priority: order.priority
+        });
+      }
+
+      return deadlines;
     } catch (error) {
-      console.error('Machine utilization error:', error);
+      console.error('Ошибка получения дедлайнов:', error);
       return [];
     }
   }
