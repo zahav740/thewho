@@ -92,11 +92,75 @@ code {
 
 /* Machine cards grid */
 .machines-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 20px;
+  display: block;
   margin-bottom: 32px;
   padding: 8px 0;
+}
+
+/* Группы станков */
+.machine-group {
+  margin-bottom: 32px;
+}
+
+.machine-group-header {
+  margin-bottom: 16px;
+  padding: 12px;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+.machine-group-header:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.machine-group-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Цветовые схемы для групп */
+.milling-group {
+  background-color: #e6f7ff;
+  border-left: 4px solid #1890ff;
+}
+
+.milling-group .machine-group-title {
+  color: #1890ff;
+}
+
+.turning-group {
+  background-color: #f6ffed;
+  border-left: 4px solid #52c41a;
+}
+
+.turning-group .machine-group-title {
+  color: #52c41a;
+}
+
+.other-group {
+  background-color: #fff7e6;
+  border-left: 4px solid #faad14;
+}
+
+.other-group .machine-group-title {
+  color: #faad14;
+}
+
+/* Исправление для карточек в группах */
+.machine-group .ant-row .ant-col {
+  margin-bottom: 16px;
+}
+
+/* Стабильная позиция карточек */
+.machine-card-wrapper {
+  position: relative;
+  width: 100%;
+  height: auto;
 }
 
 /* Улучшения для карточек */

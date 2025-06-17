@@ -302,16 +302,140 @@ export const ProductionPage: React.FC = () => {
             {useImprovedPlanning ? t('planning.test_improved') : t('planning.test_standard')}
           </Button>
           
+          {/* ИСПРАВЛЕНО: Группировка станков по типам с фиксированным порядком */}
           <div className="machines-grid">
-            {machines?.map((machine) => (
-              <MachineCard
-                key={machine.id}
-                machine={machine}
-                isSelected={selectedMachine?.id === machine.id}
-                onSelect={() => setSelectedMachine(machine)}
-                onOpenPlanningModal={handleOpenPlanningModal}
-              />
-            ))}
+            {/* Группа: Фрезерные станки */}
+            {(() => {
+              const millingMachines = machines
+                ?.filter(machine => machine.machineType === 'MILLING' || machine.machineType === 'milling' || machine.machineType.includes('milling'))
+                .sort((a, b) => a.machineName.localeCompare(b.machineName)); // Стабильная сортировка по имени
+              
+              if (millingMachines && millingMachines.length > 0) {
+                return (
+                  <div key="milling-group" style={{ marginBottom: '32px' }}>
+                    <div style={{ 
+                      marginBottom: '16px', 
+                      padding: '12px', 
+                      backgroundColor: '#e6f7ff', 
+                      borderRadius: '8px',
+                      borderLeft: '4px solid #1890ff'
+                    }}>
+                      <h3 style={{ 
+                        margin: 0, 
+                        color: '#1890ff', 
+                        fontSize: '18px',
+                        fontWeight: 'bold'
+                      }}>
+                        🔧 Фрезерные станки ({millingMachines.length})
+                      </h3>
+                    </div>
+                    <Row gutter={[16, 16]}>
+                      {millingMachines.map((machine) => (
+                        <Col xs={24} sm={12} lg={8} xl={6} key={`milling-${machine.id}`}>
+                          <MachineCard
+                            machine={machine}
+                            isSelected={selectedMachine?.id === machine.id}
+                            onSelect={() => setSelectedMachine(machine)}
+                            onOpenPlanningModal={handleOpenPlanningModal}
+                          />
+                        </Col>
+                      ))}
+                    </Row>
+                  </div>
+                );
+              }
+              return null;
+            })()}
+            
+            {/* Группа: Токарные станки */}
+            {(() => {
+              const turningMachines = machines
+                ?.filter(machine => machine.machineType === 'TURNING' || machine.machineType === 'turning' || machine.machineType.includes('turning'))
+                .sort((a, b) => a.machineName.localeCompare(b.machineName)); // Стабильная сортировка по имени
+              
+              if (turningMachines && turningMachines.length > 0) {
+                return (
+                  <div key="turning-group" style={{ marginBottom: '32px' }}>
+                    <div style={{ 
+                      marginBottom: '16px', 
+                      padding: '12px', 
+                      backgroundColor: '#f6ffed', 
+                      borderRadius: '8px',
+                      borderLeft: '4px solid #52c41a'
+                    }}>
+                      <h3 style={{ 
+                        margin: 0, 
+                        color: '#52c41a', 
+                        fontSize: '18px',
+                        fontWeight: 'bold'
+                      }}>
+                        🔄 Токарные станки ({turningMachines.length})
+                      </h3>
+                    </div>
+                    <Row gutter={[16, 16]}>
+                      {turningMachines.map((machine) => (
+                        <Col xs={24} sm={12} lg={8} xl={6} key={`turning-${machine.id}`}>
+                          <MachineCard
+                            machine={machine}
+                            isSelected={selectedMachine?.id === machine.id}
+                            onSelect={() => setSelectedMachine(machine)}
+                            onOpenPlanningModal={handleOpenPlanningModal}
+                          />
+                        </Col>
+                      ))}
+                    </Row>
+                  </div>
+                );
+              }
+              return null;
+            })()}
+            
+            {/* Группа: Другие станки (если есть) */}
+            {(() => {
+              const otherMachines = machines
+                ?.filter(machine => 
+                  !['MILLING', 'milling', 'TURNING', 'turning'].includes(machine.machineType) &&
+                  !machine.machineType.includes('milling') &&
+                  !machine.machineType.includes('turning')
+                )
+                .sort((a, b) => a.machineName.localeCompare(b.machineName)); // Стабильная сортировка по имени
+              
+              if (otherMachines && otherMachines.length > 0) {
+                return (
+                  <div key="other-group" style={{ marginBottom: '32px' }}>
+                    <div style={{ 
+                      marginBottom: '16px', 
+                      padding: '12px', 
+                      backgroundColor: '#fff7e6', 
+                      borderRadius: '8px',
+                      borderLeft: '4px solid #faad14'
+                    }}>
+                      <h3 style={{ 
+                        margin: 0, 
+                        color: '#faad14', 
+                        fontSize: '18px',
+                        fontWeight: 'bold'
+                      }}>
+                        ⚙️ Другие станки ({otherMachines.length})
+                      </h3>
+                    </div>
+                    <Row gutter={[16, 16]}>
+                      {otherMachines.map((machine) => (
+                        <Col xs={24} sm={12} lg={8} xl={6} key={`other-${machine.id}`}>
+                          <MachineCard
+                            machine={machine}
+                            isSelected={selectedMachine?.id === machine.id}
+                            onSelect={() => setSelectedMachine(machine)}
+                            onOpenPlanningModal={handleOpenPlanningModal}
+                          />
+                        </Col>
+                      ))}
+                    </Row>
+                  </div>
+                );
+              }
+              return null;
+            })()}
           </div>
         </Col>
       </Row>
