@@ -6,9 +6,7 @@ import { ProductionPage } from './pages/Production/ProductionPage';
 import { DatabasePage } from './pages/Database/DatabasePage';
 import { ShiftsPage } from './pages/Shifts/ShiftsPage';
 import { CalendarPage } from './pages/Calendar/CalendarPage';
-import { ProductionPlanningPage } from './pages/Planning';
 import { ActiveOperationsPage } from './pages/ActiveOperations';
-import { OperationHistory } from './pages/OperationHistory';
 import { OperatorsPage } from './pages/Operators';
 import { TranslationsPage } from './pages/Translations';
 import { TranslationTestPage } from './pages/TranslationTest/TranslationTestPage';
@@ -25,15 +23,13 @@ const App: React.FC = () => {
       >
         <Routes>
           <Route path="/" element={<Layout />}>
-            <Route index element={<Navigate to="/production" replace />} />
-            <Route path="production" element={<ProductionPage />} />
+            <Route index element={<Navigate to="/database" replace />} />
             <Route path="database" element={<DatabasePage />} />
+            <Route path="production" element={<ProductionPage />} />
             <Route path="shifts" element={<ShiftsPage />} />
-            <Route path="operators" element={<OperatorsPage />} />
-            <Route path="planning" element={<ProductionPlanningPage />} />
             <Route path="operations" element={<ActiveOperationsPage />} />
-            <Route path="operation-history" element={<OperationHistory />} />
             <Route path="calendar" element={<CalendarPage />} />
+            <Route path="operators" element={<OperatorsPage />} />
             <Route path="translations" element={<TranslationsPage />} />
             <Route path="translation-test" element={<TranslationTestPage />} />
             <Route path="language-demo" element={<LanguageSwitcherDemo />} />

@@ -39,8 +39,7 @@ import { OperationStatus } from '../../../types/operation.types';
 
 import { ShiftForm } from './ShiftForm';
 import { OperationDetailModal } from './OperationDetailModal';
-import DataDiagnostics from './DataDiagnostics';
-import SimpleProductionView from './SimpleProductionView';
+
 // СТАРОЕ: import { OperationCompletionModal } from './OperationCompletionModal';
 // НОВОЕ: Система автозавершения операций
 import OperationCompletionNotification from '../../../components/OperationCompletionNotification';
@@ -108,22 +107,55 @@ interface ActiveMachine {
   };
 }
 
-// Утилитарная функция для получения названия типа станка
-const getMachineTypeLabel = (type: string, t: (key: string) => string): string => {
-  if (!type) return t('shifts.machine_generic');
+// Утилитарная функция для определения типа станка (фрезерный или токарный)
+const getMachineCategory = (machine: ActiveMachine): 'milling' | 'turning' | 'unknown' => {
+  const { machineName, machineType } = machine;
+  const upperName = machineName?.toUpperCase() || '';
+  const upperType = machineType?.toUpperCase() || '';
   
-  const upperType = type.toUpperCase();
-  if (upperType.includes('MILLING')) {
-    return t('shifts.milling');
-  } else if (upperType.includes('TURNING')) {
-    return t('shifts.turning');
-  } else if (upperType.includes('DRILLING')) {
-    return t('shifts.drilling');
-  } else if (upperType.includes('GRINDING')) {
-    return t('shifts.grinding');
+  // Проверяем тип станка сначала (более надёжно)
+  if (upperType.includes('MILLING') || upperType.includes('MILL')) {
+    return 'milling';
+  }
+  if (upperType.includes('TURNING') || upperType.includes('TURN')) {
+    return 'turning';
   }
   
-  return t('shifts.machine_generic');
+  // Известные фрезерные станки (по названию)
+  if (upperName.includes('MITSUBISHI') || 
+      upperName.includes('MAZAK') ||
+      upperName.includes('HAAS') ||
+      upperName.includes('DMG') ||
+      upperName.includes('MAKINO') ||
+      upperName.startsWith('F1') || upperName.startsWith('F2') || 
+      upperName.startsWith('F3') || upperName.startsWith('F4')) {
+    return 'milling';
+  }
+  
+  // Известные токарные станки (по названию)
+  if (upperName.startsWith('T1') || upperName.startsWith('T2') || 
+      upperName.startsWith('T3') || upperName.startsWith('T4') ||
+      upperName.includes('DOOSAN') ||
+      upperName.includes('OKUMA') ||
+      upperName.includes('CITIZEN')) {
+    return 'turning';
+  }
+  
+  return 'unknown';
+};
+
+// Утилитарная функция для получения названия типа станка
+const getMachineTypeLabel = (machine: ActiveMachine, t: (key: string) => string): string => {
+  const category = getMachineCategory(machine);
+  
+  switch (category) {
+    case 'milling':
+      return t('shifts.milling');
+    case 'turning':
+      return t('shifts.turning');
+    default:
+      return t('shifts.machine_generic');
+  }
 };
 
 export const ActiveMachinesMonitor: React.FC<ActiveMachinesMonitorProps> = ({ selectedOperation: selectedOperationFromProduction }) => {
@@ -616,8 +648,6 @@ export const ActiveMachinesMonitor: React.FC<ActiveMachinesMonitorProps> = ({ se
 
   return (
     <div>
-      {/* ОТЛАДОЧНЫЕ КОМПОНЕНТЫ */}
-      <SimpleProductionView />
       
       {/* 🆕 НОВОЕ: Отображение выбранной операции с real-time обновлениями */}
       {currentSelectedOperation && (
@@ -716,7 +746,15 @@ export const ActiveMachinesMonitor: React.FC<ActiveMachinesMonitorProps> = ({ se
       </div>
 
       <Row gutter={[16, 16]}>
-        {activeMachines.map(machine => {
+        {/* Фрезерные станки */}
+        <Col span={24}>
+          <Title level={4} style={{ marginBottom: 16, color: '#1890ff' }}>
+            🔧 {t('shifts.milling_machines')} ({activeMachines.filter(machine => getMachineCategory(machine) === 'milling').length})
+          </Title>
+          <Row gutter={[16, 16]}>
+            {activeMachines
+              .filter(machine => getMachineCategory(machine) === 'milling')
+              .map(machine => {
           // 🆕 Проверяем, соответствует ли станок выбранной операции (с поддержкой real-time)
           const isSelectedMachine = currentSelectedOperation && 
             machine.machineName === currentSelectedOperation.machineName;
@@ -730,7 +768,7 @@ export const ActiveMachinesMonitor: React.FC<ActiveMachinesMonitorProps> = ({ se
                       status={getMachineStatusColor(machine.status) as any} 
                       text={machine.machineName}
                     />
-                    <Tag color="blue">{getMachineTypeLabel(machine.machineType, t)}</Tag>
+                    <Tag color="blue">{getMachineTypeLabel(machine, t)}</Tag>
                     {/* 🆕 НОВОЕ: Индикатор выбранной операции */}
                     {isSelectedMachine && (
                       <Tag color="success" style={{ fontSize: '10px' }}>
@@ -936,6 +974,239 @@ export const ActiveMachinesMonitor: React.FC<ActiveMachinesMonitorProps> = ({ se
           </Col>
           );
         })}
+          </Row>
+        </Col>
+        
+        {/* Токарные станки */}
+        <Col span={24} style={{ marginTop: 32 }}>
+          <Title level={4} style={{ marginBottom: 16, color: '#52c41a' }}>
+            ⚙️ {t('shifts.turning_machines')} ({activeMachines.filter(machine => getMachineCategory(machine) === 'turning').length})
+          </Title>
+          <Row gutter={[16, 16]}>
+            {activeMachines
+              .filter(machine => getMachineCategory(machine) === 'turning')
+              .map(machine => {
+                // 🆕 Проверяем, соответствует ли станок выбранной операции (с поддержкой real-time)
+                const isSelectedMachine = currentSelectedOperation && 
+                  machine.machineName === currentSelectedOperation.machineName;
+                
+                return (
+                  <Col xs={24} sm={12} lg={8} xl={6} key={machine.id}>
+                    <Card
+                      title={
+                        <Space>
+                          <Badge 
+                            status={getMachineStatusColor(machine.status) as any} 
+                            text={machine.machineName}
+                          />
+                          <Tag color="green">{getMachineTypeLabel(machine, t)}</Tag>
+                          {/* 🆕 НОВОЕ: Индикатор выбранной операции */}
+                          {isSelectedMachine && (
+                            <Tag color="success" style={{ fontSize: '10px' }}>
+                              🎆 ВЫБРАНО
+                            </Tag>
+                          )}
+                        </Space>
+                      }
+                      extra={
+                        <Tag color={getMachineStatusColor(machine.status)}>
+                          {getMachineStatusText(machine.status)}
+                        </Tag>
+                      }
+                      actions={[
+                        <Tooltip title={t('shifts.shift_record')}>
+                          <Button
+                            type="primary"
+                            icon={<FileTextOutlined />}
+                            onClick={() => handleCreateShiftRecord(machine.id)}
+                          >
+                            {t('shifts.shift_record')}
+                          </Button>
+                        </Tooltip>
+                      ]}
+                      size="small"
+                      style={{
+                        // 🆕 НОВОЕ: Подсвечиваем карточку выбранного станка
+                        borderColor: isSelectedMachine ? '#52c41a' : undefined,
+                        borderWidth: isSelectedMachine ? 2 : 1,
+                        backgroundColor: isSelectedMachine ? '#f6ffed' : undefined,
+                        boxShadow: isSelectedMachine ? '0 4px 16px rgba(82, 196, 26, 0.3)' : undefined
+                      }}
+                    >
+                    {machine.currentOperationDetails ? (
+                      <div>
+                        <div 
+                          style={{ 
+                            marginBottom: 12, 
+                            cursor: 'pointer',
+                            padding: '8px',
+                            backgroundColor: '#f0f9ff',
+                            borderRadius: '4px',
+                            border: '1px solid #91d5ff'
+                          }}
+                          onClick={() => handleOperationClick(machine.currentOperationDetails)}
+                        >
+                          <Text strong>{t('shifts.current_operation')}:</Text>
+                          <br />
+                          <Text>{t('form.operation')} {machine.currentOperationDetails.operationNumber}</Text>
+                          <br />
+                          <Text type="secondary">
+                            {machine.currentOperationDetails.orderDrawingNumber}
+                          </Text>
+                          <br />
+                          <Text type="secondary" style={{ fontSize: '11px' }}>
+                            <BarChartOutlined /> {t('shifts.click_for_analytics')}
+                          </Text>
+                        </div>
+
+                        {/* ИСПРАВЛЕННОЕ: Улучшенный индикатор прогресса с проверкой завершения */}
+                        <div style={{ marginBottom: 12 }}>
+                          <Text>{t('shifts.progress_execution')}:</Text>
+                          <Progress 
+                            percent={Math.round(machine.currentOperationDetails.progress || 0)} 
+                            size="small"
+                            status={(machine.currentOperationDetails.progress || 0) >= 100 ? 'success' : 'active'}
+                            strokeColor={(machine.currentOperationDetails.progress || 0) >= 100 ? '#52c41a' : undefined}
+                          />
+                          <Text type="secondary" style={{ fontSize: '11px' }}>
+                            {machine.currentOperationDetails.totalProduced || 0} {t('shifts.of')} {machine.currentOperationDetails.targetQuantity || 0} {t('shifts.parts_suffix')}
+                            {(machine.currentOperationDetails.progress || 0) >= 100 && (
+                              <Tag color="green" style={{ marginLeft: 8, fontSize: '10px' }}>
+                                ✅ ВЫПОЛНЕНО
+                              </Tag>
+                            )}
+                          </Text>
+                        </div>
+
+                        <div style={{ marginBottom: 12 }}>
+                          <Text>
+                            <ClockCircleOutlined /> {t('form.time')}: {machine.currentOperationDetails.estimatedTime}{t('shifts.minutes')}
+                          </Text>
+                        </div>
+
+                        <Divider style={{ margin: '12px 0' }} />
+
+                        <div>
+                          <Text strong>{t('shifts.production_by_operation')}:</Text>
+                          <br />
+                          <Tag color="purple" style={{ fontSize: '10px', marginBottom: '8px' }}>
+                            📋 {machine.currentOperationDetails.orderDrawingNumber}
+                          </Tag>
+                          {/* НОВОЕ: Индикатор новой операции */}
+                          {(machine.currentOperationProduction?.dayShift.quantity || 0) === 0 && 
+                           (machine.currentOperationProduction?.nightShift.quantity || 0) === 0 && (
+                            <div style={{ textAlign: 'center', margin: '8px 0' }}>
+                              <Tag color="green" style={{ fontSize: '11px' }}>
+                                🆕 НОВАЯ ОПЕРАЦИЯ
+                              </Tag>
+                              <br />
+                              <Text type="secondary" style={{ fontSize: '10px' }}>
+                                Производство еще не началось
+                              </Text>
+                            </div>
+                          )}
+                          <div style={{ marginTop: 8 }}>
+                            <Row gutter={8}>
+                              <Col span={12}>
+                                <div style={{ textAlign: 'center', padding: '8px', backgroundColor: '#f0f9ff', borderRadius: '4px' }}>
+                                  <Text type="secondary">{t('shifts.day')}</Text>
+                                  <br />
+                                  <Text strong style={{ fontSize: '18px' }}>
+                                    {machine.currentOperationProduction?.dayShift.quantity || 0}
+                                  </Text>
+                                  <br />
+                                  <Text type="secondary" style={{ fontSize: '12px' }}>
+                                    {machine.currentOperationProduction?.dayShift.operator || '-'}
+                                  </Text>
+                                  {(machine.currentOperationProduction?.dayShift.efficiency || 0) > 0 && (
+                                    <>
+                                      <br />
+                                      <Text type="secondary" style={{ fontSize: '10px', color: (machine.currentOperationProduction?.dayShift.efficiency || 0) > 80 ? '#52c41a' : '#faad14' }}>
+                                        ⚡ {(machine.currentOperationProduction?.dayShift.efficiency || 0).toFixed(0)}%
+                                      </Text>
+                                    </>
+                                  )}
+                                </div>
+                              </Col>
+                              <Col span={12}>
+                                <div style={{ textAlign: 'center', padding: '8px', backgroundColor: '#f6f6f6', borderRadius: '4px' }}>
+                                  <Text type="secondary">{t('shifts.night')}</Text>
+                                  <br />
+                                  <Text strong style={{ fontSize: '18px' }}>
+                                    {machine.currentOperationProduction?.nightShift.quantity || 0}
+                                  </Text>
+                                  <br />
+                                  <Text type="secondary" style={{ fontSize: '12px' }}>
+                                    {machine.currentOperationProduction?.nightShift.operator || 'Аркадий'}
+                                  </Text>
+                                  {(machine.currentOperationProduction?.nightShift.efficiency || 0) > 0 && (
+                                    <>
+                                      <br />
+                                      <Text type="secondary" style={{ fontSize: '10px', color: (machine.currentOperationProduction?.nightShift.efficiency || 0) > 80 ? '#52c41a' : '#faad14' }}>
+                                        ⚡ {(machine.currentOperationProduction?.nightShift.efficiency || 0).toFixed(0)}%
+                                      </Text>
+                                    </>
+                                  )}
+                                </div>
+                              </Col>
+                            </Row>
+                            
+                            {/* НОВОЕ: Общая сумма выполненного объема */}
+                            <div style={{ 
+                              marginTop: '12px', 
+                              padding: '10px', 
+                              backgroundColor: '#f0f9ff', 
+                              borderRadius: '8px',
+                              border: '2px solid #1890ff'
+                            }}>
+                              <div style={{ textAlign: 'center' }}>
+                                <Text strong style={{ fontSize: '14px', color: '#1890ff' }}>
+                                  📊 ОБЩИЙ ОБЪЕМ
+                                </Text>
+                                <br />
+                                <Text strong style={{ fontSize: '24px', color: '#1890ff' }}>
+                                  {((machine.currentOperationProduction?.dayShift.quantity || 0) + 
+                                    (machine.currentOperationProduction?.nightShift.quantity || 0))}
+                                </Text>
+                                <Text type="secondary" style={{ fontSize: '12px', marginLeft: '4px' }}>
+                                  деталей
+                                </Text>
+                                <br />
+                                <div style={{ marginTop: '4px' }}>
+                                  <Text type="secondary" style={{ fontSize: '11px' }}>
+                                    День: {machine.currentOperationProduction?.dayShift.quantity || 0} + 
+                                    Ночь: {machine.currentOperationProduction?.nightShift.quantity || 0}
+                                  </Text>
+                                </div>
+                                {/* 🆕 Индикатор синхронизации */}
+                                <div style={{ marginTop: '4px' }}>
+                                  <Text type="secondary" style={{ fontSize: '10px', color: '#52c41a' }}>
+                                    🔄 Синхронизируется автоматически
+                                  </Text>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ textAlign: 'center', padding: '20px' }}>
+                        <PauseCircleOutlined style={{ fontSize: '48px', color: '#d9d9d9' }} />
+                        <div style={{ marginTop: 12 }}>
+                          <Text type="secondary">{t('shifts.machine_idle')}</Text>
+                          <br />
+                          <Text type="secondary" style={{ fontSize: '12px' }}>
+                            {t('shifts.no_assigned_operations')}
+                          </Text>
+                        </div>
+                      </div>
+                    )}
+                  </Card>
+                </Col>
+                );
+              })}
+          </Row>
+        </Col>
       </Row>
 
       <ShiftForm

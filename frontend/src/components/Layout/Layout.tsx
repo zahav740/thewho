@@ -13,9 +13,7 @@ import {
   DatabaseOutlined,
   ScheduleOutlined,
   CalendarOutlined,
-  SettingOutlined,
   PlayCircleOutlined,
-  HistoryOutlined,
   UserOutlined,
   GlobalOutlined,
 } from '@ant-design/icons';
@@ -37,28 +35,16 @@ export const Layout: React.FC = () => {
 
   const menuItems: MenuProps['items'] = [
     {
-      key: '/production',
-      icon: <AppstoreOutlined />,
-      label: t('menu.production'),
-      onClick: () => navigate('/production'),
-    },
-    {
-      key: '/operations',
-      icon: <PlayCircleOutlined />,
-      label: t('menu.operations'),
-      onClick: () => navigate('/operations'),
-    },
-    {
-      key: '/operation-history',
-      icon: <HistoryOutlined />,
-      label: t('menu.operation_history'),
-      onClick: () => navigate('/operation-history'),
-    },
-    {
       key: '/database',
       icon: <DatabaseOutlined />,
       label: t('menu.database'),
       onClick: () => navigate('/database'),
+    },
+    {
+      key: '/production',
+      icon: <AppstoreOutlined />,
+      label: t('menu.production'),
+      onClick: () => navigate('/production'),
     },
     {
       key: '/shifts',
@@ -67,22 +53,22 @@ export const Layout: React.FC = () => {
       onClick: () => navigate('/shifts'),
     },
     {
-      key: '/operators',
-      icon: <UserOutlined />,
-      label: t('menu.operators'),
-      onClick: () => navigate('/operators'),
-    },
-    {
-      key: '/planning',
-      icon: <SettingOutlined />,
-      label: t('menu.planning'),
-      onClick: () => navigate('/planning'),
+      key: '/operations',
+      icon: <PlayCircleOutlined />,
+      label: t('menu.operations'),
+      onClick: () => navigate('/operations'),
     },
     {
       key: '/calendar',
       icon: <CalendarOutlined />,
       label: t('menu.calendar'),
       onClick: () => navigate('/calendar'),
+    },
+    {
+      key: '/operators',
+      icon: <UserOutlined />,
+      label: t('menu.operators'),
+      onClick: () => navigate('/operators'),
     },
     {
       key: '/translations',
@@ -144,22 +130,18 @@ export const Layout: React.FC = () => {
 
 function getPageTitle(pathname: string, t: (key: string) => string): string {
   switch (pathname) {
-    case '/production':
-      return t('page.production.title');
-    case '/operations':
-      return t('page.operations.title');
-    case '/operation-history':
-      return t('page.operation_history.title');
     case '/database':
       return t('page.database.title');
+    case '/production':
+      return t('page.production.title');
     case '/shifts':
       return t('page.shifts.title');
-    case '/operators':
-      return t('page.operators.title');
-    case '/planning':
-      return t('page.planning.title');
+    case '/operations':
+      return t('page.operations.title');
     case '/calendar':
       return t('page.calendar.title');
+    case '/operators':
+      return t('page.operators.title');
     case '/translations':
       return t('translations.title');
     default:
