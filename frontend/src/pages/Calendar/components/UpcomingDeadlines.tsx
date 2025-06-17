@@ -1,25 +1,53 @@
 /**
  * @file: UpcomingDeadlines.tsx
- * @description: Компонент предстоящих дедлайнов
- * @dependencies: antd, calendarApi
+ * @description: Компонент предстоящих дедлайнов (ОБНОВЛЕННЫЙ)
+ * @dependencies: antd
  * @created: 2025-01-28
+ * @updated: 2025-06-17 - Обновлен для работы с новым API
  */
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, Table, Tag, Progress, InputNumber, Space, Alert, Spin, Badge } from 'antd';
 import { ExclamationCircleOutlined, CheckCircleOutlined } from '@ant-design/icons';
-import { useQuery } from '@tanstack/react-query';
 import dayjs from 'dayjs';
-import { enhancedCalendarApi } from '../../../services/enhancedCalendarApi';
+
+// API для получения данных
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5100/api';
+
+const fetchUpcomingDeadlines = async (days: number) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/calendar/upcoming-deadlines?days=${days}`);
+    const data = await response.json();
+    return Array.isArray(data) ? data : [];
+  } catch (error) {
+    console.error('❌ Ошибка загрузки дедлайнов:', error);
+    return [];
+  }
+};
 
 export const UpcomingDeadlines: React.FC = () => {
   const [daysAhead, setDaysAhead] = useState(14);
+  const [deadlines, setDeadlines] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const { data: deadlines, isLoading, error } = useQuery({
-    queryKey: ['upcoming-deadlines', daysAhead],
-    queryFn: () => enhancedCalendarApi.getUpcomingDeadlines(daysAhead),
-  });
+  useEffect(() => {
+    loadData();
+  }, [daysAhead]);
 
-  if (isLoading) {
+  const loadData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await fetchUpcomingDeadlines(daysAhead);
+      setDeadlines(data);
+    } catch (err) {
+      setError('Ошибка загрузки данных');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
     return (
       <Card>
         <Spin spinning={true}>
@@ -36,7 +64,7 @@ export const UpcomingDeadlines: React.FC = () => {
       <Card>
         <Alert
           message="Ошибка загрузки"
-          description="Не удалось загрузить предстоящие дедлайны"
+          description={error || 'Не удалось загрузить предстоящие дедлайны'}
           type="error"
           showIcon
         />

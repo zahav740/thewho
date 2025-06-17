@@ -1,30 +1,26 @@
 /**
  * @file: CalendarPage.tsx
- * @description: Страница производственного календаря
- * @dependencies: ProductionCalendar, MachineUtilization, UpcomingDeadlines
+ * @description: Страница производственного календаря (УПРОЩЕННАЯ ВЕРСИЯ)
+ * @dependencies: FixedProductionCalendar, MachineUtilization, UpcomingDeadlines
  * @created: 2025-01-28
+ * @updated: 2025-06-17 - Удалены старые версии календарей, оставлен только исправленный
  */
 import React, { useState } from 'react';
-import { Row, Col, DatePicker, Space, Tabs, Button, Typography, Alert } from 'antd';
-import { CalendarOutlined, BarChartOutlined, AlertOutlined, SettingOutlined, InfoCircleOutlined } from '@ant-design/icons';
+import { Row, Col, DatePicker, Space, Tabs, Typography, Alert } from 'antd';
+import { CalendarOutlined, BarChartOutlined, AlertOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
-import { ProductionCalendar } from './components/ProductionCalendar';
-import { EnhancedProductionCalendar } from './components/EnhancedProductionCalendar';
-import { ModernProductionCalendar } from './components/ModernProductionCalendar';
 import { FixedProductionCalendar } from './components/FixedProductionCalendar';
 import { MachineUtilization } from './components/MachineUtilization';
 import { UpcomingDeadlines } from './components/UpcomingDeadlines';
 
 const { RangePicker } = DatePicker;
-const { Text } = Typography; // Убираем неиспользуемый Title
+const { Text } = Typography;
 
 export const CalendarPage: React.FC = () => {
   const [dateRange, setDateRange] = useState<[Dayjs, Dayjs]>([
     dayjs().startOf('week'),
-    dayjs().endOf('week').add(2, 'week'), // Увеличено до 3 недель
+    dayjs().endOf('week').add(2, 'week'), // 3 недели
   ]);
-
-  const [calendarType, setCalendarType] = useState<'classic' | 'enhanced' | 'modern' | 'fixed'>('fixed'); // По умолчанию используем Fixed
 
   const handleDateRangeChange = (dates: [Dayjs | null, Dayjs | null] | null) => {
     if (dates && dates[0] && dates[1]) {
@@ -43,41 +39,13 @@ export const CalendarPage: React.FC = () => {
 
   return (
     <div className="page-container">
-      {/* Переключатель версий календаря */}
+      {/* Информация о календаре */}
       <Alert
-        message="🚀 Новый современный календарь!"
+        message="⚡ Производственный календарь"
         description={
-          <Space>
-            <Text>Доступны три версии календаря: классический, улучшенный и современный с продвинутым интерфейсом.</Text>
-            <Button.Group size="small">
-              <Button 
-                type={calendarType === 'classic' ? 'primary' : 'default'}
-                onClick={() => setCalendarType('classic')}
-              >
-                Классический
-              </Button>
-              <Button 
-                type={calendarType === 'enhanced' ? 'primary' : 'default'}
-                onClick={() => setCalendarType('enhanced')}
-              >
-                Улучшенный
-              </Button>
-              <Button 
-                type={calendarType === 'modern' ? 'primary' : 'default'}
-                onClick={() => setCalendarType('modern')}
-              >
-                🔥 Современный
-              </Button>
-              <Button 
-                type={calendarType === 'fixed' ? 'primary' : 'default'}
-                onClick={() => setCalendarType('fixed')}
-              >
-                ⚡ Исправленный
-              </Button>
-            </Button.Group>
-          </Space>
+          <Text>Современный календарь с интеграцией базы данных PostgreSQL и интерактивным интерфейсом.</Text>
         }
-        type="info"
+        type="success"
         showIcon
         closable
         style={{ marginBottom: 16 }}
@@ -99,36 +67,6 @@ export const CalendarPage: React.FC = () => {
                 { label: 'Текущий месяц', value: [dayjs().startOf('month'), dayjs().endOf('month')] },
               ]}
             />
-            <Button.Group>
-              <Button 
-                type={calendarType === 'classic' ? 'primary' : 'default'}
-                icon={<CalendarOutlined />}
-                onClick={() => setCalendarType('classic')}
-              >
-                Классический
-              </Button>
-              <Button 
-                type={calendarType === 'enhanced' ? 'primary' : 'default'}
-                icon={<BarChartOutlined />}
-                onClick={() => setCalendarType('enhanced')}
-              >
-                Улучшенный
-              </Button>
-              <Button 
-                type={calendarType === 'modern' ? 'primary' : 'default'}
-                icon={<SettingOutlined />}
-                onClick={() => setCalendarType('modern')}
-              >
-                🔥 Современный
-              </Button>
-              <Button 
-                type={calendarType === 'fixed' ? 'primary' : 'default'}
-                icon={<SettingOutlined />}
-                onClick={() => setCalendarType('fixed')}
-              >
-                ⚡ Исправленный
-              </Button>
-            </Button.Group>
           </Space>
         </Col>
       </Row>
@@ -143,20 +81,10 @@ export const CalendarPage: React.FC = () => {
                 label: (
                   <span>
                     <CalendarOutlined />
-                    {calendarType === 'classic' && 'Классический календарь'}
-                    {calendarType === 'enhanced' && 'Улучшенный календарь'}
-                    {calendarType === 'modern' && '🔥 Современный календарь'}
-                    {calendarType === 'fixed' && '⚡ Исправленный календарь'}
+                    ⚡ Производственный календарь
                   </span>
                 ),
-                children: (
-                  <>
-                    {calendarType === 'classic' && <ProductionCalendar filter={filter} />}
-                    {calendarType === 'enhanced' && <EnhancedProductionCalendar filter={filter} />}
-                    {calendarType === 'modern' && <ModernProductionCalendar filter={filter} />}
-                    {calendarType === 'fixed' && <FixedProductionCalendar filter={filter} />}
-                  </>
-                )
+                children: <FixedProductionCalendar filter={filter} />
               },
               {
                 key: 'utilization',
@@ -183,62 +111,24 @@ export const CalendarPage: React.FC = () => {
         </Col>
       </Row>
 
-      {/* Информационные сообщения для разных типов календарей */}
-      {calendarType === 'enhanced' && (
-        <Alert
-          message="📅 Особенности улучшенного календаря"
-          description={
-            <div>
-              <Text>• Пятница и суббота — выходные дни</Text><br/>
-              <Text>• Продолжительность операций рассчитывается в рабочих днях</Text><br/>
-              <Text>• Наведите курсор на ячейку для детальной информации о сменах</Text><br/>
-              <Text>• Отображается время наладки и эффективность операторов</Text>
-            </div>
-          }
-          type="info"
-          showIcon
-          style={{ marginTop: 16 }}
-          icon={<InfoCircleOutlined />}
-        />
-      )}
-      
-      {calendarType === 'modern' && (
-        <Alert
-          message="🚀 Особенности современного календаря"
-          description={
-            <div>
-              <Text>• Современный дизайн с карточками станков</Text><br/>
-              <Text>• Режимы просмотра: сетка и таймлайн</Text><br/>
-              <Text>• Фильтрация по типу станков и статусу операций</Text><br/>
-              <Text>• Мини-календарь загрузки для каждого станка</Text><br/>
-              <Text>• Реальные данные из базы данных производства</Text>
-            </div>
-          }
-          type="success"
-          showIcon
-          style={{ marginTop: 16 }}
-          icon={<InfoCircleOutlined />}
-        />
-      )}
-      
-      {calendarType === 'fixed' && (
-        <Alert
-          message="⚡ Исправленный календарь"
-          description={
-            <div>
-              <Text>• Исправлены все ошибки с библиотеками</Text><br/>
-              <Text>• Полная интеграция с базой данных PostgreSQL</Text><br/>
-              <Text>• Современный дизайн без зависимостей от Ant Design</Text><br/>
-              <Text>• Кликабельные ячейки с детальной информацией</Text><br/>
-              <Text>• Реальное отображение данных из production CRM</Text>
-            </div>
-          }
-          type="success"
-          showIcon
-          style={{ marginTop: 16 }}
-          icon={<InfoCircleOutlined />}
-        />
-      )}
+      {/* Информация о календаре */}
+      <Alert
+        message="⚡ Современный производственный календарь"
+        description={
+          <div>
+            <Text>• Полная интеграция с базой данных PostgreSQL</Text><br/>
+            <Text>• Современный дизайн без зависимостей от внешних библиотек</Text><br/>
+            <Text>• Кликабельные ячейки с детальной информацией об операциях</Text><br/>
+            <Text>• Реальное отображение данных из production CRM</Text><br/>
+            <Text>• Интерактивные карточки станков с мини-календарями</Text><br/>
+            <Text>• Статистика загрузки и эффективности в реальном времени</Text>
+          </div>
+        }
+        type="info"
+        showIcon
+        style={{ marginTop: 16 }}
+        icon={<InfoCircleOutlined />}
+      />
     </div>
   );
 };

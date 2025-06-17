@@ -1,14 +1,27 @@
 /**
  * @file: MachineUtilization.tsx
- * @description: Компонент загруженности станков
- * @dependencies: antd, recharts, calendarApi
+ * @description: Компонент загруженности станков (ОБНОВЛЕННЫЙ)
+ * @dependencies: antd, recharts
  * @created: 2025-01-28
+ * @updated: 2025-06-17 - Обновлен для работы с новым API
  */
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, Progress, Row, Col, Statistic, Spin, Alert } from 'antd';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { useQuery } from '@tanstack/react-query';
-import { calendarApi } from '../../../services/calendarApi';
+
+// API для получения данных
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5100/api';
+
+const fetchMachineSummary = async (startDate: string, endDate: string) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/calendar/machine-summary?startDate=${startDate}&endDate=${endDate}`);
+    const data = await response.json();
+    return data.success ? data : null;
+  } catch (error) {
+    console.error('❌ Ошибка загрузки сводки станков:', error);
+    return null;
+  }
+};
 
 interface MachineUtilizationProps {
   filter: {
@@ -18,12 +31,32 @@ interface MachineUtilizationProps {
 }
 
 export const MachineUtilization: React.FC<MachineUtilizationProps> = ({ filter }) => {
-  const { data: utilization, isLoading, error } = useQuery({
-    queryKey: ['machine-utilization', filter],
-    queryFn: () => calendarApi.getMachineUtilization(filter.startDate, filter.endDate),
-  });
+  const [utilization, setUtilization] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  if (isLoading) {
+  useEffect(() => {
+    loadData();
+  }, [filter.startDate, filter.endDate]);
+
+  const loadData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await fetchMachineSummary(filter.startDate, filter.endDate);
+      if (data && data.machines) {
+        setUtilization(data.machines);
+      } else {
+        setError('Нет данных о станках');
+      }
+    } catch (err) {
+      setError('Ошибка загрузки данных');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
     return (
       <Card>
         <Spin spinning={true}>
@@ -35,12 +68,12 @@ export const MachineUtilization: React.FC<MachineUtilizationProps> = ({ filter }
     );
   }
 
-  if (error || !utilization) {
+  if (error || !utilization || utilization.length === 0) {
     return (
       <Card>
         <Alert
           message="Ошибка загрузки"
-          description="Не удалось загрузить данные о загруженности"
+          description={error || 'Не удалось загрузить данные о загруженности'}
           type="error"
           showIcon
         />
@@ -55,7 +88,7 @@ export const MachineUtilization: React.FC<MachineUtilizationProps> = ({ filter }
       : 0;
     
     return {
-      name: machine.machineCode || 'Неизвестный станок',
+      name: machine.machineName || 'Неизвестный станок',
       загруженность: Math.round(utilizationPercent * 100) / 100, // Округляем до 2 знаков
       свободно: Math.round((100 - utilizationPercent) * 100) / 100,
     };
@@ -78,10 +111,8 @@ export const MachineUtilization: React.FC<MachineUtilizationProps> = ({ filter }
     return '#ff4d4f';
   };
 
-  const formatMinutes = (minutes: number) => {
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    return `${hours}ч ${mins}м`;
+  const formatDays = (days: number) => {
+    return `${days} дн.`;
   };
 
   return (
@@ -122,21 +153,21 @@ export const MachineUtilization: React.FC<MachineUtilizationProps> = ({ filter }
               const safeUtilizationPercent = typeof machine.utilizationPercent === 'number' && !isNaN(machine.utilizationPercent)
                 ? Math.max(0, Math.min(100, machine.utilizationPercent))
                 : 0;
-              const safeUsedMinutes = typeof machine.usedMinutes === 'number' && !isNaN(machine.usedMinutes)
-                ? machine.usedMinutes
+              const safeUsedDays = typeof machine.daysWithOperations === 'number' && !isNaN(machine.daysWithOperations)
+                ? machine.daysWithOperations
                 : 0;
-              const safeTotalMinutes = typeof machine.totalCapacityMinutes === 'number' && !isNaN(machine.totalCapacityMinutes)
-                ? machine.totalCapacityMinutes
+              const safeTotalDays = typeof machine.workingDays === 'number' && !isNaN(machine.workingDays)
+                ? machine.workingDays
                 : 0;
               
               return (
                 <div key={machine.machineId} style={{ marginBottom: 16 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                     <span>
-                      <strong>{machine.machineCode || 'Неизвестный станок'}</strong>
+                      <strong>{machine.machineName || 'Неизвестный станок'}</strong>
                     </span>
                     <span style={{ color: '#999' }}>
-                      {formatMinutes(safeUsedMinutes)} / {formatMinutes(safeTotalMinutes)}
+                      {formatDays(machine.daysWithOperations || 0)} / {formatDays(machine.workingDays || 0)}
                     </span>
                   </div>
                   <Progress
