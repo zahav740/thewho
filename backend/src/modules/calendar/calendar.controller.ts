@@ -142,7 +142,7 @@ export class CalendarController {
 
       return {
         operationId: operation.id,
-        drawingNumber: operation.order?.drawing_number || 'Не указан',
+        drawingNumber: operation.order?.drawingNumber || 'Не указан',
         operationNumber: operation.operationNumber,
         estimatedTime: operation.estimatedTime,
         totalQuantity: operation.order?.quantity || 0,
@@ -239,7 +239,7 @@ export class CalendarController {
           sr."dayShiftTimePerUnit",
           sr."nightShiftTimePerUnit",
           sr."setupTime",
-          sr.drawingnumber as drawing_number,
+          sr."drawingnumber" as drawing_number,
           o."operationNumber" as operation_number
         FROM shift_records sr
         LEFT JOIN operations o ON sr."operationId" = o.id
@@ -327,7 +327,7 @@ export class CalendarController {
       
       return {
         operationId: operation.id,
-        drawingNumber: operation.order.drawing_number,
+        drawingNumber: operation.order.drawingNumber,
         operationNumber: operation.operationNumber,
         estimatedTimePerPart: operation.estimatedTime,
         totalQuantity: totalQuantity,
@@ -447,7 +447,7 @@ export class CalendarController {
 
         deadlines.push({
           orderId: order.id.toString(),
-          drawingNumber: order.drawing_number,
+          drawingNumber: order.drawingNumber,
           deadline: order.deadline,
           daysUntilDeadline: daysUntil,
           completedOperations,
