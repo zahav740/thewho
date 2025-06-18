@@ -1,9 +1,9 @@
 /**
  * @file: ProductionPage.tsx
- * @description: Страница производства (обновленная с улучшенным планированием)
- * @dependencies: MachineCard, OrderRecommendations, PlanningModalImproved
+ * @description: Адаптивная страница производства с улучшенным планированием и полной поддержкой мобильных устройств
+ * @dependencies: MachineCard, OrderRecommendations, PlanningModalImproved, ResponsiveGrid
  * @created: 2025-01-28
- * @updated: 2025-06-08
+ * @updated: 2025-06-18 - Добавлена полная адаптивность для всех устройств
  */
 import React, { useState } from 'react';
 import { Row, Col, Spin, Alert, Button, Switch, Space, Card, Typography, Tag } from 'antd';
@@ -11,29 +11,40 @@ import { ThunderboltOutlined, BugOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from '../../i18n';
 import { machinesApi } from '../../services/machinesApi';
-import { synchronizationApi } from '../../services/synchronizationApi'; // 🆕 Новый API синхронизации
-import { useSynchronization } from '../../hooks'; // 🆕 Хук синхронизации
+import { synchronizationApi } from '../../services/synchronizationApi';
+import { useSynchronization, useResponsive, responsiveUtils } from '../../hooks';
 import { MachineAvailability } from '../../types/machine.types';
 import { MachineCard } from './components/MachineCard';
 import { OrderRecommendations } from './components/OrderRecommendations';
 import { PlanningModal } from '../../components/PlanningModal';
 import { QUERY_KEYS } from '../../utils/queryKeys';
-// 🆕 ИМПОРТ УЛУЧШЕННОГО ПЛАНИРОВАНИЯ
 import PlanningModalImproved from '../../components/PlanningModal/PlanningModalImproved';
+
+// Импорт адаптивных компонентов
+import { 
+  ResponsiveContainer, 
+  ResponsiveActions,
+  ResponsiveGrid 
+} from '../../components/ResponsiveGrid';
+
 
 const { Text } = Typography;
 
 export const ProductionPage: React.FC = () => {
   const { t, currentLanguage } = useTranslation();
+  const screenInfo = useResponsive();
   const [selectedMachine, setSelectedMachine] = useState<MachineAvailability | null>(null);
   const [planningModalVisible, setPlanningModalVisible] = useState(false);
   const [planningMachine, setPlanningMachine] = useState<MachineAvailability | null>(null);
-  // 🆕 СОСТОЯНИЕ ДЛЯ УЛУЧШЕННОГО ПЛАНИРОВАНИЯ
-  const [useImprovedPlanning, setUseImprovedPlanning] = useState(true); // По умолчанию включено
-  // НОВОЕ: Состояние для выбранной операции
+  const [useImprovedPlanning, setUseImprovedPlanning] = useState(true);
   const [selectedOperation, setSelectedOperation] = useState<any>(null);
 
-  // 🆕 НОВОЕ: Система синхронизации
+  // Адаптивные параметры
+  const componentSize = responsiveUtils.getComponentSize(screenInfo);
+  const cardSize: 'default' | 'small' = screenInfo.isMobile ? 'small' : 'default';
+  const cardSpacing = screenInfo.isMobile ? 12 : screenInfo.isTablet ? 16 : 24;
+
+  // Система синхронизации
   const {
     forceSyncAll,
     syncOperation,
@@ -41,7 +52,7 @@ export const ProductionPage: React.FC = () => {
     checkSyncHealth,
   } = useSynchronization({
     autoSync: true,
-    syncInterval: 15000, // Синхронизация каждые 15 секунд
+    syncInterval: 15000,
     onSyncSuccess: (data) => {
       console.log('✅ Автоматическая синхронизация завершена:', data);
     },
@@ -51,18 +62,15 @@ export const ProductionPage: React.FC = () => {
   });
 
   const { data: machines, isLoading, error } = useQuery({
-    queryKey: QUERY_KEYS.MACHINES, // Обновлено: централизованный ключ
+    queryKey: QUERY_KEYS.MACHINES,
     queryFn: machinesApi.getAll,
-    refetchInterval: 5000, // Обновляем каждые 5 секунд
+    refetchInterval: 5000,
   });
 
   const handleOpenPlanningModal = (machine: MachineAvailability) => {
     console.log('🔥🔥🔥 handleOpenPlanningModal called with machine:', machine.machineName);
-    console.log('🔥🔥🔥 Current modal state - visible:', planningModalVisible, 'machine:', planningMachine);
-    console.log('🔥🔥🔥 Using improved planning:', useImprovedPlanning);
     setPlanningMachine(machine);
     setPlanningModalVisible(true);
-    console.log('🔥🔥🔥 Modal state updated - should be visible now');
   };
 
   const handleClosePlanningModal = () => {
@@ -70,12 +78,10 @@ export const ProductionPage: React.FC = () => {
     setPlanningMachine(null);
   };
 
-  // 🆕 НОВОЕ: Обработчик выбора операции с полной синхронизацией
   const handleOperationSelect = async (operation: any) => {
     try {
       console.log('🎯 Операция выбрана в Производстве:', operation);
       
-      // 🆕 1. Назначаем операцию через новый API
       const syncResult = await synchronizationApi.assignOperationThroughPlanning({
         operationId: operation.id,
         machineId: operation.machineId || operation.assignedMachine,
@@ -84,7 +90,6 @@ export const ProductionPage: React.FC = () => {
       if (syncResult.success) {
         console.log('✅ Операция успешно назначена и синхронизирована:', syncResult);
         
-        // 🆕 2. Обновляем выбранную операцию с данными синхронизации
         const enhancedOperation = {
           ...operation,
           syncedWithShifts: true,
@@ -94,32 +99,25 @@ export const ProductionPage: React.FC = () => {
         
         setSelectedOperation(enhancedOperation);
         
-        // 🆕 3. Отправляем событие для real-time обновления
         window.dispatchEvent(new CustomEvent('operationAssigned', {
           detail: enhancedOperation
         }));
         
-        // 🆕 4. Принудительная синхронизация всех данных
         await forceSyncAll();
         
         console.log('📢 Операция', operation.operationNumber, 'назначена и синхронизирована с Модулем Смен');
         
       } else {
         console.error('❌ Ошибка назначения операции:', syncResult.error);
-        
-        // Откат к старому методу
         await handleLegacyOperationSelect(operation);
       }
       
     } catch (error) {
       console.error('❌ Ошибка при назначении операции с синхронизацией:', error);
-      
-      // Откат к старому методу
       await handleLegacyOperationSelect(operation);
     }
   };
 
-  // 🆕 Откат к старому методу (для совместимости)
   const handleLegacyOperationSelect = async (operation: any) => {
     try {
       console.log('⚠️ Откат к старому методу назначения операции');
@@ -130,10 +128,8 @@ export const ProductionPage: React.FC = () => {
         legacyMode: true,
       });
       
-      // Сохраняем в localStorage для обратной совместимости
       localStorage.setItem('selectedOperation', JSON.stringify(operation));
       
-      // Отправляем событие для legacy-синхронизации
       window.dispatchEvent(new CustomEvent('operationAssigned', {
         detail: { ...operation, legacyMode: true }
       }));
@@ -168,385 +164,419 @@ export const ProductionPage: React.FC = () => {
     );
   }
 
+  // Группировка машин по типам
+  const millingMachines = machines
+    ?.filter(machine => machine.machineType === 'MILLING' || machine.machineType === 'milling' || machine.machineType.includes('milling'))
+    .sort((a, b) => a.machineName.localeCompare(b.machineName));
+  
+  const turningMachines = machines
+    ?.filter(machine => machine.machineType === 'TURNING' || machine.machineType === 'turning' || machine.machineType.includes('turning'))
+    .sort((a, b) => a.machineName.localeCompare(b.machineName));
+  
+  const otherMachines = machines
+    ?.filter(machine => 
+      !['MILLING', 'milling', 'TURNING', 'turning'].includes(machine.machineType) &&
+      !machine.machineType.includes('milling') &&
+      !machine.machineType.includes('turning')
+    )
+    .sort((a, b) => a.machineName.localeCompare(b.machineName));
+
   return (
-    <div className="page-container">
-      {/* 🆕 ПАНЕЛЬ УПРАВЛЕНИЯ ПЛАНИРОВАНИЕМ */}
-      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-        <Col span={24}>
-          <Card 
-            size="small" 
-            style={{ 
-              background: 'linear-gradient(135deg, #e6f7ff 0%, #f0f9ff 100%)',
-              borderColor: '#1890ff',
-              borderRadius: '12px',
-              marginBottom: 16
-            }}
-          >
-            <Space align="center" style={{ width: '100%', justifyContent: 'space-between' }}>
-              <Space direction="vertical" size={4}>
-                <div style={{ fontWeight: 'bold', fontSize: '16px', color: '#1890ff' }}>
-                  🌐 {t('app.title')} - {t('language.current')}: {currentLanguage.toUpperCase()}
-                </div>
-                <div style={{ fontSize: '14px', color: '#595959' }}>
-                  {t('page.production.title')} | {t('menu.production')}
-                </div>
-              </Space>
-            </Space>
-          </Card>
-        </Col>
-      </Row>
-      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-        <Col span={24}>
-          <Card 
-            size="small" 
-            style={{ 
-              background: useImprovedPlanning 
-                ? 'linear-gradient(135deg, #fff7e6 0%, #fffbe6 100%)' 
-                : 'linear-gradient(135deg, #f6ffed 0%, #f0f9ff 100%)',
-              borderColor: useImprovedPlanning ? '#faad14' : '#52c41a',
-              borderRadius: '12px'
-            }}
-          >
-            <Space align="center" style={{ width: '100%', justifyContent: 'space-between' }}>
-              <Space>
-                {useImprovedPlanning ? (
-                  <ThunderboltOutlined style={{ color: '#faad14', fontSize: '20px' }} />
-                ) : (
-                  <BugOutlined style={{ color: '#52c41a', fontSize: '20px' }} />
-                )}
-                <span style={{ fontWeight: 'bold', fontSize: '16px' }}>
-                  {useImprovedPlanning ? t('planning.improved_enabled') : t('planning.standard_enabled')}
-                </span>
-              </Space>
-              <Space>
-                <span>{t('planning.standard')}</span>
-                <Switch 
-                  checked={useImprovedPlanning}
-                  onChange={setUseImprovedPlanning}
-                  style={{
-                    backgroundColor: useImprovedPlanning ? '#faad14' : undefined
-                  }}
-                />
-                <span>{t('planning.improved')}</span>
-                
-                {/* 🆕 НОВОЕ: Кнопки управления синхронизацией */}
-                <Button
-                  type="primary"
-                  size="small"
-                  icon={<span>🔄</span>}
-                  onClick={async () => {
-                    try {
-                      console.log('🔄 Ручная синхронизация...');
-                      await forceSyncAll();
-                      console.log('✅ Ручная синхронизация завершена');
-                    } catch (error) {
-                      console.error('❌ Ошибка ручной синхронизации:', error);
-                    }
-                  }}
-                  style={{
-                    backgroundColor: '#52c41a',
-                    borderColor: '#52c41a',
-                    marginLeft: '16px'
-                  }}
-                >
-                  Синхронизация
-                </Button>
-                
-                <Button
-                  size="small"
-                  icon={<span>🌡️</span>}
-                  onClick={async () => {
-                    try {
-                      console.log('🌡️ Проверка системы...');
-                      const healthStatus = await checkSyncHealth();
-                      console.log('✅ Система синхронизации работает:', healthStatus);
-                    } catch (error) {
-                      console.error('❌ Ошибка проверки системы:', error);
-                    }
-                  }}
-                >
-                  Проверка
-                </Button>
-              </Space>
+    <ResponsiveContainer className="production-page">
+      {/* Адаптивный заголовок приложения */}
+      <Card 
+        size={cardSize}
+        style={{ 
+          background: 'linear-gradient(135deg, #e6f7ff 0%, #f0f9ff 100%)',
+          borderColor: '#1890ff',
+          borderRadius: screenInfo.isMobile ? 8 : 12,
+          marginBottom: cardSpacing
+        }}
+      >
+        <Space 
+          align="center" 
+          style={{ 
+            width: '100%', 
+            justifyContent: screenInfo.isMobile ? 'center' : 'space-between',
+            flexDirection: screenInfo.isMobile ? 'column' : 'row'
+          }}
+        >
+          <Space direction={screenInfo.isMobile ? 'horizontal' : 'vertical'} size={4}>
+            <div style={{ 
+              fontWeight: 'bold', 
+              fontSize: screenInfo.isMobile ? '14px' : '16px', 
+              color: '#1890ff',
+              textAlign: screenInfo.isMobile ? 'center' : 'left'
+            }}>
+              🌐 {t('app.title')} - {t('language.current')}: {currentLanguage.toUpperCase()}
+            </div>
+            <div style={{ 
+              fontSize: screenInfo.isMobile ? '12px' : '14px', 
+              color: '#595959',
+              textAlign: screenInfo.isMobile ? 'center' : 'left'
+            }}>
+              {t('page.production.title')} | {t('menu.production')}
+            </div>
+          </Space>
+        </Space>
+      </Card>
+
+      {/* Адаптивная панель управления планированием */}
+      <Card 
+        size={cardSize}
+        style={{ 
+          background: useImprovedPlanning 
+            ? 'linear-gradient(135deg, #fff7e6 0%, #fffbe6 100%)' 
+            : 'linear-gradient(135deg, #f6ffed 0%, #f0f9ff 100%)',
+          borderColor: useImprovedPlanning ? '#faad14' : '#52c41a',
+          borderRadius: screenInfo.isMobile ? 8 : 12,
+          marginBottom: cardSpacing
+        }}
+      >
+        <Space 
+          direction={screenInfo.isMobile ? 'vertical' : 'horizontal'}
+          align="center" 
+          style={{ 
+            width: '100%', 
+            justifyContent: screenInfo.isMobile ? 'center' : 'space-between'
+          }}
+        >
+          <Space align="center">
+            {useImprovedPlanning ? (
+              <ThunderboltOutlined style={{ color: '#faad14', fontSize: screenInfo.isMobile ? '18px' : '20px' }} />
+            ) : (
+              <BugOutlined style={{ color: '#52c41a', fontSize: screenInfo.isMobile ? '18px' : '20px' }} />
+            )}
+            <span style={{ 
+              fontWeight: 'bold', 
+              fontSize: screenInfo.isMobile ? '14px' : '16px',
+              textAlign: 'center'
+            }}>
+              {useImprovedPlanning ? t('planning.improved_enabled') : t('planning.standard_enabled')}
+            </span>
+          </Space>
+          
+          {/* Адаптивная панель управления */}
+          <ResponsiveActions direction="auto" wrap={true}>
+            <Space align="center" size={screenInfo.isMobile ? 'small' : 'middle'}>
+              <span style={{ fontSize: screenInfo.isMobile ? '12px' : '14px' }}>
+                {t('planning.standard')}
+              </span>
+              <Switch 
+                checked={useImprovedPlanning}
+                onChange={setUseImprovedPlanning}
+                size={screenInfo.isMobile ? 'small' : 'default'}
+                style={{
+                  backgroundColor: useImprovedPlanning ? '#faad14' : undefined
+                }}
+              />
+              <span style={{ fontSize: screenInfo.isMobile ? '12px' : '14px' }}>
+                {t('planning.improved')}
+              </span>
             </Space>
             
-            {useImprovedPlanning && (
-              <div style={{ marginTop: 12, color: '#8c5700', fontSize: '14px' }}>
-                {t('planning.features_enabled')}
+            <Space size={screenInfo.isMobile ? 'small' : 'middle'}>
+              <Button
+                type="primary"
+                size={componentSize}
+                icon={<span>🔄</span>}
+                onClick={async () => {
+                  try {
+                    console.log('🔄 Ручная синхронизация...');
+                    await forceSyncAll();
+                    console.log('✅ Ручная синхронизация завершена');
+                  } catch (error) {
+                    console.error('❌ Ошибка ручной синхронизации:', error);
+                  }
+                }}
+                style={{
+                  backgroundColor: '#52c41a',
+                  borderColor: '#52c41a',
+                  fontSize: screenInfo.isMobile ? '12px' : '14px'
+                }}
+              >
+                {screenInfo.isMobile ? 'Синх' : 'Синхронизация'}
+              </Button>
+              
+              <Button
+                size={componentSize}
+                icon={<span>🌡️</span>}
+                onClick={async () => {
+                  try {
+                    console.log('🌡️ Проверка системы...');
+                    const healthStatus = await checkSyncHealth();
+                    console.log('✅ Система синхронизации работает:', healthStatus);
+                  } catch (error) {
+                    console.error('❌ Ошибка проверки системы:', error);
+                  }
+                }}
+                style={{ fontSize: screenInfo.isMobile ? '12px' : '14px' }}
+              >
+                {screenInfo.isMobile ? 'Тест' : 'Проверка'}
+              </Button>
+            </Space>
+          </ResponsiveActions>
+        </Space>
+        
+        {useImprovedPlanning && (
+          <div style={{ 
+            marginTop: 12, 
+            color: '#8c5700', 
+            fontSize: screenInfo.isMobile ? '12px' : '14px',
+            textAlign: screenInfo.isMobile ? 'center' : 'left'
+          }}>
+            {t('planning.features_enabled')}
+          </div>
+        )}
+      </Card>
+
+      {/* Заголовок и тестовая кнопка */}
+      <ResponsiveActions justify="space-between" className="section-header">
+        <Typography.Title 
+          level={responsiveUtils.getTitleLevel(screenInfo, 2)} 
+          style={{ margin: 0 }}
+        >
+          {t('production.machines')}
+        </Typography.Title>
+        
+        <Button 
+          type="primary" 
+          size={componentSize}
+          onClick={() => {
+            console.log('🧪 Test button clicked');
+            if (machines && machines.length > 0) {
+              handleOpenPlanningModal(machines[0]);
+            }
+          }}
+          style={{ 
+            backgroundColor: useImprovedPlanning ? '#faad14' : undefined,
+            borderColor: useImprovedPlanning ? '#faad14' : undefined,
+            fontSize: screenInfo.isMobile ? '12px' : '14px'
+          }}
+          icon={useImprovedPlanning ? <ThunderboltOutlined /> : <BugOutlined />}
+        >
+          {screenInfo.isMobile 
+            ? (useImprovedPlanning ? 'Тест+' : 'Тест') 
+            : (useImprovedPlanning ? t('planning.test_improved') : t('planning.test_standard'))
+          }
+        </Button>
+      </ResponsiveActions>
+
+      {/* Адаптивные группы станков */}
+      <div className="machines-grid" style={{ marginTop: cardSpacing }}>
+        {/* Группа: Фрезерные станки */}
+        {millingMachines && millingMachines.length > 0 && (
+          <div key="milling-group" className="machine-group milling-group" style={{ marginBottom: cardSpacing * 1.5 }}>
+            <div className="machine-group-header">
+              <Typography.Title 
+                level={responsiveUtils.getTitleLevel(screenInfo, 3)} 
+                className="machine-group-title"
+                style={{ margin: 0 }}
+              >
+                🔧 Фрезерные станки ({millingMachines.length})
+              </Typography.Title>
+            </div>
+            <ResponsiveGrid 
+              minItemWidth={screenInfo.isMobile ? 280 : 320}
+              maxColumns={{ xs: 1, sm: 2, md: 2, lg: 3, xl: 4, xxl: 5 }}
+            >
+              {millingMachines.map((machine) => (
+                <MachineCard
+                  key={`milling-${machine.id}`}
+                  machine={machine}
+                  isSelected={selectedMachine?.id === machine.id}
+                  onSelect={() => setSelectedMachine(machine)}
+                  onOpenPlanningModal={handleOpenPlanningModal}
+                />
+              ))}
+            </ResponsiveGrid>
+          </div>
+        )}
+        
+        {/* Группа: Токарные станки */}
+        {turningMachines && turningMachines.length > 0 && (
+          <div key="turning-group" className="machine-group turning-group" style={{ marginBottom: cardSpacing * 1.5 }}>
+            <div className="machine-group-header">
+              <Typography.Title 
+                level={responsiveUtils.getTitleLevel(screenInfo, 3)} 
+                className="machine-group-title"
+                style={{ margin: 0 }}
+              >
+                🔄 Токарные станки ({turningMachines.length})
+              </Typography.Title>
+            </div>
+            <ResponsiveGrid 
+              minItemWidth={screenInfo.isMobile ? 280 : 320}
+              maxColumns={{ xs: 1, sm: 2, md: 2, lg: 3, xl: 4, xxl: 5 }}
+            >
+              {turningMachines.map((machine) => (
+                <MachineCard
+                  key={`turning-${machine.id}`}
+                  machine={machine}
+                  isSelected={selectedMachine?.id === machine.id}
+                  onSelect={() => setSelectedMachine(machine)}
+                  onOpenPlanningModal={handleOpenPlanningModal}
+                />
+              ))}
+            </ResponsiveGrid>
+          </div>
+        )}
+        
+        {/* Группа: Другие станки */}
+        {otherMachines && otherMachines.length > 0 && (
+          <div key="other-group" className="machine-group other-group" style={{ marginBottom: cardSpacing * 1.5 }}>
+            <div className="machine-group-header">
+              <Typography.Title 
+                level={responsiveUtils.getTitleLevel(screenInfo, 3)} 
+                className="machine-group-title"
+                style={{ margin: 0 }}
+              >
+                ⚙️ Другие станки ({otherMachines.length})
+              </Typography.Title>
+            </div>
+            <ResponsiveGrid 
+              minItemWidth={screenInfo.isMobile ? 280 : 320}
+              maxColumns={{ xs: 1, sm: 2, md: 2, lg: 3, xl: 4, xxl: 5 }}
+            >
+              {otherMachines.map((machine) => (
+                <MachineCard
+                  key={`other-${machine.id}`}
+                  machine={machine}
+                  isSelected={selectedMachine?.id === machine.id}
+                  onSelect={() => setSelectedMachine(machine)}
+                  onOpenPlanningModal={handleOpenPlanningModal}
+                />
+              ))}
+            </ResponsiveGrid>
+          </div>
+        )}
+      </div>
+
+      {/* Адаптивные рекомендации по заказам */}
+      {selectedMachine && (
+        <Card 
+          style={{ 
+            marginTop: cardSpacing,
+            borderRadius: screenInfo.isMobile ? 8 : 12
+          }}
+          size={cardSize}
+        >
+          <OrderRecommendations 
+            machine={selectedMachine} 
+            onOperationSelect={handleOperationSelect}
+          />
+        </Card>
+      )}
+
+      {/* Адаптивное отображение выбранной операции */}
+      {selectedOperation && (
+        <Card 
+          title={
+            <span style={{ fontSize: screenInfo.isMobile ? '14px' : '16px' }}>
+              🎆 Выбранная операция
+            </span>
+          }
+          extra={
+            <Space size="small">
+              {selectedOperation.syncedWithShifts && (
+                <Tag color="green" style={{ fontSize: screenInfo.isMobile ? '10px' : '12px' }}>
+                  ✅ {screenInfo.isMobile ? 'Синх' : 'Синхронизировано'}
+                </Tag>
+              )}
+              <Button 
+                type="link" 
+                size={componentSize}
+                onClick={() => {
+                  setSelectedOperation(null);
+                  localStorage.removeItem('selectedOperation');
+                  window.dispatchEvent(new CustomEvent('operationCleared'));
+                  console.log('🗑️ Операция очищена');
+                }}
+                style={{ fontSize: screenInfo.isMobile ? '12px' : '14px' }}
+              >
+                {screenInfo.isMobile ? 'X' : 'Очистить'}
+              </Button>
+            </Space>
+          }
+          style={{ 
+            marginTop: cardSpacing,
+            borderColor: selectedOperation.syncedWithShifts ? '#52c41a' : '#faad14',
+            backgroundColor: selectedOperation.syncedWithShifts ? '#f6ffed' : '#fffbe6',
+            borderRadius: screenInfo.isMobile ? 8 : 12
+          }}
+          size={cardSize}
+        >
+          <Space direction="vertical" style={{ width: '100%' }} size="small">
+            <Text strong style={{ 
+              fontSize: screenInfo.isMobile ? '14px' : '16px', 
+              color: selectedOperation.syncedWithShifts ? '#52c41a' : '#faad14' 
+            }}>
+              📋 Операция #{selectedOperation.operationNumber}
+            </Text>
+            
+            <div style={{ fontSize: screenInfo.isMobile ? '12px' : '14px' }}>
+              <div><Text strong>Тип:</Text> {selectedOperation.operationType}</div>
+              <div><Text strong>Станок:</Text> {selectedOperation.machineName} ({selectedOperation.machineType})</div>
+              <div><Text strong>Чертеж:</Text> {selectedOperation.orderDrawingNumber}</div>
+              <div><Text strong>Время:</Text> {selectedOperation.estimatedTime} мин</div>
+            </div>
+            
+            {/* Информация о синхронизации */}
+            {selectedOperation.syncedWithShifts ? (
+              <div style={{ 
+                padding: screenInfo.isMobile ? '8px' : '12px', 
+                backgroundColor: '#d4edda', 
+                borderRadius: screenInfo.isMobile ? '6px' : '8px',
+                marginTop: '8px',
+                border: '2px solid #52c41a'
+              }}>
+                <Text strong style={{ 
+                  color: '#155724',
+                  fontSize: screenInfo.isMobile ? '12px' : '14px'
+                }}>
+                  ✅ Операция назначена и синхронизирована
+                </Text>
+                <br />
+                <Text style={{ 
+                  fontSize: screenInfo.isMobile ? '10px' : '12px', 
+                  color: '#155724' 
+                }}>
+                  • Автоматически создана запись смены<br />
+                  • Отображается в мониторинге смен<br />
+                  • Прогресс обновляется автоматически
+                </Text>
+                {selectedOperation.synchronizationStatus && (
+                  <div style={{ marginTop: '8px' }}>
+                    <Text style={{ 
+                      fontSize: screenInfo.isMobile ? '9px' : '11px', 
+                      color: '#666' 
+                    }}>
+                      Прогресс: {selectedOperation.synchronizationStatus.progress.toFixed(1)}% 
+                      ({selectedOperation.synchronizationStatus.totalProduced}/{selectedOperation.synchronizationStatus.targetQuantity})
+                    </Text>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div style={{ 
+                padding: screenInfo.isMobile ? '6px' : '8px', 
+                backgroundColor: '#fff3cd', 
+                borderRadius: screenInfo.isMobile ? '4px' : '6px',
+                marginTop: '8px'
+              }}>
+                <Text strong style={{ 
+                  color: '#856404',
+                  fontSize: screenInfo.isMobile ? '12px' : '14px'
+                }}>
+                  ⚠️ Операция выбрана, но не синхронизирована
+                </Text>
               </div>
             )}
-          </Card>
-        </Col>
-      </Row>
-
-      <Row gutter={[16, 16]}>
-        <Col span={24}>
-          <h2>{t('production.machines')}</h2>
-          
-          {/* Тестовая кнопка */}
-          <Button 
-            type="primary" 
-            onClick={() => {
-              console.log('🧪 Test button clicked');
-              if (machines && machines.length > 0) {
-                handleOpenPlanningModal(machines[0]);
-              }
-            }}
-            style={{ 
-              marginBottom: '16px',
-              backgroundColor: useImprovedPlanning ? '#faad14' : undefined,
-              borderColor: useImprovedPlanning ? '#faad14' : undefined
-            }}
-            icon={useImprovedPlanning ? <ThunderboltOutlined /> : <BugOutlined />}
-          >
-            {useImprovedPlanning ? t('planning.test_improved') : t('planning.test_standard')}
-          </Button>
-          
-          {/* ИСПРАВЛЕНО: Группировка станков по типам с фиксированным порядком */}
-          <div className="machines-grid">
-            {/* Группа: Фрезерные станки */}
-            {(() => {
-              const millingMachines = machines
-                ?.filter(machine => machine.machineType === 'MILLING' || machine.machineType === 'milling' || machine.machineType.includes('milling'))
-                .sort((a, b) => a.machineName.localeCompare(b.machineName)); // Стабильная сортировка по имени
-              
-              if (millingMachines && millingMachines.length > 0) {
-                return (
-                  <div key="milling-group" style={{ marginBottom: '32px' }}>
-                    <div style={{ 
-                      marginBottom: '16px', 
-                      padding: '12px', 
-                      backgroundColor: '#e6f7ff', 
-                      borderRadius: '8px',
-                      borderLeft: '4px solid #1890ff'
-                    }}>
-                      <h3 style={{ 
-                        margin: 0, 
-                        color: '#1890ff', 
-                        fontSize: '18px',
-                        fontWeight: 'bold'
-                      }}>
-                        🔧 Фрезерные станки ({millingMachines.length})
-                      </h3>
-                    </div>
-                    <Row gutter={[16, 16]}>
-                      {millingMachines.map((machine) => (
-                        <Col xs={24} sm={12} lg={8} xl={6} key={`milling-${machine.id}`}>
-                          <MachineCard
-                            machine={machine}
-                            isSelected={selectedMachine?.id === machine.id}
-                            onSelect={() => setSelectedMachine(machine)}
-                            onOpenPlanningModal={handleOpenPlanningModal}
-                          />
-                        </Col>
-                      ))}
-                    </Row>
-                  </div>
-                );
-              }
-              return null;
-            })()}
-            
-            {/* Группа: Токарные станки */}
-            {(() => {
-              const turningMachines = machines
-                ?.filter(machine => machine.machineType === 'TURNING' || machine.machineType === 'turning' || machine.machineType.includes('turning'))
-                .sort((a, b) => a.machineName.localeCompare(b.machineName)); // Стабильная сортировка по имени
-              
-              if (turningMachines && turningMachines.length > 0) {
-                return (
-                  <div key="turning-group" style={{ marginBottom: '32px' }}>
-                    <div style={{ 
-                      marginBottom: '16px', 
-                      padding: '12px', 
-                      backgroundColor: '#f6ffed', 
-                      borderRadius: '8px',
-                      borderLeft: '4px solid #52c41a'
-                    }}>
-                      <h3 style={{ 
-                        margin: 0, 
-                        color: '#52c41a', 
-                        fontSize: '18px',
-                        fontWeight: 'bold'
-                      }}>
-                        🔄 Токарные станки ({turningMachines.length})
-                      </h3>
-                    </div>
-                    <Row gutter={[16, 16]}>
-                      {turningMachines.map((machine) => (
-                        <Col xs={24} sm={12} lg={8} xl={6} key={`turning-${machine.id}`}>
-                          <MachineCard
-                            machine={machine}
-                            isSelected={selectedMachine?.id === machine.id}
-                            onSelect={() => setSelectedMachine(machine)}
-                            onOpenPlanningModal={handleOpenPlanningModal}
-                          />
-                        </Col>
-                      ))}
-                    </Row>
-                  </div>
-                );
-              }
-              return null;
-            })()}
-            
-            {/* Группа: Другие станки (если есть) */}
-            {(() => {
-              const otherMachines = machines
-                ?.filter(machine => 
-                  !['MILLING', 'milling', 'TURNING', 'turning'].includes(machine.machineType) &&
-                  !machine.machineType.includes('milling') &&
-                  !machine.machineType.includes('turning')
-                )
-                .sort((a, b) => a.machineName.localeCompare(b.machineName)); // Стабильная сортировка по имени
-              
-              if (otherMachines && otherMachines.length > 0) {
-                return (
-                  <div key="other-group" style={{ marginBottom: '32px' }}>
-                    <div style={{ 
-                      marginBottom: '16px', 
-                      padding: '12px', 
-                      backgroundColor: '#fff7e6', 
-                      borderRadius: '8px',
-                      borderLeft: '4px solid #faad14'
-                    }}>
-                      <h3 style={{ 
-                        margin: 0, 
-                        color: '#faad14', 
-                        fontSize: '18px',
-                        fontWeight: 'bold'
-                      }}>
-                        ⚙️ Другие станки ({otherMachines.length})
-                      </h3>
-                    </div>
-                    <Row gutter={[16, 16]}>
-                      {otherMachines.map((machine) => (
-                        <Col xs={24} sm={12} lg={8} xl={6} key={`other-${machine.id}`}>
-                          <MachineCard
-                            machine={machine}
-                            isSelected={selectedMachine?.id === machine.id}
-                            onSelect={() => setSelectedMachine(machine)}
-                            onOpenPlanningModal={handleOpenPlanningModal}
-                          />
-                        </Col>
-                      ))}
-                    </Row>
-                  </div>
-                );
-              }
-              return null;
-            })()}
-          </div>
-        </Col>
-      </Row>
-
-      {selectedMachine && (
-        <Row gutter={[16, 16]} style={{ marginTop: 24 }}>
-          <Col span={24}>
-            <OrderRecommendations 
-              machine={selectedMachine} 
-              onOperationSelect={handleOperationSelect}
-            />
-          </Col>
-        </Row>
+          </Space>
+        </Card>
       )}
 
-      {/* 🆕 НОВОЕ: Отображение выбранной операции с статусом синхронизации */}
-      {selectedOperation && (
-        <Row gutter={[16, 16]} style={{ marginTop: 24 }}>
-          <Col span={24}>
-            <Card 
-              title="🎆 Выбранная операция" 
-              extra={
-                <Space>
-                  {selectedOperation.syncedWithShifts && (
-                    <Tag color="green" style={{ fontSize: '12px' }}>
-                      ✅ Синхронизировано
-                    </Tag>
-                  )}
-                  <Button 
-                    type="link" 
-                    onClick={() => {
-                      setSelectedOperation(null);
-                      localStorage.removeItem('selectedOperation');
-                      // 🆕 Отправляем событие об очистке
-                      window.dispatchEvent(new CustomEvent('operationCleared'));
-                      console.log('🗑️ Операция очищена');
-                    }}
-                  >
-                    Очистить
-                  </Button>
-                </Space>
-              }
-              style={{ 
-                borderColor: selectedOperation.syncedWithShifts ? '#52c41a' : '#faad14',
-                backgroundColor: selectedOperation.syncedWithShifts ? '#f6ffed' : '#fffbe6',
-                borderRadius: '12px'
-              }}
-            >
-              <Space direction="vertical" style={{ width: '100%' }}>
-                <Text strong style={{ fontSize: '16px', color: selectedOperation.syncedWithShifts ? '#52c41a' : '#faad14' }}>
-                  📋 Операция #{selectedOperation.operationNumber}
-                </Text>
-                <div>
-                  <Text strong>Тип:</Text> {selectedOperation.operationType}
-                </div>
-                <div>
-                  <Text strong>Станок:</Text> {selectedOperation.machineName} ({selectedOperation.machineType})
-                </div>
-                <div>
-                  <Text strong>Чертеж:</Text> {selectedOperation.orderDrawingNumber}
-                </div>
-                <div>
-                  <Text strong>Время:</Text> {selectedOperation.estimatedTime} мин
-                </div>
-                
-                {/* 🆕 Информация о синхронизации */}
-                {selectedOperation.syncedWithShifts ? (
-                  <div style={{ 
-                    padding: '12px', 
-                    backgroundColor: '#d4edda', 
-                    borderRadius: '8px',
-                    marginTop: '8px',
-                    border: '2px solid #52c41a'
-                  }}>
-                    <Text strong style={{ color: '#155724' }}>
-                      ✅ Операция назначена и синхронизирована
-                    </Text>
-                    <br />
-                    <Text style={{ fontSize: '12px', color: '#155724' }}>
-                      • Автоматически создана запись смены<br />
-                      • Отображается в мониторинге смен<br />
-                      • Прогресс обновляется автоматически
-                    </Text>
-                    {selectedOperation.synchronizationStatus && (
-                      <div style={{ marginTop: '8px' }}>
-                        <Text style={{ fontSize: '11px', color: '#666' }}>
-                          Прогресс: {selectedOperation.synchronizationStatus.progress.toFixed(1)}% 
-                          ({selectedOperation.synchronizationStatus.totalProduced}/{selectedOperation.synchronizationStatus.targetQuantity})
-                        </Text>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div style={{ 
-                    padding: '8px', 
-                    backgroundColor: '#fff3cd', 
-                    borderRadius: '6px',
-                    marginTop: '8px'
-                  }}>
-                    <Text strong style={{ color: '#856404' }}>
-                      ⚠️ Операция выбрана, но не синхронизирована
-                    </Text>
-                  </div>
-                )}
-              </Space>
-            </Card>
-          </Col>
-        </Row>
-      )}
-
-      {/* 🆕 КОНДИЦИОННОЕ ОТОБРАЖЕНИЕ МОДАЛЬНЫХ ОКОН */}
+      {/* Модальные окна планирования */}
       {useImprovedPlanning ? (
         <PlanningModalImproved
           visible={planningModalVisible}
@@ -561,8 +591,8 @@ export const ProductionPage: React.FC = () => {
         />
       )}
       
-      {/* Тестовый индикатор */}
-      {planningModalVisible && (
+      {/* Тестовый индикатор для десктопов */}
+      {planningModalVisible && !screenInfo.isMobile && (
         <div style={{ 
           position: 'fixed', 
           top: 10, 
@@ -572,11 +602,13 @@ export const ProductionPage: React.FC = () => {
           padding: '10px',
           zIndex: 9999,
           borderRadius: '4px',
-          fontWeight: 'bold'
+          fontWeight: 'bold',
+          fontSize: '12px'
         }}>
-          {useImprovedPlanning ? '🆕 Улучшенное' : '🧪 Стандартное'} планирование активно! Станок: {planningMachine?.machineName}
+          {useImprovedPlanning ? '🆕 Улучшенное' : '🧪 Стандартное'} планирование активно! 
+          <br />Станок: {planningMachine?.machineName}
         </div>
       )}
-    </div>
+    </ResponsiveContainer>
   );
 };

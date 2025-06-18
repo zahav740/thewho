@@ -1,8 +1,55 @@
-/* Global styles */
+/* Import responsive variables */
+@import './styles/responsive-variables.css';
+
+/* Global styles with responsive design */
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  /* Предотвращение автозума */
+  -webkit-text-size-adjust: none;
+  -ms-text-size-adjust: none;
+  text-size-adjust: none;
+  /* Предотвращение тап-зума */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+html {
+  font-size: 11.2px; /* 14px * 0.8 = 11.2px (уменьшили на 20%) */
+  /* Предотвращение автозума браузера */
+  -webkit-text-size-adjust: 100%;
+  -ms-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  /* Стабильный zoom level */
+  zoom: 1;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Responsive font scaling - уменьшенные размеры */
+@media (max-width: 768px) {
+  html {
+    font-size: 13px; /* было 14px */
+  }
+}
+
+@media (max-width: 480px) {
+  html {
+    font-size: 12px; /* было 13px */
+  }
+}
+
+@media (min-width: 1920px) {
+  html {
+    font-size: 15px; /* было 18px */
+  }
 }
 
 body {
@@ -13,6 +60,15 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background-color: #f0f2f5;
+  overflow-x: hidden; /* Prevent horizontal scroll */
+  /* Предотвращение масштабирования */
+  -webkit-text-size-adjust: 100%;
+  -ms-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  /* Минимальная ширина для предотвращения зума */
+  min-width: 320px;
+  /* Максимальная ширина */
+  max-width: 100vw;
 }
 
 code {
@@ -20,25 +76,82 @@ code {
     monospace;
 }
 
-/* Ant Design customizations */
+/* Ant Design customizations with responsive design */
 .ant-layout {
   min-height: 100vh;
+  /* Предотвращение зума */
+  zoom: 1 !important;
+  -webkit-text-size-adjust: 100% !important;
 }
 
 .ant-layout-header {
   background: #fff;
-  padding: 0 24px;
+  padding: 0 1rem;
   box-shadow: 0 1px 4px rgba(0, 21, 41, 0.08);
+  height: auto;
+  min-height: 56px; /* было 64px */
+}
+
+/* Responsive header */
+@media (max-width: 768px) {
+  .ant-layout-header {
+    padding: 0 0.5rem;
+    min-height: 48px; /* было 56px */
+  }
 }
 
 .ant-layout-sider {
   box-shadow: 2px 0 6px rgba(0, 21, 41, 0.08);
 }
 
-/* Custom scrollbar */
+/* Responsive sidebar */
+@media (max-width: 768px) {
+  .ant-layout-sider {
+    position: fixed !important;
+    z-index: 1000;
+    height: 100vh;
+    left: 0;
+    top: 0;
+  }
+  
+  .ant-layout-sider-collapsed {
+    left: -200px;
+  }
+  
+  .ant-layout > .ant-layout {
+    margin-left: 0 !important;
+  }
+}
+
+/* Mobile overlay for sidebar */
+.mobile-sidebar-overlay {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 999;
+}
+
+@media (max-width: 768px) {
+  .mobile-sidebar-overlay.active {
+    display: block;
+  }
+}
+
+/* Custom scrollbar with responsive width */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
+}
+
+@media (max-width: 768px) {
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
 }
 
 ::-webkit-scrollbar-track {
@@ -54,59 +167,149 @@ code {
   background: #555;
 }
 
-/* Loading spinner */
+/* Loading spinner - responsive */
 .loading-container {
   display: flex;
   justify-content: center;
   align-items: center;
   min-height: 400px;
+  padding: 1rem;
 }
 
-/* Page container */
+@media (max-width: 768px) {
+  .loading-container {
+    min-height: 200px;
+  }
+}
+
+/* Page container - responsive - уменьшенные отступы */
 .page-container {
-  padding: 24px;
+  padding: 1rem; /* было 1.5rem */
   background: #fff;
   min-height: 360px;
-  border-radius: 8px;
+  border-radius: 6px; /* было 8px */
+  margin: 0;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
 }
 
-/* Actions bar */
+@media (max-width: 768px) {
+  .page-container {
+    padding: 0.75rem; /* было 1rem */
+    border-radius: 4px;
+    margin: 0;
+  }
+}
+
+@media (max-width: 480px) {
+  .page-container {
+    padding: 0.5rem; /* было 0.75rem */
+    border-radius: 0;
+  }
+}
+
+/* Actions bar - responsive */
 .actions-bar {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
-  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 768px) {
+  .actions-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
 }
 
 .actions-bar-left {
   display: flex;
-  gap: 8px;
+  gap: 0.5rem;
   flex-wrap: wrap;
+  align-items: center;
+}
+
+@media (max-width: 768px) {
+  .actions-bar-left {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .actions-bar-left {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .actions-bar-left .ant-btn {
+    width: 100%;
+    margin-bottom: 0.5rem;
+  }
 }
 
 .actions-bar-right {
   display: flex;
-  gap: 8px;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
-/* Machine cards grid */
+@media (max-width: 768px) {
+  .actions-bar-right {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* Responsive buttons */
+@media (max-width: 480px) {
+  .ant-btn {
+    padding: 0.5rem 1rem;
+    height: auto;
+    min-height: 36px;
+  }
+  
+  .ant-btn-sm {
+    padding: 0.25rem 0.75rem;
+    min-height: 28px;
+  }
+}
+
+/* Machine cards grid - responsive */
 .machines-grid {
   display: block;
-  margin-bottom: 32px;
-  padding: 8px 0;
+  margin-bottom: 2rem;
+  padding: 0.5rem 0;
 }
 
-/* Группы станков */
+/* Responsive grid for machine groups */
 .machine-group {
-  margin-bottom: 32px;
+  margin-bottom: 2rem;
+}
+
+@media (max-width: 768px) {
+  .machine-group {
+    margin-bottom: 1.5rem;
+  }
 }
 
 .machine-group-header {
-  margin-bottom: 16px;
-  padding: 12px;
+  margin-bottom: 1rem;
+  padding: 0.75rem;
   border-radius: 8px;
   transition: all 0.3s ease;
+}
+
+@media (max-width: 768px) {
+  .machine-group-header {
+    padding: 0.5rem;
+    margin-bottom: 0.75rem;
+  }
 }
 
 .machine-group-header:hover {
@@ -114,16 +317,29 @@ code {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
+@media (max-width: 768px) {
+  .machine-group-header:hover {
+    transform: none; /* Disable hover effects on mobile */
+  }
+}
+
 .machine-group-title {
   margin: 0;
-  font-size: 18px;
+  font-size: 1.125rem;
   font-weight: bold;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
-/* Цветовые схемы для групп */
+@media (max-width: 768px) {
+  .machine-group-title {
+    font-size: 1rem;
+  }
+}
+
+/* Color schemes for groups - unchanged */
 .milling-group {
   background-color: #e6f7ff;
   border-left: 4px solid #1890ff;
@@ -151,21 +367,28 @@ code {
   color: #faad14;
 }
 
-/* Исправление для карточек в группах */
+/* Responsive cards in groups */
 .machine-group .ant-row .ant-col {
-  margin-bottom: 16px;
+  margin-bottom: 1rem;
 }
 
-/* Стабильная позиция карточек */
+@media (max-width: 768px) {
+  .machine-group .ant-row .ant-col {
+    margin-bottom: 0.75rem;
+  }
+}
+
+/* Stable position for cards */
 .machine-card-wrapper {
   position: relative;
   width: 100%;
   height: auto;
 }
 
-/* Улучшения для карточек */
+/* Card improvements with responsive design */
 .ant-card {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  height: 100%;
 }
 
 .ant-card:hover {
@@ -173,15 +396,47 @@ code {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12) !important;
 }
 
-/* Стили для тегов */
+@media (max-width: 768px) {
+  .ant-card:hover {
+    transform: none; /* Disable hover effects on mobile */
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12) !important;
+  }
+}
+
+/* Responsive card body - уменьшенные отступы */
+.ant-card-body {
+  padding: 1rem; /* было 1.5rem */
+}
+
+@media (max-width: 768px) {
+  .ant-card-body {
+    padding: 0.75rem; /* было 1rem */
+  }
+}
+
+@media (max-width: 480px) {
+  .ant-card-body {
+    padding: 0.5rem; /* было 0.75rem */
+  }
+}
+
+/* Responsive tags */
 .ant-tag {
   border-radius: 12px;
   padding: 4px 12px;
   font-weight: 500;
   border: none;
+  margin: 2px;
 }
 
-/* Стили для кнопок */
+@media (max-width: 480px) {
+  .ant-tag {
+    padding: 2px 8px;
+    font-size: 0.75rem;
+  }
+}
+
+/* Button improvements */
 .ant-btn {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -190,7 +445,13 @@ code {
   transform: translateY(-1px);
 }
 
-/* Анимации для статистики */
+@media (max-width: 768px) {
+  .ant-btn:hover {
+    transform: none; /* Disable hover effects on mobile */
+  }
+}
+
+/* Statistics animations */
 .ant-statistic {
   transition: all 0.3s ease;
 }
@@ -199,35 +460,497 @@ code {
   transform: scale(1.02);
 }
 
-/* Utility classes */
+@media (max-width: 768px) {
+  .ant-statistic:hover {
+    transform: none; /* Disable hover effects on mobile */
+  }
+}
+
+/* Responsive tables */
+.ant-table-wrapper {
+  overflow-x: auto;
+}
+
+@media (max-width: 768px) {
+  .ant-table {
+    font-size: 0.875rem;
+  }
+  
+  .ant-table-thead > tr > th,
+  .ant-table-tbody > tr > td {
+    padding: 0.5rem 0.25rem;
+  }
+}
+
+/* Responsive forms */
+.ant-form {
+  max-width: 100%;
+}
+
+.ant-form-item {
+  margin-bottom: 1rem;
+}
+
+@media (max-width: 768px) {
+  .ant-form-item {
+    margin-bottom: 0.75rem;
+  }
+}
+
+/* Responsive modals */
+@media (max-width: 768px) {
+  .ant-modal {
+    margin: 0 !important;
+    padding: 1rem !important;
+    max-width: 100vw !important;
+  }
+  
+  .ant-modal-content {
+    margin: 0;
+  }
+  
+  .ant-modal-body {
+    padding: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .ant-modal {
+    padding: 0.5rem !important;
+  }
+  
+  .ant-modal-body {
+    padding: 0.75rem;
+  }
+}
+
+/* Responsive header layout */
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+@media (max-width: 768px) {
+  .header-content {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+  
+  .header-content h3 {
+    font-size: 1.25rem !important;
+    margin: 0 !important;
+  }
+}
+
+/* Responsive menu items */
+@media (max-width: 768px) {
+  .ant-menu-item {
+    padding: 0 1rem !important;
+  }
+  
+  .ant-menu-item-icon {
+    min-width: 1.5rem;
+  }
+}
+
+/* Utility classes - responsive */
 .mb-16 {
-  margin-bottom: 16px;
+  margin-bottom: 1rem;
 }
 
 .mb-24 {
-  margin-bottom: 24px;
+  margin-bottom: 1.5rem;
 }
 
 .mt-16 {
-  margin-top: 16px;
+  margin-top: 1rem;
 }
 
 .mt-24 {
-  margin-top: 24px;
+  margin-top: 1.5rem;
+}
+
+@media (max-width: 768px) {
+  .mb-16 {
+    margin-bottom: 0.75rem;
+  }
+  
+  .mb-24 {
+    margin-bottom: 1rem;
+  }
+  
+  .mt-16 {
+    margin-top: 0.75rem;
+  }
+  
+  .mt-24 {
+    margin-top: 1rem;
+  }
+}
+
+/* Responsive spacing classes */
+.responsive-spacing {
+  padding: 1.5rem;
+}
+
+@media (max-width: 768px) {
+  .responsive-spacing {
+    padding: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .responsive-spacing {
+    padding: 0.75rem;
+  }
+}
+
+/* Responsive grid system */
+.responsive-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+}
+
+@media (max-width: 768px) {
+  .responsive-grid {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .responsive-grid {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+  }
 }
 
 /* SVG fixes */
 svg {
   display: inline-block;
   vertical-align: middle;
+  max-width: 100%;
+  height: auto;
 }
 
 svg path {
   fill: currentColor;
 }
 
-/* Hide any problematic external content */
+/* Hide problematic external content */
 [id*="translate"],
 [class*="translate"] {
   display: none !important;
+}
+
+/* Responsive text */
+.responsive-text {
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+@media (max-width: 768px) {
+  .responsive-text {
+    font-size: 0.875rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .responsive-text {
+    font-size: 0.8rem;
+  }
+}
+
+/* Container max-width for large screens */
+@media (min-width: 1600px) {
+  .page-container {
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+}
+
+/* Responsive flexbox utilities */
+.flex-responsive {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+@media (max-width: 768px) {
+  .flex-responsive {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+}
+
+/* Touch-friendly interactive elements */
+@media (max-width: 768px) {
+  .ant-btn,
+  .ant-input,
+  .ant-select-selector {
+    min-height: 44px; /* Touch-friendly minimum size */
+  }
+}
+
+/* Prevent zoom on input focus (iOS) */
+@media (max-width: 768px) {
+  input,
+  select,
+  textarea,
+  .ant-input,
+  .ant-select-selector {
+    font-size: 16px !important;
+    /* Предотвращение автозума на iOS */
+    -webkit-text-size-adjust: 100%;
+    -webkit-appearance: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  /* Предотвращение двойного клика для зума */
+  * {
+    touch-action: manipulation;
+  }
+}
+
+/* Responsive content layout */
+.content-responsive {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+@media (max-width: 768px) {
+  .content-responsive {
+    padding: 0;
+  }
+}
+
+/* Enhanced mobile navigation */
+.mobile-nav-toggle {
+  display: none;
+  position: fixed;
+  top: 1rem;
+  left: 1rem;
+  z-index: 1001;
+  background: #fff;
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  padding: 0.5rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+@media (max-width: 768px) {
+  .mobile-nav-toggle {
+    display: block;
+  }
+}
+
+/* Print styles */
+@media print {
+  .ant-layout-sider,
+  .actions-bar,
+  .mobile-nav-toggle {
+    display: none !important;
+  }
+  
+  .page-container {
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+  }
+  
+  .ant-card {
+    box-shadow: none !important;
+    border: 1px solid #ddd !important;
+  }
+}
+
+/* Принудительное отключение автозума */
+.no-zoom {
+  zoom: 1 !important;
+  -webkit-text-size-adjust: 100% !important;
+  -ms-text-size-adjust: 100% !important;
+  text-size-adjust: 100% !important;
+  touch-action: manipulation !important;
+  -webkit-touch-callout: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+/* Применяем ко всем основным контейнерам */
+#root,
+.page-container,
+.ant-layout,
+.responsive-container {
+  zoom: 1 !important;
+  -webkit-text-size-adjust: 100% !important;
+  -ms-text-size-adjust: 100% !important;
+  text-size-adjust: 100% !important;
+  touch-action: manipulation !important;
+}
+
+/* ГЛОБАЛЬНОЕ УМЕНЬШЕНИЕ МАСШТАБА НА 20% */
+#root {
+  transform: scale(0.8) !important;
+  transform-origin: top left !important;
+  width: 125% !important; /* Компенсируем уменьшение: 100% / 0.8 = 125% */
+  height: 125% !important;
+  overflow: hidden !important;
+}
+
+/* Компенсация для body */
+body {
+  overflow-x: auto !important;
+  width: 100vw !important;
+}
+
+/* Особые правила для мобильных */
+@media (max-width: 768px) {
+  body,
+  html,
+  #root {
+    zoom: 1 !important;
+    -webkit-text-size-adjust: none !important;
+    -ms-text-size-adjust: none !important;
+    text-size-adjust: none !important;
+    width: 100vw !important;
+    overflow-x: hidden !important;
+  }
+}
+
+/* Компактные стили для Ant Design компонентов */
+.ant-btn {
+  padding: 4px 12px !important; /* уменьшили отступы */
+  font-size: 13px !important;
+  height: auto !important;
+  min-height: 28px !important;
+}
+
+.ant-btn-sm {
+  padding: 2px 8px !important;
+  font-size: 11px !important;
+  min-height: 24px !important;
+}
+
+.ant-btn-lg {
+  padding: 6px 16px !important;
+  font-size: 14px !important;
+  min-height: 32px !important;
+}
+
+/* Компактные карточки */
+.ant-card-small .ant-card-body {
+  padding: 8px !important;
+}
+
+.ant-card-head {
+  padding: 0 12px !important;
+  min-height: 40px !important;
+}
+
+.ant-card-head-title {
+  font-size: 14px !important;
+  font-weight: 500 !important;
+}
+
+/* Компактные заголовки */
+h1, .ant-typography-h1 { font-size: 1.5rem !important; }
+h2, .ant-typography-h2 { font-size: 1.25rem !important; }
+h3, .ant-typography-h3 { font-size: 1.125rem !important; }
+h4, .ant-typography-h4 { font-size: 1rem !important; }
+h5, .ant-typography-h5 { font-size: 0.875rem !important; }
+
+/* Компактные статистики */
+.ant-statistic-content {
+  font-size: 20px !important;
+}
+
+.ant-statistic-title {
+  font-size: 12px !important;
+  margin-bottom: 2px !important;
+}
+
+/* Компактные теги */
+.ant-tag {
+  padding: 2px 6px !important;
+  font-size: 11px !important;
+  line-height: 1.2 !important;
+}
+
+/* Компактные инпуты */
+.ant-input {
+  padding: 4px 8px !important;
+  font-size: 13px !important;
+}
+
+.ant-select-selector {
+  padding: 0 8px !important;
+}
+
+/* Мобильные компактные стили */
+@media (max-width: 768px) {
+  .ant-btn {
+    padding: 6px 10px !important;
+    font-size: 12px !important;
+    min-height: 32px !important;
+  }
+  
+  .ant-card-body {
+    padding: 8px !important;
+  }
+  
+  .ant-card-head {
+    padding: 0 8px !important;
+    min-height: 36px !important;
+  }
+  
+  h1, .ant-typography-h1 { font-size: 1.25rem !important; }
+  h2, .ant-typography-h2 { font-size: 1.125rem !important; }
+  h3, .ant-typography-h3 { font-size: 1rem !important; }
+  h4, .ant-typography-h4 { font-size: 0.875rem !important; }
+  h5, .ant-typography-h5 { font-size: 0.75rem !important; }
+}
+
+/* Управление масштабом - классы для разных уровней */
+.scale-80 {
+  transform: scale(0.8) !important;
+  transform-origin: top left !important;
+  width: 125% !important;
+  height: 125% !important;
+}
+
+.scale-75 {
+  transform: scale(0.75) !important;
+  transform-origin: top left !important;
+  width: 133.33% !important;
+  height: 133.33% !important;
+}
+
+.scale-90 {
+  transform: scale(0.9) !important;
+  transform-origin: top left !important;
+  width: 111.11% !important;
+  height: 111.11% !important;
+}
+
+/* Альтернативный метод через zoom (для совместимости) */
+.zoom-80 {
+  zoom: 0.8 !important;
+  -moz-transform: scale(0.8) !important;
+  -moz-transform-origin: top left !important;
+}
+
+/* Масштабирование только содержимого */
+.content-scale-80 .page-container,
+.content-scale-80 .ant-layout-content,
+.content-scale-80 .responsive-container {
+  transform: scale(0.8) !important;
+  transform-origin: top left !important;
+  margin-bottom: -20% !important;
+  margin-right: -20% !important;
 }

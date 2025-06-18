@@ -1,9 +1,9 @@
 /**
  * @file: CalendarPage.tsx
- * @description: Страница производственного календаря (УПРОЩЕННАЯ ВЕРСИЯ)
- * @dependencies: FixedProductionCalendar, MachineUtilization, UpcomingDeadlines
+ * @description: Адаптивная страница производственного календаря с разделением на фрезерные и токарные станки
+ * @dependencies: FixedProductionCalendar, MachineUtilization, UpcomingDeadlines, ResponsiveGrid
  * @created: 2025-01-28
- * @updated: 2025-06-17 - Удалены старые версии календарей, оставлен только исправленный
+ * @updated: 2025-06-18 - Добавлена адаптивность и разделение станков по типам
  */
 import React, { useState } from 'react';
 import { Row, Col, DatePicker, Space, Tabs, Typography, Alert } from 'antd';
@@ -13,10 +13,19 @@ import { FixedProductionCalendar } from './components/FixedProductionCalendar';
 import { MachineUtilization } from './components/MachineUtilization';
 import { UpcomingDeadlines } from './components/UpcomingDeadlines';
 
+// Импорт адаптивных компонентов
+import { 
+  ResponsiveContainer, 
+  ResponsiveActions 
+} from '../../components/ResponsiveGrid';
+import { useResponsive, responsiveUtils } from '../../hooks';
+
 const { RangePicker } = DatePicker;
 const { Text } = Typography;
 
 export const CalendarPage: React.FC = () => {
+  const screenInfo = useResponsive();
+  const componentSize = responsiveUtils.getComponentSize(screenInfo);
   const [dateRange, setDateRange] = useState<[Dayjs, Dayjs]>([
     dayjs().startOf('week'),
     dayjs().endOf('week').add(2, 'week'), // 3 недели
@@ -38,12 +47,12 @@ export const CalendarPage: React.FC = () => {
   };
 
   return (
-    <div className="page-container">
+    <ResponsiveContainer className="calendar-page">
       {/* Информация о календаре */}
       <Alert
-        message="⚡ Производственный календарь"
+        message="⚡ Производственный календарь с разделением по типам станков"
         description={
-          <Text>Современный календарь с интеграцией базы данных PostgreSQL и интерактивным интерфейсом.</Text>
+          <Text>Современный календарь с интеграцией PostgreSQL и разделением на 🔧 фрезерные и ⚙️ токарные станки.</Text>
         }
         type="success"
         showIcon
@@ -51,35 +60,42 @@ export const CalendarPage: React.FC = () => {
         style={{ marginBottom: 16 }}
       />
 
-      <Row gutter={[16, 16]}>
-        <Col span={24}>
-          <Space>
-            <span>Период:</span>
-            <RangePicker
-              value={dateRange}
-              onChange={handleDateRangeChange}
-              format="DD.MM.YYYY"
-              allowClear={false}
-              presets={[
-                { label: 'Текущая неделя', value: [dayjs().startOf('week'), dayjs().endOf('week')] },
-                { label: 'Следующая неделя', value: [dayjs().add(1, 'week').startOf('week'), dayjs().add(1, 'week').endOf('week')] },
-                { label: '2 недели', value: [dayjs().startOf('week'), dayjs().endOf('week').add(1, 'week')] },
-                { label: 'Текущий месяц', value: [dayjs().startOf('month'), dayjs().endOf('month')] },
-              ]}
-            />
-          </Space>
-        </Col>
-      </Row>
+      {/* Адаптивная панель управления */}
+      <ResponsiveActions 
+        direction={screenInfo.isMobile ? 'vertical' : 'horizontal'}
+        justify="start"
+        style={{ marginBottom: 16 }}
+      >
+        <span style={{ fontSize: screenInfo.isMobile ? '14px' : '16px' }}>Период:</span>
+        <RangePicker
+          value={dateRange}
+          onChange={handleDateRangeChange}
+          format="DD.MM.YYYY"
+          allowClear={false}
+          size={componentSize}
+          style={{ 
+            width: screenInfo.isMobile ? '100%' : 'auto',
+            minWidth: screenInfo.isMobile ? '280px' : '300px'
+          }}
+          presets={[
+            { label: 'Текущая неделя', value: [dayjs().startOf('week'), dayjs().endOf('week')] },
+            { label: 'Следующая неделя', value: [dayjs().add(1, 'week').startOf('week'), dayjs().add(1, 'week').endOf('week')] },
+            { label: '2 недели', value: [dayjs().startOf('week'), dayjs().endOf('week').add(1, 'week')] },
+            { label: 'Текущий месяц', value: [dayjs().startOf('month'), dayjs().endOf('month')] },
+          ]}
+        />
+      </ResponsiveActions>
 
       <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
         <Col span={24}>
           <Tabs 
             defaultActiveKey="calendar"
+            size={componentSize}
             items={[
               {
                 key: 'calendar',
                 label: (
-                  <span>
+                  <span style={{ fontSize: screenInfo.isMobile ? '12px' : '14px' }}>
                     <CalendarOutlined />
                     ⚡ Производственный календарь
                   </span>
@@ -89,9 +105,9 @@ export const CalendarPage: React.FC = () => {
               {
                 key: 'utilization',
                 label: (
-                  <span>
+                  <span style={{ fontSize: screenInfo.isMobile ? '12px' : '14px' }}>
                     <BarChartOutlined />
-                    Загруженность станков
+                    {screenInfo.isMobile ? 'Загрузка' : 'Загруженность станков'}
                   </span>
                 ),
                 children: <MachineUtilization filter={filter} />
@@ -99,9 +115,9 @@ export const CalendarPage: React.FC = () => {
               {
                 key: 'deadlines',
                 label: (
-                  <span>
+                  <span style={{ fontSize: screenInfo.isMobile ? '12px' : '14px' }}>
                     <AlertOutlined />
-                    Предстоящие сроки
+                    {screenInfo.isMobile ? 'Сроки' : 'Предстоящие сроки'}
                   </span>
                 ),
                 children: <UpcomingDeadlines />
@@ -129,6 +145,6 @@ export const CalendarPage: React.FC = () => {
         style={{ marginTop: 16 }}
         icon={<InfoCircleOutlined />}
       />
-    </div>
+    </ResponsiveContainer>
   );
 };

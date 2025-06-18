@@ -1,9 +1,9 @@
 /**
  * @file: DatabasePage.tsx
- * @description: Страница базы данных заказов с поддержкой i18n
- * @dependencies: OrdersList, OrderForm, CSVImportModal
+ * @description: Адаптивная страница базы данных заказов с поддержкой i18n
+ * @dependencies: OrdersList, OrderForm, CSVImportModal, ResponsiveGrid
  * @created: 2025-01-28
- * @updated: 2025-06-10 // Добавлена поддержка переводов
+ * @updated: 2025-06-18 - Добавлена полная адаптивность для всех устройств
  */
 import React, { useState } from 'react';
 import { Button, Row, Col, message, Space, Tooltip } from 'antd';
@@ -21,12 +21,18 @@ import { OrdersFilter } from '../../types/order.types';
 import { OrdersList } from './components/OrdersList';
 import { OrderForm } from './components/OrderForm.SIMPLE';
 import { CSVImportModal } from './components/CSVImportModal';
-
 import { EnhancedExcelImporter } from '../../components/ExcelUploader/EnhancedExcelImporter';
 import { useTranslation } from '../../i18n';
+import { 
+  ResponsiveContainer, 
+  ResponsiveActions,
+  ResponsiveTableWrapper 
+} from '../../components/ResponsiveGrid';
+import { useResponsive, responsiveUtils } from '../../hooks';
 
 export const DatabasePage: React.FC = () => {
   const { t, tWithParams } = useTranslation();
+  const screenInfo = useResponsive();
   const [showOrderForm, setShowOrderForm] = useState(false);
   const [showCSVImport, setShowCSVImport] = useState(false);
   const [showEnhancedExcelImport, setShowEnhancedExcelImport] = useState(false);
@@ -38,6 +44,9 @@ export const DatabasePage: React.FC = () => {
     queryKey: ['orders', filter],
     queryFn: () => ordersApi.getAll(filter),
   });
+
+  const componentSize = responsiveUtils.getComponentSize(screenInfo);
+  const cardSize: 'default' | 'small' = screenInfo.isMobile ? 'small' : 'default';
 
   const handleCreateOrder = () => {
     setEditingOrderId(undefined);
@@ -153,102 +162,136 @@ export const DatabasePage: React.FC = () => {
   };
 
   return (
-    <div className="page-container">
-      <Row gutter={[16, 16]}>
-        <Col span={24}>
-          <div className="actions-bar">
-            <div className="actions-bar-left">
+    <ResponsiveContainer className="database-page">
+      {/* Адаптивная панель действий */}
+      <ResponsiveActions 
+        direction="auto" 
+        justify={screenInfo.isMobile ? 'center' : 'space-between'}
+        className="actions-section"
+        style={{ marginBottom: screenInfo.isMobile ? 16 : 24 }}
+      >
+        <div style={{ 
+          display: 'flex', 
+          flexDirection: screenInfo.isMobile ? 'column' : 'row',
+          gap: screenInfo.isMobile ? 8 : 12,
+          width: screenInfo.isMobile ? '100%' : 'auto'
+        }}>
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={handleCreateOrder}
+            size={componentSize}
+            style={{ 
+              width: screenInfo.isMobile ? '100%' : 'auto',
+              height: screenInfo.isMobile ? 44 : 'auto'
+            }}
+          >
+            {t('database.new_order')}
+          </Button>
+          
+          {/* Импорт кнопки в адаптивном контейнере */}
+          <Space.Compact 
+            style={{ 
+              width: screenInfo.isMobile ? '100%' : 'auto',
+              display: 'flex',
+              flexDirection: screenInfo.isMobile ? 'column' : 'row'
+            }}
+          >
+            {/* Stable CSV import - recommended */}
+            <Tooltip title={t('tooltip.csv_reliable')}>
               <Button
                 type="primary"
-                icon={<PlusOutlined />}
-                onClick={handleCreateOrder}
+                icon={<ImportOutlined />}
+                onClick={() => setShowCSVImport(true)}
+                size={componentSize}
+                style={{ 
+                  background: '#52c41a',
+                  borderColor: '#52c41a',
+                  width: screenInfo.isMobile ? '100%' : 'auto',
+                  height: screenInfo.isMobile ? 44 : 'auto',
+                  marginBottom: screenInfo.isMobile ? 8 : 0
+                }}
               >
-                {t('database.new_order')}
+                {screenInfo.isMobile ? t('database.csv_import') : t('database.csv_import')}
+                <CheckCircleOutlined style={{ marginLeft: 4 }} />
               </Button>
-              
-              <Space.Compact>
-                {/* Stable CSV import - recommended */}
-                <Tooltip title={t('tooltip.csv_reliable')}>
-                  <Button
-                    type="primary"
-                    icon={<ImportOutlined />}
-                    onClick={() => setShowCSVImport(true)}
-                    style={{ 
-                      background: '#52c41a',
-                      borderColor: '#52c41a'
-                    }}
-                  >
-                    {t('database.csv_import')}
-                    <CheckCircleOutlined style={{ marginLeft: 4 }} />
-                  </Button>
-                </Tooltip>
-                
-                {/* 🆕 NEW Enhanced Excel import */}
-                <Tooltip title={t('tooltip.excel_2_enhanced')}>
-                  <Button
-                    type="primary"
-                    icon={<FileExcelOutlined />}
-                    onClick={() => setShowEnhancedExcelImport(true)}
-                    style={{ 
-                      background: 'linear-gradient(45deg, #667eea, #764ba2)',
-                      border: 'none'
-                    }}
-                  >
-                    {t('database.excel_2_0')}
-                    <CheckCircleOutlined style={{ marginLeft: 4, color: '#52c41a' }} />
-                  </Button>
-                </Tooltip>
-                
-                {/* Old Excel uploader - may be unstable */}
-                <Tooltip title={t('tooltip.excel_1_unstable')}>
-                  <Button
-                    type="default"
-                    icon={<FileExcelOutlined />}
-                    onClick={() => {
-                      // Create input for file selection
-                      const input = document.createElement('input');
-                      input.type = 'file';
-                      input.accept = '.xlsx,.xls';
-                      input.onchange = (e) => {
-                        const file = (e.target as HTMLInputElement).files?.[0];
-                        if (file) {
-                          handleExcelUpload(file);
-                        }
-                      };
-                      input.click();
-                    }}
-                  >
-                    {t('database.excel_1_0')}
-                    <WarningOutlined style={{ marginLeft: 4, color: '#faad14' }} />
-                  </Button>
-                </Tooltip>
-              </Space.Compact>
-              
+            </Tooltip>
+            
+            {/* Enhanced Excel import */}
+            <Tooltip title={t('tooltip.excel_2_enhanced')}>
               <Button
-                icon={<ReloadOutlined />}
-                onClick={() => refetch()}
+                type="primary"
+                icon={<FileExcelOutlined />}
+                onClick={() => setShowEnhancedExcelImport(true)}
+                size={componentSize}
+                style={{ 
+                  background: 'linear-gradient(45deg, #667eea, #764ba2)',
+                  border: 'none',
+                  width: screenInfo.isMobile ? '100%' : 'auto',
+                  height: screenInfo.isMobile ? 44 : 'auto',
+                  marginBottom: screenInfo.isMobile ? 8 : 0
+                }}
               >
-                {t('database.refresh')}
+                {screenInfo.isMobile ? t('database.excel_2_0') : t('database.excel_2_0')}
+                <CheckCircleOutlined style={{ marginLeft: 4, color: '#52c41a' }} />
               </Button>
-            </div>
-          </div>
-        </Col>
-      </Row>
+            </Tooltip>
+            
+            {/* Old Excel uploader - may be unstable */}
+            {!screenInfo.isMobile && (
+              <Tooltip title={t('tooltip.excel_1_unstable')}>
+                <Button
+                  type="default"
+                  icon={<FileExcelOutlined />}
+                  onClick={() => {
+                    // Create input for file selection
+                    const input = document.createElement('input');
+                    input.type = 'file';
+                    input.accept = '.xlsx,.xls';
+                    input.onchange = (e) => {
+                      const file = (e.target as HTMLInputElement).files?.[0];
+                      if (file) {
+                        handleExcelUpload(file);
+                      }
+                    };
+                    input.click();
+                  }}
+                  size={componentSize}
+                >
+                  {t('database.excel_1_0')}
+                  <WarningOutlined style={{ marginLeft: 4, color: '#faad14' }} />
+                </Button>
+              </Tooltip>
+            )}
+          </Space.Compact>
+          
+          <Button
+            icon={<ReloadOutlined />}
+            onClick={() => refetch()}
+            size={componentSize}
+            style={{ 
+              width: screenInfo.isMobile ? '100%' : 'auto',
+              height: screenInfo.isMobile ? 44 : 'auto'
+            }}
+          >
+            {t('database.refresh')}
+          </Button>
+        </div>
+      </ResponsiveActions>
 
-      <Row gutter={[16, 16]}>
-        <Col span={24}>
-          <OrdersList
-            data={data}
-            loading={isLoading}
-            error={error}
-            filter={filter}
-            onFilterChange={setFilter}
-            onEdit={handleEditOrder}
-            onDelete={handleDeleteOrder}
-            onRefresh={refetch}
-          />
-        </Col>
-      </Row>
+      {/* Адаптивная таблица заказов */}
+      <ResponsiveTableWrapper>
+        <OrdersList
+          data={data}
+          loading={isLoading}
+          error={error}
+          filter={filter}
+          onFilterChange={setFilter}
+          onEdit={handleEditOrder}
+          onDelete={handleDeleteOrder}
+          onRefresh={refetch}
+        />
+      </ResponsiveTableWrapper>
 
       {/* Order creation/editing form */}
       <OrderForm
@@ -258,19 +301,19 @@ export const DatabasePage: React.FC = () => {
         onSuccess={handleFormSuccess}
       />
 
-      {/* NEW: Stable CSV import */}
+      {/* Stable CSV import */}
       <CSVImportModal
         visible={showCSVImport}
         onClose={() => setShowCSVImport(false)}
         onSuccess={handleCSVImportSuccess}
       />
 
-      {/* 🆕 NEW: Enhanced Excel import */}
+      {/* Enhanced Excel import */}
       <EnhancedExcelImporter
         visible={showEnhancedExcelImport}
         onClose={() => setShowEnhancedExcelImport(false)}
         onSuccess={handleEnhancedExcelImportSuccess}
       />
-    </div>
+    </ResponsiveContainer>
   );
 };

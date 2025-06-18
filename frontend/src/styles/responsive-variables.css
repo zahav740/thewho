@@ -1,0 +1,271 @@
+/**
+ * @file: responsive-variables.css
+ * @description: CSS переменные для адаптивного дизайна
+ * @created: 2025-06-18
+ */
+
+:root {
+  /* Масштаб уменьшен на 20% */
+  --global-scale: 0.8;
+  
+  /* Breakpoints */
+  --breakpoint-xs: 0px;
+  --breakpoint-sm: 576px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 992px;
+  --breakpoint-xl: 1200px;
+  --breakpoint-xxl: 1600px;
+  
+  /* Spacing scale - уменьшенные на 20% */
+  --spacing-xs: 0.1rem;     /* 1.6px - было 2px */
+  --spacing-sm: 0.2rem;     /* 3.2px - было 4px */
+  --spacing-md: 0.4rem;     /* 6.4px - было 8px */
+  --spacing-lg: 0.6rem;     /* 9.6px - было 12px */
+  --spacing-xl: 0.8rem;     /* 12.8px - было 16px */
+  --spacing-xxl: 1rem;      /* 16px - было 20px */
+  --spacing-xxxl: 1.2rem;   /* 19.2px - было 24px */
+  
+  /* Font sizes - уменьшенные на 20% */
+  --font-size-xs: 0.48rem;   /* 7.68px - было 9.6px */
+  --font-size-sm: 0.6rem;    /* 9.6px - было 12px */
+  --font-size-base: 0.7rem;  /* 11.2px - было 14px */
+  --font-size-lg: 0.8rem;    /* 12.8px - было 16px */
+  --font-size-xl: 0.9rem;    /* 14.4px - было 18px */
+  --font-size-xxl: 1rem;     /* 16px - было 20px */
+  --font-size-xxxl: 1.2rem;  /* 19.2px - было 24px */
+  
+  /* Line heights */
+  --line-height-tight: 1.25;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.75;
+  
+  /* Border radius */
+  --border-radius-sm: 0.25rem;  /* 4px */
+  --border-radius-md: 0.5rem;   /* 8px */
+  --border-radius-lg: 0.75rem;  /* 12px */
+  --border-radius-xl: 1rem;     /* 16px */
+  
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.07);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
+  --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.15);
+  
+  /* Z-index scale */
+  --z-dropdown: 1000;
+  --z-sticky: 1020;
+  --z-fixed: 1030;
+  --z-modal: 1040;
+  --z-popover: 1050;
+  --z-tooltip: 1060;
+  
+  /* Transition durations */
+  --transition-fast: 150ms;
+  --transition-normal: 300ms;
+  --transition-slow: 500ms;
+  
+  /* Container max-widths */
+  --container-sm: 540px;
+  --container-md: 720px;
+  --container-lg: 960px;
+  --container-xl: 1140px;
+  --container-xxl: 1400px;
+}
+
+/* Mobile first responsive spacing - еще более компактные */
+@media (max-width: 767px) {
+  :root {
+    --spacing-xs: 0.0625rem;  /* 1px - было 2px */
+    --spacing-sm: 0.125rem;   /* 2px - было 4px */
+    --spacing-md: 0.25rem;    /* 4px - было 8px */
+    --spacing-lg: 0.5rem;     /* 8px - было 12px */
+    --spacing-xl: 0.75rem;    /* 12px - было 16px */
+    --spacing-xxl: 1rem;      /* 16px - было 20px */
+    --spacing-xxxl: 1.25rem;  /* 20px - было 24px */
+    
+    --font-size-xs: 0.5rem;    /* 8px - было 10px */
+    --font-size-sm: 0.625rem;  /* 10px - было 12px */
+    --font-size-base: 0.75rem; /* 12px - было 14px */
+    --font-size-lg: 0.875rem;  /* 14px - было 16px */
+    --font-size-xl: 1rem;      /* 16px - было 18px */
+    --font-size-xxl: 1.125rem; /* 18px - было 20px */
+    --font-size-xxxl: 1.25rem; /* 20px - было 24px */
+  }
+}
+
+/* Tablet responsive spacing */
+@media (min-width: 768px) and (max-width: 991px) {
+  :root {
+    --spacing-lg: 0.875rem;   /* 14px */
+    --spacing-xl: 1.25rem;    /* 20px */
+    --spacing-xxl: 1.75rem;   /* 28px */
+    --spacing-xxxl: 2.5rem;   /* 40px */
+  }
+}
+
+/* Large screen spacing */
+@media (min-width: 1600px) {
+  :root {
+    --spacing-xl: 2rem;       /* 32px */
+    --spacing-xxl: 2.5rem;    /* 40px */
+    --spacing-xxxl: 4rem;     /* 64px */
+    
+    --font-size-base: 1.125rem; /* 18px */
+    --font-size-lg: 1.25rem;    /* 20px */
+    --font-size-xl: 1.5rem;     /* 24px */
+    --font-size-xxl: 1.75rem;   /* 28px */
+    --font-size-xxxl: 2.25rem;  /* 36px */
+  }
+}
+
+/* Utility classes using CSS variables */
+.spacing-xs { margin: var(--spacing-xs); }
+.spacing-sm { margin: var(--spacing-sm); }
+.spacing-md { margin: var(--spacing-md); }
+.spacing-lg { margin: var(--spacing-lg); }
+.spacing-xl { margin: var(--spacing-xl); }
+.spacing-xxl { margin: var(--spacing-xxl); }
+
+.p-xs { padding: var(--spacing-xs); }
+.p-sm { padding: var(--spacing-sm); }
+.p-md { padding: var(--spacing-md); }
+.p-lg { padding: var(--spacing-lg); }
+.p-xl { padding: var(--spacing-xl); }
+.p-xxl { padding: var(--spacing-xxl); }
+
+.m-xs { margin: var(--spacing-xs); }
+.m-sm { margin: var(--spacing-sm); }
+.m-md { margin: var(--spacing-md); }
+.m-lg { margin: var(--spacing-lg); }
+.m-xl { margin: var(--spacing-xl); }
+.m-xxl { margin: var(--spacing-xxl); }
+
+.text-xs { font-size: var(--font-size-xs); }
+.text-sm { font-size: var(--font-size-sm); }
+.text-base { font-size: var(--font-size-base); }
+.text-lg { font-size: var(--font-size-lg); }
+.text-xl { font-size: var(--font-size-xl); }
+.text-xxl { font-size: var(--font-size-xxl); }
+
+.rounded-sm { border-radius: var(--border-radius-sm); }
+.rounded-md { border-radius: var(--border-radius-md); }
+.rounded-lg { border-radius: var(--border-radius-lg); }
+.rounded-xl { border-radius: var(--border-radius-xl); }
+
+.shadow-sm { box-shadow: var(--shadow-sm); }
+.shadow-md { box-shadow: var(--shadow-md); }
+.shadow-lg { box-shadow: var(--shadow-lg); }
+.shadow-xl { box-shadow: var(--shadow-xl); }
+
+/* Responsive display utilities */
+.hidden-xs { display: block; }
+.hidden-sm { display: block; }
+.hidden-md { display: block; }
+.hidden-lg { display: block; }
+.hidden-xl { display: block; }
+
+@media (max-width: 575px) {
+  .hidden-xs { display: none !important; }
+}
+
+@media (max-width: 767px) {
+  .hidden-sm { display: none !important; }
+}
+
+@media (max-width: 991px) {
+  .hidden-md { display: none !important; }
+}
+
+@media (max-width: 1199px) {
+  .hidden-lg { display: none !important; }
+}
+
+@media (max-width: 1599px) {
+  .hidden-xl { display: none !important; }
+}
+
+/* Responsive text alignment */
+.text-left-mobile {
+  text-align: left;
+}
+
+@media (max-width: 767px) {
+  .text-center-mobile {
+    text-align: center !important;
+  }
+  
+  .text-left-mobile {
+    text-align: left !important;
+  }
+}
+
+/* Responsive flex utilities */
+.flex-col-mobile {
+  display: flex;
+  flex-direction: row;
+}
+
+@media (max-width: 767px) {
+  .flex-col-mobile {
+    flex-direction: column !important;
+  }
+}
+
+.flex-row-desktop {
+  display: flex;
+  flex-direction: column;
+}
+
+@media (min-width: 768px) {
+  .flex-row-desktop {
+    flex-direction: row !important;
+  }
+}
+
+/* Container classes */
+.container-responsive {
+  width: 100%;
+  max-width: var(--container-xxl);
+  margin: 0 auto;
+  padding: 0 var(--spacing-lg);
+}
+
+@media (max-width: 767px) {
+  .container-responsive {
+    padding: 0 var(--spacing-md);
+  }
+}
+
+/* Touch-friendly sizing */
+.touch-target {
+  min-height: 44px;
+  min-width: 44px;
+  padding: var(--spacing-sm) var(--spacing-lg);
+}
+
+@media (max-width: 767px) {
+  .touch-target {
+    min-height: 48px;
+    padding: var(--spacing-md) var(--spacing-lg);
+  }
+}
+
+/* Responsive grid utilities */
+.grid-responsive {
+  display: grid;
+  gap: var(--spacing-lg);
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+@media (max-width: 767px) {
+  .grid-responsive {
+    grid-template-columns: 1fr;
+    gap: var(--spacing-md);
+  }
+}
+
+@media (min-width: 1200px) {
+  .grid-responsive {
+    gap: var(--spacing-xl);
+  }
+}

@@ -1,9 +1,11 @@
 /**
  * @file: FixedProductionCalendar.tsx
- * @description: Исправленный современный календарь производства с интеграцией с базой данных
+ * @description: Исправленный современный календарь производства с разделением на фрезерные и токарные станки
  * @created: 2025-06-17
+ * @updated: 2025-06-18 - Добавлено разделение станков по типам (фрезерные и токарные)
  */
 import React, { useState, useEffect } from 'react';
+import { Tabs } from 'antd';
 
 interface CalendarProps {
   filter: {
@@ -56,6 +58,7 @@ export const FixedProductionCalendar: React.FC<CalendarProps> = ({ filter }) => 
   const [calendarData, setCalendarData] = useState<any>(null);
   const [summaryData, setSummaryData] = useState<any>(null);
   const [viewMode, setViewMode] = useState<'grid' | 'timeline'>('grid');
+  const [activeTab, setActiveTab] = useState<'all' | 'milling' | 'turning'>('all');
 
   useEffect(() => {
     loadData();
@@ -82,6 +85,28 @@ export const FixedProductionCalendar: React.FC<CalendarProps> = ({ filter }) => 
       console.error('Ошибка загрузки данных:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Фильтруем станки по типам
+  const getFilteredMachines = () => {
+    if (!calendarData?.machineSchedules) return [];
+    
+    switch (activeTab) {
+      case 'milling':
+        return calendarData.machineSchedules.filter((machine: any) => 
+          machine.machineType === 'MILLING' || machine.machineType === 'milling' || 
+          machine.machineType.toLowerCase().includes('milling') ||
+          machine.machineName.toLowerCase().includes('фрез')
+        );
+      case 'turning':
+        return calendarData.machineSchedules.filter((machine: any) => 
+          machine.machineType === 'TURNING' || machine.machineType === 'turning' || 
+          machine.machineType.toLowerCase().includes('turning') ||
+          machine.machineName.toLowerCase().includes('токар')
+        );
+      default:
+        return calendarData.machineSchedules;
     }
   };
 
@@ -219,7 +244,9 @@ export const FixedProductionCalendar: React.FC<CalendarProps> = ({ filter }) => 
                 {machine.machineName}
               </div>
               <div style={{ color: '#999', fontSize: '12px' }}>
-                {machine.machineType === 'MILLING' ? 'Фрезерный' : 'Токарный'}
+                {machine.machineType === 'MILLING' ? 'Фрезерный станок' : 
+                 machine.machineType === 'TURNING' ? 'Токарный станок' : 
+                 machine.machineType}
               </div>
             </div>
           </div>
@@ -355,6 +382,134 @@ export const FixedProductionCalendar: React.FC<CalendarProps> = ({ filter }) => 
     );
   };
 
+  // Получаем статистику по типам станков
+  const getStatsForType = (type: 'milling' | 'turning') => {
+    if (!calendarData?.machineSchedules) return { total: 0, active: 0, utilization: 0 };
+
+    const machines = calendarData.machineSchedules.filter((machine: any) => {
+      if (type === 'milling') {
+        return machine.machineType === 'MILLING' || machine.machineType === 'milling' || 
+               machine.machineType.toLowerCase().includes('milling') ||
+               machine.machineName.toLowerCase().includes('фрез');
+      } else {
+        return machine.machineType === 'TURNING' || machine.machineType === 'turning' || 
+               machine.machineType.toLowerCase().includes('turning') ||
+               machine.machineName.toLowerCase().includes('токар');
+      }
+    });
+
+    const activeMachines = machines.filter((m: any) => m.currentOperation);
+    const totalUtilization = machines.reduce((acc: number, machine: any) => {
+      const workingDays = machine.days.filter((d: any) => d.isWorkingDay).slice(0, 21);
+      const busyDays = workingDays.filter((d: any) => 
+        (d.completedShifts && d.completedShifts.length > 0) || d.plannedOperation
+      );
+      return acc + (workingDays.length > 0 ? (busyDays.length / workingDays.length) * 100 : 0);
+    }, 0);
+
+    return {
+      total: machines.length,
+      active: activeMachines.length,
+      utilization: machines.length > 0 ? Math.round(totalUtilization / machines.length) : 0
+    };
+  };
+
+  const renderStatsHeader = () => {
+    const millingStats = getStatsForType('milling');
+    const turningStats = getStatsForType('turning');
+    const filteredMachines = getFilteredMachines();
+
+    return (
+      <div style={{
+        backgroundColor: 'white',
+        borderBottom: '1px solid #f0f0f0',
+        padding: '20px'
+      }}>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+          gap: '20px'
+        }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{
+              fontSize: '32px',
+              fontWeight: '600',
+              color: '#1890ff',
+              marginBottom: '4px'
+            }}>
+              {filteredMachines.length}
+            </div>
+            <div style={{ color: '#8c8c8c', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+              ⚙️ Всего станков
+            </div>
+          </div>
+          
+          <div style={{ textAlign: 'center' }}>
+            <div style={{
+              fontSize: '32px',
+              fontWeight: '600',
+              color: '#52c41a',
+              marginBottom: '4px'
+            }}>
+              {filteredMachines.filter((m: any) => m.currentOperation).length}
+            </div>
+            <div style={{ color: '#8c8c8c', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+              ▶️ В работе
+            </div>
+          </div>
+
+          {activeTab === 'all' && (
+            <>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{
+                  fontSize: '24px',
+                  fontWeight: '600',
+                  color: '#1890ff',
+                  marginBottom: '4px'
+                }}>
+                  🔧 {millingStats.total}
+                </div>
+                <div style={{ color: '#8c8c8c', fontSize: '12px' }}>
+                  Фрезерных ({millingStats.active} работают)
+                </div>
+              </div>
+              
+              <div style={{ textAlign: 'center' }}>
+                <div style={{
+                  fontSize: '24px',
+                  fontWeight: '600',
+                  color: '#52c41a',
+                  marginBottom: '4px'
+                }}>
+                  ⚙️ {turningStats.total}
+                </div>
+                <div style={{ color: '#8c8c8c', fontSize: '12px' }}>
+                  Токарных ({turningStats.active} работают)
+                </div>
+              </div>
+            </>
+          )}
+          
+          <div style={{ textAlign: 'center' }}>
+            <div style={{
+              fontSize: '32px',
+              fontWeight: '600',
+              color: '#faad14',
+              marginBottom: '4px'
+            }}>
+              {activeTab === 'milling' ? millingStats.utilization :
+               activeTab === 'turning' ? turningStats.utilization :
+               summaryData?.summary?.averageUtilization || 0}%
+            </div>
+            <div style={{ color: '#8c8c8c', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+              ⚡ Средняя загрузка
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   if (loading) {
     return (
       <div style={{
@@ -431,6 +586,8 @@ export const FixedProductionCalendar: React.FC<CalendarProps> = ({ filter }) => 
     );
   }
 
+  const filteredMachines = getFilteredMachines();
+
   return (
     <div style={{
       backgroundColor: '#f5f5f5',
@@ -459,7 +616,11 @@ export const FixedProductionCalendar: React.FC<CalendarProps> = ({ filter }) => 
               alignItems: 'center',
               gap: '12px'
             }}>
-              📅 Современный календарь производства
+              📅 Производственный календарь {
+                activeTab === 'milling' ? '🔧 Фрезерные станки' :
+                activeTab === 'turning' ? '⚙️ Токарные станки' :
+                'Все станки'
+              }
             </h3>
             {calendarData && (
               <div style={{ color: '#8c8c8c', fontSize: '14px' }}>
@@ -505,88 +666,72 @@ export const FixedProductionCalendar: React.FC<CalendarProps> = ({ filter }) => 
             </button>
           </div>
         </div>
+
+        {/* Табы для фильтрации */}
+        <div style={{ marginTop: '20px' }}>
+          <Tabs
+            activeKey={activeTab}
+            onChange={(key) => setActiveTab(key as 'all' | 'milling' | 'turning')}
+            items={[
+              {
+                key: 'all',
+                label: (
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    🏭 Все станки ({calendarData?.machineSchedules?.length || 0})
+                  </span>
+                ),
+              },
+              {
+                key: 'milling',
+                label: (
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    🔧 Фрезерные ({getStatsForType('milling').total})
+                  </span>
+                ),
+              },
+              {
+                key: 'turning',
+                label: (
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    ⚙️ Токарные ({getStatsForType('turning').total})
+                  </span>
+                ),
+              },
+            ]}
+          />
+        </div>
       </div>
 
       {/* Статистика */}
-      <div style={{
-        backgroundColor: 'white',
-        borderBottom: '1px solid #f0f0f0',
-        padding: '20px'
-      }}>
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(4, 1fr)',
-          gap: '20px'
-        }}>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{
-              fontSize: '32px',
-              fontWeight: '600',
-              color: '#1890ff',
-              marginBottom: '4px'
-            }}>
-              {summaryData?.summary?.totalMachines || calendarData?.machineSchedules?.length || 0}
-            </div>
-            <div style={{ color: '#8c8c8c', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
-              ⚙️ Всего станков
-            </div>
-          </div>
-          
-          <div style={{ textAlign: 'center' }}>
-            <div style={{
-              fontSize: '32px',
-              fontWeight: '600',
-              color: '#52c41a',
-              marginBottom: '4px'
-            }}>
-              {summaryData?.summary?.activeMachines || calendarData?.machineSchedules?.filter((m: any) => m.currentOperation).length || 0}
-            </div>
-            <div style={{ color: '#8c8c8c', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
-              ▶️ В работе
-            </div>
-          </div>
-          
-          <div style={{ textAlign: 'center' }}>
-            <div style={{
-              fontSize: '32px',
-              fontWeight: '600',
-              color: '#722ed1',
-              marginBottom: '4px'
-            }}>
-              {calendarData?.totalWorkingDays || 0}
-            </div>
-            <div style={{ color: '#8c8c8c', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
-              📅 Рабочих дней
-            </div>
-          </div>
-          
-          <div style={{ textAlign: 'center' }}>
-            <div style={{
-              fontSize: '32px',
-              fontWeight: '600',
-              color: '#faad14',
-              marginBottom: '4px'
-            }}>
-              {summaryData?.summary?.averageUtilization || 0}%
-            </div>
-            <div style={{ color: '#8c8c8c', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
-              ⚡ Средняя загрузка
-            </div>
-          </div>
-        </div>
-      </div>
+      {renderStatsHeader()}
 
       {/* Основной контент */}
       <div style={{
         padding: '20px'
       }}>
-        {viewMode === 'grid' ? (
+        {filteredMachines.length === 0 ? (
+          <div style={{
+            textAlign: 'center',
+            padding: '40px',
+            color: '#8c8c8c'
+          }}>
+            <div style={{ fontSize: '48px', marginBottom: '20px' }}>
+              {activeTab === 'milling' ? '🔧' : activeTab === 'turning' ? '⚙️' : '🏭'}
+            </div>
+            <h3>Нет станков этого типа</h3>
+            <p>В выбранном периоде нет {
+              activeTab === 'milling' ? 'фрезерных' :
+              activeTab === 'turning' ? 'токарных' :
+              'активных'
+            } станков</p>
+          </div>
+        ) : viewMode === 'grid' ? (
           <div style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
             gap: '0'
           }}>
-            {calendarData?.machineSchedules?.map(renderMachineCard)}
+            {filteredMachines.map(renderMachineCard)}
           </div>
         ) : (
           <div style={{ color: '#999', textAlign: 'center', padding: '40px' }}>
@@ -624,6 +769,12 @@ export const FixedProductionCalendar: React.FC<CalendarProps> = ({ filter }) => 
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <div style={{ width: '12px', height: '12px', backgroundColor: '#444', borderRadius: '2px' }}></div>
               Станок свободен
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              🔧 Фрезерные станки
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              ⚙️ Токарные станки
             </div>
           </div>
         </div>
@@ -705,7 +856,7 @@ export const FixedProductionCalendar: React.FC<CalendarProps> = ({ filter }) => 
                     <strong>Операция:</strong> {selectedOperation.operationNumber}
                   </div>
                   <div style={{ marginBottom: '8px' }}>
-                    <strong>Станок:</strong> {selectedOperation.machine?.machineName}
+                    <strong>Станок:</strong> {selectedOperation.machine?.machineName} ({selectedOperation.machine?.machineType === 'MILLING' ? 'Фрезерный' : 'Токарный'})
                   </div>
                   <div style={{ marginBottom: '8px' }}>
                     <strong>Дата:</strong> {selectedOperation.date}
