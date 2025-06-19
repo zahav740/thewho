@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
 
 interface User {
   id: number;
@@ -33,6 +32,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const isAuthenticated = !!user && !!token;
 
   const login = (newToken: string, newUser: User) => {
+    console.log('✅ AuthContext.login вызван:', { user: newUser.username, role: newUser.role });
     setToken(newToken);
     setUser(newUser);
     localStorage.setItem('authToken', newToken);
@@ -40,12 +40,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const logout = () => {
+    console.log('🚪 AuthContext.logout вызван');
+    
+    // Очищаем состояние
     setToken(null);
     setUser(null);
+    
+    // Очищаем localStorage
     localStorage.removeItem('authToken');
     localStorage.removeItem('user');
-    // Перенаправляем на страницу входа через изменение URL
-    window.location.href = '/login';
+    
+    // Перенаправляем на страницу входа БЕЗ перезагрузки страницы
+    console.log('🔄 Перенаправляем на /login');
+    
+    // Используем setTimeout чтобы убедиться что состояние обновилось
+    setTimeout(() => {
+      window.location.href = '/login';
+    }, 100);
   };
 
   const checkAuth = async (): Promise<boolean> => {
@@ -53,11 +64,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const storedUser = localStorage.getItem('user');
 
     if (!storedToken || !storedUser) {
+      console.log('🔍 Нет сохраненных данных аутентификации');
       setIsLoading(false);
       return false;
     }
 
     try {
+      console.log('🔍 Проверяем валидность токена...');
       // Проверяем валидность токена на сервере
       const response = await fetch(`${API_URL}/auth/verify`, {
         method: 'POST',
@@ -69,18 +82,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       if (response.ok) {
         const userData = JSON.parse(storedUser);
+        console.log('✅ Токен валидный, пользователь автоматически авторизован:', userData.username);
         setToken(storedToken);
         setUser(userData);
         setIsLoading(false);
         return true;
       } else {
+        console.log('❌ Токен недействителен, очищаем данные');
         // Токен недействителен
         logout();
         setIsLoading(false);
         return false;
       }
     } catch (error) {
-      console.error('Auth check failed:', error);
+      console.error('❌ Ошибка проверки аутентификации:', error);
       logout();
       setIsLoading(false);
       return false;

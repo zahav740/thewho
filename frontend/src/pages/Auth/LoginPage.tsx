@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Form, Input, Button, Checkbox, Card, Typography, Space, message } from 'antd';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
 import { useTranslation } from '../../i18n';
+import { useAuth } from '../../contexts/AuthContext';
 import { LanguageSwitcher } from '../../components/LanguageSwitcher/LanguageSwitcher';
 import './LoginPage.css';
 
@@ -21,6 +22,15 @@ export const LoginPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const { login, isAuthenticated } = useAuth();
+
+  // Если пользователь уже авторизован, перенаправляем его
+  useEffect(() => {
+    if (isAuthenticated) {
+      console.log('🔄 Пользователь уже авторизован, перенаправляем на /database');
+      navigate('/database', { replace: true });
+    }
+  }, [isAuthenticated, navigate]);
 
   // Загружаем сохраненные учетные данные при инициализации
   useEffect(() => {
@@ -28,13 +38,14 @@ export const LoginPage: React.FC = () => {
     if (savedCredentials) {
       try {
         const { username, password } = JSON.parse(savedCredentials);
+        console.log('💾 Загружаем сохраненные данные для:', username);
         form.setFieldsValue({
           username,
           password,
           remember: true
         });
       } catch (error) {
-        console.error('Error loading saved credentials:', error);
+        console.error('Ошибка загрузки сохраненных данных:', error);
       }
     }
   }, [form]);
@@ -42,7 +53,7 @@ export const LoginPage: React.FC = () => {
   const handleSubmit = async (values: LoginFormData) => {
     setIsLoading(true);
 
-    console.log('🚀 Начинаем вход с данными:', values);
+    console.log('🚀 Начинаем вход с данными:', { username: values.username, remember: values.remember });
 
     try {
       const response = await fetch(`${API_URL}/auth/login`, {
@@ -59,23 +70,17 @@ export const LoginPage: React.FC = () => {
       console.log('🔍 Ответ от сервера:', {
         status: response.status,
         statusText: response.statusText,
-        ok: response.ok,
-        headers: Object.fromEntries(response.headers.entries())
+        ok: response.ok
       });
 
       if (!response.ok) {
-        console.log('❌ Ответ не OK, получаем ошибку...');
         const errorData = await response.json();
-        console.log('❌ Данные ошибки:', errorData);
+        console.log('❌ Ошибка входа:', errorData);
         throw new Error(errorData.message || t('auth.invalid_credentials'));
       }
 
       const data = await response.json();
-      console.log('✅ Полученные данные:', data);
-      
-      // Сохраняем токен и информацию о пользователе
-      localStorage.setItem('authToken', data.access_token);
-      localStorage.setItem('user', JSON.stringify(data.user));
+      console.log('✅ Полученные данные:', { user: data.user.username, role: data.user.role });
       
       // Сохраняем или удаляем учетные данные в зависимости от чекбокса
       if (values.remember) {
@@ -89,11 +94,14 @@ export const LoginPage: React.FC = () => {
         console.log('🗑️ Учетные данные удалены');
       }
       
-      console.log('✅ Данные сохранены в localStorage');
+      // Вызываем login из AuthContext
+      login(data.access_token, data.user);
+      
+      console.log('✅ Авторизация успешна, перенаправляем...');
       
       // Перенаправляем на главную страницу
-      console.log('✅ Перенаправляем на /database...');
-      navigate('/database');
+      navigate('/database', { replace: true });
+      
     } catch (err) {
       console.log('❌ Ошибка при входе:', err);
       message.error(err instanceof Error ? err.message : t('auth.login_error'));

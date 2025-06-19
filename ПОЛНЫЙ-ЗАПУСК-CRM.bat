@@ -1,35 +1,45 @@
 @echo off
-echo ========================================
-echo 🚀 ПОЛНЫЙ ЗАПУСК PRODUCTION CRM
-echo ========================================
+echo ==============================================
+echo    ПОЛНЫЙ ЗАПУСК CRM СИСТЕМЫ
+echo ==============================================
+echo.
 
-echo 🔧 1. Запуск Backend...
-cd /d "C:\Users\kasuf\Downloads\TheWho\production-crm\backend"
-start "Backend" cmd /k "npm run start:dev"
+echo 🛑 Останавливаем все процессы...
+taskkill /F /IM node.exe >nul 2>&1
+timeout /t 2 >nul
 
-echo ⏳ Ждем 5 секунд для запуска backend...
-timeout /t 5 /nobreak > nul
+echo 🗃️ Запускаем PostgreSQL...
+net start postgresql-x64-14 >nul 2>&1
 
-echo 🎨 2. Запуск Frontend...
-cd /d "C:\Users\kasuf\Downloads\TheWho\production-crm\frontend"  
-start "Frontend" cmd /k "npm start"
+echo 🔧 Запускаем Backend...
+start "Backend Server" cmd /c "cd /d C:\Users\kasuf\Downloads\TheWho\production-crm\backend && npm run start:dev"
 
-echo ⏳ Ждем 10 секунд для запуска frontend...
-timeout /t 10 /nobreak > nul
+echo ⏱️ Ждем запуска backend (10 секунд)...
+timeout /t 10 >nul
 
-echo 🌐 3. Открытие браузера...
-start http://localhost:3000
+echo 🌐 Запускаем Frontend...
+start "Frontend Server" cmd /c "cd /d C:\Users\kasuf\Downloads\TheWho\production-crm\frontend && npm start"
 
 echo.
-echo =======================================
-echo ✅ ПРИЛОЖЕНИЕ ЗАПУЩЕНО!
-echo =======================================
-echo 📊 Backend:  http://localhost:5100
-echo 🎨 Frontend: http://localhost:3000  
-echo 📅 Календарь: http://localhost:3000 (раздел Календарь)
+echo ✅ СИСТЕМА ЗАПУЩЕНА:
+echo    🔧 Backend: http://localhost:5100
+echo    🌐 Frontend: http://localhost:5101
 echo.
-echo 🎯 Перейдите в раздел "Календарь" для проверки
-echo    исправленного производственного календаря
+echo 🔑 ДАННЫЕ ДЛЯ ВХОДА:
+echo    Логин: kasuf
+echo    Пароль: kasuf123
+echo.
+echo 📋 ИНСТРУКЦИЯ:
+echo    1. Дождитесь полной загрузки (1-2 минуты)
+echo    2. Откройте http://localhost:5101
+echo    3. Войдите в систему
+echo    4. Перейдите в "База данных"
+echo    5. Проверьте большие иконки (32px)
+echo.
+echo ⚠️ Если вход не работает:
+echo    - Проверьте что backend запустился без ошибок
+echo    - Убедитесь что PostgreSQL работает
+echo    - Проверьте консоль на ошибки
 echo.
 
 pause
