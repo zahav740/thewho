@@ -29,6 +29,7 @@ import {
   ResponsiveTableWrapper 
 } from '../../components/ResponsiveGrid';
 import { useResponsive, responsiveUtils } from '../../hooks';
+import './DatabasePage.css';
 
 export const DatabasePage: React.FC = () => {
   const { t, tWithParams } = useTranslation();

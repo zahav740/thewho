@@ -184,13 +184,26 @@ export const OrdersList: React.FC<OrdersListProps> = ({
     {
       title: t('database.actions'),
       key: 'actions',
-      width: 120,
+      width: 160,
+      align: 'center',
       render: (_: any, record: Order) => (
-        <Space>
+        <Space size="large" style={{ justifyContent: 'center', width: '100%' }}>
           <Button
-            type="link"
-            icon={<EditOutlined />}
+            type="primary"
+            ghost
+            icon={<EditOutlined style={{ fontSize: '32px' }} />}
             onClick={() => onEdit(record.id)}
+            size="large"
+            style={{ 
+              width: '50px',
+              height: '50px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: '8px',
+              borderWidth: '2px'
+            }}
+            title={t('button.edit')}
           />
           <Popconfirm
             title={t('database.delete_order')}
@@ -199,7 +212,23 @@ export const OrdersList: React.FC<OrdersListProps> = ({
             okText={t('database.delete_button')}
             cancelText={t('database.cancel_button')}
           >
-            <Button type="link" danger icon={<DeleteOutlined />} />
+            <Button 
+              type="primary"
+              danger
+              ghost
+              icon={<DeleteOutlined style={{ fontSize: '32px' }} />} 
+              size="large"
+              style={{ 
+                width: '50px',
+                height: '50px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: '8px',
+                borderWidth: '2px'
+              }}
+              title={t('button.delete')}
+            />
           </Popconfirm>
         </Space>
       ),
@@ -300,6 +329,8 @@ export const OrdersList: React.FC<OrdersListProps> = ({
             border: '1px solid #f0f0f0',
             borderRadius: '8px'
           }}
+          size="middle"
+          scroll={{ x: 'max-content' }}
         />  
       </Space>
       

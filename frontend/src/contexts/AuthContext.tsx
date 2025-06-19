@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 interface User {
   id: number;
@@ -43,6 +44,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setUser(null);
     localStorage.removeItem('authToken');
     localStorage.removeItem('user');
+    // Перенаправляем на страницу входа через изменение URL
+    window.location.href = '/login';
   };
 
   const checkAuth = async (): Promise<boolean> => {

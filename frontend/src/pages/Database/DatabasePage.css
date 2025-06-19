@@ -1,0 +1,45 @@
+/* Стили для БОЛЬШИХ иконок в таблице заказов */
+.ant-table-tbody .ant-btn {
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.ant-table-tbody .ant-btn:hover {
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.ant-table-tbody .ant-btn-primary:hover {
+  box-shadow: 0 4px 12px rgba(24, 144, 255, 0.4);
+}
+
+.ant-table-tbody .ant-btn-dangerous:hover {
+  box-shadow: 0 4px 12px rgba(255, 77, 79, 0.4);
+}
+
+/* Увеличиваем высоту строк таблицы для больших кнопок */
+.ant-table-tbody > tr > td {
+  padding: 20px 8px !important;
+  vertical-align: middle;
+}
+
+/* Стили для колонки действий */
+.ant-table-tbody .ant-space {
+  justify-content: center;
+  width: 100%;
+}
+
+/* Анимация при клике */
+.ant-table-tbody .ant-btn:active {
+  transform: scale(0.95);
+}
+
+/* Убираем границы у ячеек с кнопками */
+.ant-table-tbody > tr > td:last-child {
+  border-right: none;
+}
+
+/* Стили для иконок внутри кнопок */
+.ant-table .anticon {
+  font-size: 32px !important;
+}

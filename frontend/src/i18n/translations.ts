@@ -6,6 +6,18 @@
 
 export const translations: Record<'ru' | 'en', Record<string, string>> = {
   ru: {
+    // Аутентификация
+    'auth.login': 'Войти',
+    'auth.logout': 'Выйти',
+    'auth.confirm_logout': 'Вы действительно хотите выйти?',
+    'auth.role.admin': 'Администратор',
+    'auth.role.user': 'Пользователь',
+    'auth.username': 'Имя пользователя',
+    'auth.password': 'Пароль',
+    'auth.remember_me': 'Запомнить меня',
+    'auth.login_error': 'Ошибка входа',
+    'auth.invalid_credentials': 'Неверные учетные данные',
+
     // Навигация и меню
     'app.title': 'Production CRM',
     'app.title.short': 'CRM',
@@ -405,6 +417,18 @@ export const translations: Record<'ru' | 'en', Record<string, string>> = {
   },
 
   en: {
+    // Authentication
+    'auth.login': 'Login',
+    'auth.logout': 'Logout',
+    'auth.confirm_logout': 'Are you sure you want to logout?',
+    'auth.role.admin': 'Administrator',
+    'auth.role.user': 'User',
+    'auth.username': 'Username',
+    'auth.password': 'Password',
+    'auth.remember_me': 'Remember me',
+    'auth.login_error': 'Login error',
+    'auth.invalid_credentials': 'Invalid credentials',
+
     // Navigation and menu
     'app.title': 'Production CRM',
     'app.title.short': 'CRM',
