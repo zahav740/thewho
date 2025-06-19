@@ -1,6 +1,6 @@
 import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, Like } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { User, UserRole } from './entities/user.entity';
@@ -102,6 +102,38 @@ export class AuthService {
       },
       access_token: token,
     };
+  }
+
+  async searchUsernames(query: string): Promise<string[]> {
+    console.log('🔍 AuthService.searchUsernames вызван с запросом:', query);
+    
+    if (!query || query.length < 2) {
+      return [];
+    }
+
+    try {
+      // Поиск пользователей по username (начинается с запроса)
+      const users = await this.userRepository.find({
+        where: [
+          { username: Like(`${query}%`), isActive: true },  // начинается с query
+          { username: Like(`%${query}%`), isActive: true }  // содержит query
+        ],
+        select: ['username'],
+        order: {
+          username: 'ASC'
+        },
+        take: 10 // Ограничиваем до 10 результатов
+      });
+
+      // Извлекаем только usernames и убираем дубликаты
+      const usernames = [...new Set(users.map(user => user.username))];
+      
+      console.log('✅ Найденные usernames:', usernames);
+      return usernames;
+    } catch (error) {
+      console.error('❌ Ошибка поиска usernames:', error);
+      return [];
+    }
   }
 
   // Временный метод для создания правильного хэша

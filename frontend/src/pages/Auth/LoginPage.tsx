@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Form, Input, Button, Checkbox, Card, Typography, Space, message } from 'antd';
-import { UserOutlined, LockOutlined } from '@ant-design/icons';
+import { Form, Input, Button, Checkbox, Card, Typography, AutoComplete, message, Spin } from 'antd';
+import { UserOutlined, LockOutlined, SearchOutlined } from '@ant-design/icons';
 import { useTranslation } from '../../i18n';
 import { useAuth } from '../../contexts/AuthContext';
+import { useUsernameSearch } from '../../hooks/useUsernameSearch';
 import { LanguageSwitcher } from '../../components/LanguageSwitcher/LanguageSwitcher';
 import './LoginPage.css';
 
@@ -23,6 +24,7 @@ export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { login, isAuthenticated } = useAuth();
+  const { searchResults, isLoading: isSearching, searchUsernames, clearResults } = useUsernameSearch();
 
   // Если пользователь уже авторизован, перенаправляем его
   useEffect(() => {
@@ -49,6 +51,35 @@ export const LoginPage: React.FC = () => {
       }
     }
   }, [form]);
+
+  // Функция для получения опций автодополнения из БД
+  const getUsernameOptions = (searchText: string) => {
+    return searchResults.map(username => ({
+      value: username,
+      label: (
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center',
+          padding: '4px 0'
+        }}>
+          <UserOutlined style={{ marginRight: '8px', color: '#1890ff' }} />
+          {username}
+          <Text type="secondary" style={{ marginLeft: 'auto', fontSize: '12px' }}>
+            registered user
+          </Text>
+        </div>
+      )
+    }));
+  };
+
+  const handleUsernameSearch = (value: string) => {
+    console.log('🔍 Поиск username:', value);
+    if (value && value.length >= 2) {
+      searchUsernames(value);
+    } else {
+      clearResults();
+    }
+  };
 
   const handleSubmit = async (values: LoginFormData) => {
     setIsLoading(true);
@@ -147,11 +178,28 @@ export const LoginPage: React.FC = () => {
                 { required: true, message: t('auth.username') + ' ' + t('shifts.required_field') }
               ]}
             >
-              <Input
-                prefix={<UserOutlined />}
+              <AutoComplete
+                options={getUsernameOptions(form.getFieldValue('username') || '')}
                 placeholder={t('auth.username')}
                 disabled={isLoading}
-              />
+                filterOption={false}
+                onSearch={handleUsernameSearch}
+                onSelect={(value) => {
+                  form.setFieldsValue({ username: value });
+                  clearResults();
+                }}
+                style={{ width: '100%' }}
+                dropdownStyle={{ maxHeight: '300px' }}
+                notFoundContent={isSearching ? <Spin size="small" /> : null}
+              >
+                <Input
+                  prefix={<UserOutlined />}
+                  suffix={isSearching ? <Spin size="small" /> : <SearchOutlined style={{ color: '#bfbfbf' }} />}
+                  placeholder={t('auth.username')}
+                  disabled={isLoading}
+                  autoComplete="username"
+                />
+              </AutoComplete>
             </Form.Item>
 
             <Form.Item
@@ -165,6 +213,7 @@ export const LoginPage: React.FC = () => {
                 prefix={<LockOutlined />}
                 placeholder={t('auth.password')}
                 disabled={isLoading}
+                autoComplete="current-password"
               />
             </Form.Item>
 
@@ -187,6 +236,12 @@ export const LoginPage: React.FC = () => {
               </Button>
             </Form.Item>
           </Form>
+
+          <div style={{ textAlign: 'center', marginTop: '8px' }}>
+            <Text type="secondary" style={{ fontSize: '12px' }}>
+              💡 Type 2+ characters to search registered usernames
+            </Text>
+          </div>
 
           <div style={{ textAlign: 'center', marginTop: '16px' }}>
             <Text type="secondary">

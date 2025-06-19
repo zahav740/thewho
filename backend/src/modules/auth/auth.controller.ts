@@ -1,5 +1,5 @@
-import { Controller, Post, Body, UseGuards, Request, Get } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { Controller, Post, Body, UseGuards, Request, Get, Query } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -8,6 +8,10 @@ import { RegisterResponseDto } from './dto/register-response.dto';
 import { LocalAuthGuard } from './guards/local-auth.guard';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { Public } from '../../common/decorators/public.decorator';
+
+export class SearchUsernamesResponseDto {
+  usernames: string[];
+}
 
 @ApiTags('Authentication')
 @Controller('auth')
@@ -69,6 +73,36 @@ export class AuthController {
     } catch (error) {
       console.log('❌ Ошибка в AuthController.register:', error.message);
       throw error;
+    }
+  }
+
+  @Get('search-usernames')
+  @ApiOperation({ summary: 'Search usernames for autocomplete' })
+  @ApiQuery({ 
+    name: 'query', 
+    required: true, 
+    description: 'Search query (min 2 characters)',
+    example: 'kas'
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'List of matching usernames',
+    type: SearchUsernamesResponseDto
+  })
+  async searchUsernames(@Query('query') query: string): Promise<SearchUsernamesResponseDto> {
+    console.log('🔍 Поиск usernames по запросу:', query);
+    
+    if (!query || query.length < 2) {
+      return { usernames: [] };
+    }
+
+    try {
+      const usernames = await this.authService.searchUsernames(query);
+      console.log('✅ Найдено usernames:', usernames.length);
+      return { usernames };
+    } catch (error) {
+      console.log('❌ Ошибка поиска usernames:', error.message);
+      return { usernames: [] };
     }
   }
 

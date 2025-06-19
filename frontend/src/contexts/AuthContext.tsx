@@ -57,13 +57,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     localStorage.removeItem('authToken');
     localStorage.removeItem('user');
     
-    // Перенаправляем на страницу входа БЕЗ перезагрузки страницы
-    console.log('🔄 Перенаправляем на /login');
-    
-    // Используем setTimeout чтобы убедиться что состояние обновилось
-    setTimeout(() => {
-      window.location.href = '/login';
-    }, 100);
+    // НЕ используем window.location.href - пусть компоненты сами решают куда переходить
+    console.log('🔄 Состояние очищено, пользователь разлогинен');
   };
 
   const register = async (registerData: RegisterData): Promise<{ success: boolean; message: string; user?: User; token?: string }> => {
@@ -138,14 +133,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return true;
       } else {
         console.log('❌ Токен недействителен, очищаем данные');
-        // Токен недействителен
-        logout();
+        // Токен недействителен - просто очищаем состояние
+        setToken(null);
+        setUser(null);
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('user');
         setIsLoading(false);
         return false;
       }
     } catch (error) {
       console.error('❌ Ошибка проверки аутентификации:', error);
-      logout();
+      // При ошибке сети - просто очищаем состояние
+      setToken(null);
+      setUser(null);
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('user');
       setIsLoading(false);
       return false;
     }
