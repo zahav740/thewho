@@ -8,6 +8,7 @@ import { Controller, Get } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
+import { Public } from '../../common/decorators/public.decorator';
 
 @ApiTags('health')
 @Controller('health')
@@ -17,6 +18,7 @@ export class HealthController {
     private dataSource: DataSource,
   ) {}
 
+  @Public()
   @Get()
   @ApiOperation({ summary: 'Проверка состояния сервиса' })
   async check() {
@@ -49,6 +51,7 @@ export class HealthController {
     }
   }
 
+  @Public()
   @Get('db')
   @ApiOperation({ summary: 'Детальная проверка базы данных' })
   async checkDatabase() {
@@ -85,6 +88,7 @@ export class HealthController {
     }
   }
 
+  @Public()
   @Get('sample-data')
   @ApiOperation({ summary: 'Получить образцы данных' })
   async getSampleData() {

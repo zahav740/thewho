@@ -9,6 +9,8 @@ import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { MulterModule } from '@nestjs/platform-express';
+import { APP_GUARD } from '@nestjs/core';
+import { Reflector } from '@nestjs/core';
 import { MachinesModule } from './modules/machines/machines.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { OperationsModule } from './modules/operations/operations.module';
@@ -23,6 +25,8 @@ import { PetsModule } from './modules/pets/pets.module';
 import { TranslationsModule } from './modules/translations/translations.module';
 import { OperationAnalyticsModule } from './modules/operation-analytics/operation-analytics.module';
 import { SynchronizationModule } from './modules/synchronization/synchronization.module';
+import { AuthModule } from './modules/auth/auth.module';
+import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { HeaderSizeMiddleware } from './common/middleware/header-size.middleware';
 import { OrdersDataMiddleware } from './modules/orders/orders.middleware';
 
@@ -68,6 +72,15 @@ import { OrdersDataMiddleware } from './modules/orders/orders.middleware';
     TranslationsModule, // Модуль переводов
     OperationAnalyticsModule, // Модуль аналитики операций
     SynchronizationModule, // 🆕 Модуль синхронизации Production ↔ Shifts
+    AuthModule, // 🆕 Модуль аутентификации
+  ],
+  providers: [
+    // Временно отключаем глобальный guard
+    // Reflector,
+    // {
+    //   provide: APP_GUARD,
+    //   useClass: JwtAuthGuard,
+    // },
   ],
 })
 export class AppModule implements NestModule {

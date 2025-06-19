@@ -18,6 +18,7 @@ import {
 } from '@nestjs/common';
 import { TranslationsService, CreateTranslationDto, UpdateTranslationDto } from './translations.service';
 import { Translation } from './translation.entity';
+import { Public } from '../../common/decorators/public.decorator';
 
 @Controller('translations')
 export class TranslationsController {
@@ -44,6 +45,7 @@ export class TranslationsController {
   /**
    * Получить переводы в формате для клиента
    */
+  @Public()
   @Get('client')
   async getClientTranslations(): Promise<{ ru: Record<string, string>; en: Record<string, string> }> {
     try {

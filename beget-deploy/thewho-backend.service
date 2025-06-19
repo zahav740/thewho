@@ -1,0 +1,34 @@
+[Unit]
+Description=TheWho Production CRM Backend
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/var/www/thewho/backend
+Environment=NODE_ENV=production
+Environment=PORT=5100
+Environment=DB_HOST=aws-0-eu-central-1.pooler.supabase.com
+Environment=DB_PORT=6543
+Environment=DB_NAME=postgres
+Environment=DB_USERNAME=postgres.kukqacmzfmzepdfddppl
+Environment=DB_PASSWORD=Magarel1!
+Environment=JWT_SECRET="YourSuperSecretJWTKeyThatIsAtLeast256BitsLong123456789"
+Environment=CORS_ORIGIN=http://31.128.35.6
+ExecStart=/usr/bin/node dist/src/main.js
+Restart=always
+RestartSec=10
+StandardOutput=append:/var/log/thewho-backend.log
+StandardError=append:/var/log/thewho-backend-error.log
+
+# Настройки безопасности
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/www/thewho/backend/uploads
+ReadWritePaths=/var/www/thewho/backend/logs
+ReadWritePaths=/var/log
+
+[Install]
+WantedBy=multi-user.target

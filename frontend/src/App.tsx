@@ -1,7 +1,10 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { I18nProvider } from './i18n';
+import { AuthProvider } from './contexts/AuthContext';
+import { ProtectedRoute } from './components/Auth/ProtectedRoute';
 import { Layout } from './components/Layout/Layout';
+import { LoginPage } from './pages/Auth/LoginPage';
 import { ProductionPage } from './pages/Production/ProductionPage';
 import { DatabasePage } from './pages/Database/DatabasePage';
 import { ShiftsPage } from './pages/Shifts/ShiftsPage';
@@ -15,27 +18,40 @@ import { LanguageSwitcherDemo } from './components/LanguageSwitcher/LanguageSwit
 const App: React.FC = () => {
   return (
     <I18nProvider>
-      <Router
-        future={{
-          v7_startTransition: true,
-          v7_relativeSplatPath: true,
-        }}
-      >
-        <Routes>
-          <Route path="/" element={<Layout />}>
-            <Route index element={<Navigate to="/database" replace />} />
-            <Route path="database" element={<DatabasePage />} />
-            <Route path="production" element={<ProductionPage />} />
-            <Route path="shifts" element={<ShiftsPage />} />
-            <Route path="operations" element={<ActiveOperationsPage />} />
-            <Route path="calendar" element={<CalendarPage />} />
-            <Route path="operators" element={<OperatorsPage />} />
-            <Route path="translations" element={<TranslationsPage />} />
-            <Route path="translation-test" element={<TranslationTestPage />} />
-            <Route path="language-demo" element={<LanguageSwitcherDemo />} />
-          </Route>
-        </Routes>
-      </Router>
+      <AuthProvider>
+        <Router
+          future={{
+            v7_startTransition: true,
+            v7_relativeSplatPath: true,
+          }}
+        >
+          <Routes>
+            {/* Публичный маршрут для входа */}
+            <Route path="/login" element={<LoginPage />} />
+            
+            {/* Защищенные маршруты */}
+            <Route 
+              path="/" 
+              element={
+                <ProtectedRoute>
+                  <Layout />
+                </ProtectedRoute>
+              }
+            >
+              <Route index element={<Navigate to="/database" replace />} />
+              <Route path="database" element={<DatabasePage />} />
+              <Route path="production" element={<ProductionPage />} />
+              <Route path="shifts" element={<ShiftsPage />} />
+              <Route path="operations" element={<ActiveOperationsPage />} />
+              <Route path="calendar" element={<CalendarPage />} />
+              <Route path="operators" element={<OperatorsPage />} />
+              <Route path="translations" element={<TranslationsPage />} />
+              <Route path="translation-test" element={<TranslationTestPage />} />
+              <Route path="language-demo" element={<LanguageSwitcherDemo />} />
+            </Route>
+          </Routes>
+        </Router>
+      </AuthProvider>
     </I18nProvider>
   );
 };

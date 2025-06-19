@@ -9,12 +9,15 @@ import type { TranslationAPI, ClientTranslations } from './types';
 // Экспортируем типы из types.ts
 export type { TranslationAPI, ClientTranslations } from './types';
 
+// API URL для backend
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5100/api';
+
 /**
  * Получить переводы с сервера
  */
 export const fetchTranslations = async (): Promise<ClientTranslations> => {
   try {
-    const response = await fetch('/api/translations/client');
+    const response = await fetch(`${API_URL}/translations/client`);
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
@@ -31,7 +34,7 @@ export const fetchTranslations = async (): Promise<ClientTranslations> => {
  */
 export const fetchAllTranslations = async (): Promise<TranslationAPI[]> => {
   try {
-    const response = await fetch('/api/translations');
+    const response = await fetch(`${API_URL}/translations`);
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
@@ -51,7 +54,7 @@ export const upsertTranslation = async (translation: {
   en: string;
   category?: string;
 }): Promise<TranslationAPI> => {
-  const response = await fetch('/api/translations/upsert', {
+  const response = await fetch(`${API_URL}/translations/upsert`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -70,7 +73,7 @@ export const upsertTranslation = async (translation: {
  * Удалить перевод
  */
 export const deleteTranslation = async (key: string): Promise<void> => {
-  const response = await fetch(`/api/translations/${encodeURIComponent(key)}`, {
+  const response = await fetch(`${API_URL}/translations/${encodeURIComponent(key)}`, {
     method: 'DELETE',
   });
 

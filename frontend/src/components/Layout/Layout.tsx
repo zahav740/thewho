@@ -22,6 +22,7 @@ import type { MenuProps } from 'antd';
 import { useTranslation } from '../../i18n';
 import { useResponsive } from '../../hooks';
 import { LanguageSwitcher } from '../LanguageSwitcher/LanguageSwitcher';
+import { UserInfo } from '../Auth/UserInfo';
 
 const { Header, Sider, Content } = AntLayout;
 const { Title } = Typography;
@@ -207,7 +208,10 @@ export const Layout: React.FC = () => {
               }}>
                 {getPageTitle(location.pathname, t)}
               </Title>
-              <LanguageSwitcher variant="adaptive" size="small" />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <LanguageSwitcher variant="adaptive" size="small" />
+                <UserInfo />
+              </div>
             </div>
           </Header>
           
@@ -263,7 +267,10 @@ export const Layout: React.FC = () => {
           <Title level={3} style={{ margin: '16px 0' }}>
             {getPageTitle(location.pathname, t)}
           </Title>
-          <LanguageSwitcher variant="adaptive" size="small" />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <LanguageSwitcher variant="adaptive" size="small" />
+            <UserInfo />
+          </div>
         </Header>
         
         <Content style={{ 
