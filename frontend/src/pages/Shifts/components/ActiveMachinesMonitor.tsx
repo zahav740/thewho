@@ -783,13 +783,13 @@ export const ActiveMachinesMonitor: React.FC<ActiveMachinesMonitorProps> = ({ se
                   </Tag>
                 }
                 actions={[
-                  <Tooltip title={t('shifts.shift_record')}>
+                  <Tooltip title={t('shifts.new_record')}>
                     <Button
                       type="primary"
                       icon={<FileTextOutlined />}
                       onClick={() => handleCreateShiftRecord(machine.id)}
                     >
-                      {t('shifts.shift_record')}
+                      {t('shifts.new_record')}
                     </Button>
                   </Tooltip>
                 ]}
@@ -815,7 +815,7 @@ export const ActiveMachinesMonitor: React.FC<ActiveMachinesMonitorProps> = ({ se
                     }}
                     onClick={() => handleOperationClick(machine.currentOperationDetails)}
                   >
-                    <Text strong>{t('shifts.current_operation')}:</Text>
+                    <Text strong>{t('shifts.current_operation_colon')}</Text>
                     <br />
                     <Text>{t('form.operation')} {machine.currentOperationDetails.operationNumber}</Text>
                     <br />
@@ -1014,13 +1014,13 @@ export const ActiveMachinesMonitor: React.FC<ActiveMachinesMonitorProps> = ({ se
                         </Tag>
                       }
                       actions={[
-                        <Tooltip title={t('shifts.shift_record')}>
+                        <Tooltip title={t('shifts.new_record')}>
                           <Button
                             type="primary"
                             icon={<FileTextOutlined />}
                             onClick={() => handleCreateShiftRecord(machine.id)}
                           >
-                            {t('shifts.shift_record')}
+                            {t('shifts.new_record')}
                           </Button>
                         </Tooltip>
                       ]}

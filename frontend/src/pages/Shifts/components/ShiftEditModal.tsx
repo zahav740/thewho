@@ -23,6 +23,7 @@ import { SaveOutlined } from '@ant-design/icons';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { shiftsApi } from '../../../services/shiftsApi';
 import { operatorsApi } from '../../../services/operatorsApi';
+import { useTranslation } from '../../../i18n';
 import dayjs, { Dayjs } from 'dayjs';
 
 // Типы для формы
@@ -56,6 +57,7 @@ export const ShiftEditModal: React.FC<ShiftEditModalProps> = ({
   onClose,
   form
 }) => {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
 
   // НОВОЕ: Загружаем операторов из базы данных
@@ -106,7 +108,7 @@ export const ShiftEditModal: React.FC<ShiftEditModalProps> = ({
     mutationFn: ({ shiftId, data }: { shiftId: number; data: any }) =>
       shiftsApi.update(shiftId, data),
     onSuccess: () => {
-      message.success('Данные смены обновлены успешно');
+      message.success(t('shifts.shift_updated'));
       // Немедленно обновляем все связанные данные
       queryClient.invalidateQueries({ queryKey: ['shifts'] });
       queryClient.invalidateQueries({ queryKey: ['shifts', 'today'] });
@@ -116,7 +118,7 @@ export const ShiftEditModal: React.FC<ShiftEditModalProps> = ({
     },
     onError: (error) => {
       console.error('Ошибка обновления смены:', error);
-      message.error('Ошибка при обновлении данных смены');
+      message.error(t('shifts.update_error'));
     }
   });
 
@@ -124,7 +126,7 @@ export const ShiftEditModal: React.FC<ShiftEditModalProps> = ({
   const createShiftMutation = useMutation({
     mutationFn: (data: any) => shiftsApi.create(data),
     onSuccess: () => {
-      message.success('Смена создана успешно');
+      message.success(t('shifts.shift_created'));
       // Немедленно обновляем все связанные данные
       queryClient.invalidateQueries({ queryKey: ['shifts'] });
       queryClient.invalidateQueries({ queryKey: ['shifts', 'today'] });
@@ -134,7 +136,7 @@ export const ShiftEditModal: React.FC<ShiftEditModalProps> = ({
     },
     onError: (error) => {
       console.error('Ошибка создания смены:', error);
-      message.error('Ошибка при создании смены');
+      message.error(t('shifts.create_error'));
     }
   });
 
@@ -160,24 +162,25 @@ export const ShiftEditModal: React.FC<ShiftEditModalProps> = ({
       }
     }).catch((error: any) => {
       console.error('Ошибка валидации формы:', error);
+      message.error(t('shifts.validation_error'));
     });
   };
 
   return (
     <Modal
-      title={editingShift ? "Редактировать смену" : "Создать смену"}
+      title={editingShift ? t('shifts.edit_shift') : t('shifts.create_shift')}
       open={visible}
       onOk={handleSave}
       onCancel={onClose}
       width={800}
-      okText="Сохранить"
-      cancelText="Отмена"
+      okText={t('shifts.save_button')}
+      cancelText={t('shifts.cancel_button')}
       confirmLoading={updateShiftMutation.isPending || createShiftMutation.isPending}
       okButtonProps={{
         icon: <SaveOutlined />
       }}
     >
-      <Spin spinning={operatorsLoading} tip="Загрузка операторов...">
+      <Spin spinning={operatorsLoading} tip={t('shifts.loading_operators')}>
         <Form
           form={form}
           layout="vertical"
@@ -190,8 +193,8 @@ export const ShiftEditModal: React.FC<ShiftEditModalProps> = ({
             <Col span={12}>
               <Form.Item
                 name="date"
-                label="Дата смены"
-                rules={[{ required: true, message: 'Выберите дату' }]}
+                label={t('shifts.shift_date')}
+                rules={[{ required: true, message: t('shifts.select_date') }]}
               >
                 <DatePicker style={{ width: '100%' }} format="DD.MM.YYYY" />
               </Form.Item>
@@ -199,13 +202,13 @@ export const ShiftEditModal: React.FC<ShiftEditModalProps> = ({
             <Col span={12}>
               <Form.Item
                 name="shiftType"
-                label="Тип смены"
-                rules={[{ required: true, message: 'Выберите тип смены' }]}
+                label={t('shifts.shift_type')}
+                rules={[{ required: true, message: t('shifts.select_shift_type') }]}
               >
                 <Select>
-                  <Select.Option value="DAY">Дневная</Select.Option>
-                  <Select.Option value="NIGHT">Ночная</Select.Option>
-                  <Select.Option value="BOTH">Обе смены</Select.Option>
+                  <Select.Option value="DAY">{t('shifts.day_shift')}</Select.Option>
+                  <Select.Option value="NIGHT">{t('shifts.night_shift')}</Select.Option>
+                  <Select.Option value="BOTH">{t('shifts.both_shifts')}</Select.Option>
                 </Select>
               </Form.Item>
             </Col>
@@ -213,36 +216,36 @@ export const ShiftEditModal: React.FC<ShiftEditModalProps> = ({
 
           <Row gutter={16}>
             <Col span={12}>
-              <Form.Item name="drawingnumber" label="Номер чертежа">
-                <Input placeholder="Например: C6HP0021A" />
+              <Form.Item name="drawingnumber" label={t('shifts.drawing_number')}>
+                <Input placeholder={t('shifts.drawing_placeholder')} />
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="setupTime" label="Время наладки (мин)">
+              <Form.Item name="setupTime" label={t('shifts.setup_time_minutes')}>
                 <InputNumber min={0} style={{ width: '100%' }} />
               </Form.Item>
             </Col>
           </Row>
 
-          <Divider>Дневная смена</Divider>
+          <Divider>{t('shifts.day_shift')}</Divider>
           <Row gutter={16}>
             <Col span={8}>
-              <Form.Item name="dayShiftQuantity" label="Количество деталей">
+              <Form.Item name="dayShiftQuantity" label={t('shifts.part_count')}>
                 <InputNumber min={0} style={{ width: '100%' }} />
               </Form.Item>
             </Col>
             <Col span={8}>
-              <Form.Item name="dayShiftTimePerUnit" label="Время на деталь (мин)">
+              <Form.Item name="dayShiftTimePerUnit" label={t('shifts.time_per_part')}>
                 <InputNumber min={0} step={0.1} style={{ width: '100%' }} />
               </Form.Item>
             </Col>
             <Col span={8}>
-              <Form.Item name="dayShiftOperator" label="Оператор">
+              <Form.Item name="dayShiftOperator" label={t('form.operator')}>
                 <Select 
                   allowClear 
-                  placeholder="Выберите оператора"
+                  placeholder={t('shifts.select_operator')}
                   loading={operatorsLoading}
-                  notFoundContent={operatorsLoading ? <Spin size="small" /> : 'Нет данных'}
+                  notFoundContent={operatorsLoading ? <Spin size="small" /> : t('message.no_data')}
                 >
                   {dayShiftOperators.map(operator => (
                     <Select.Option key={operator.id} value={operator.name}>
@@ -254,24 +257,24 @@ export const ShiftEditModal: React.FC<ShiftEditModalProps> = ({
             </Col>
           </Row>
 
-          <Divider>Ночная смена</Divider>
+          <Divider>{t('shifts.night_shift')}</Divider>
           <Row gutter={16}>
             <Col span={8}>
-              <Form.Item name="nightShiftQuantity" label="Количество деталей">
+              <Form.Item name="nightShiftQuantity" label={t('shifts.part_count')}>
                 <InputNumber min={0} style={{ width: '100%' }} />
               </Form.Item>
             </Col>
             <Col span={8}>
-              <Form.Item name="nightShiftTimePerUnit" label="Время на деталь (мин)">
+              <Form.Item name="nightShiftTimePerUnit" label={t('shifts.time_per_part')}>
                 <InputNumber min={0} step={0.1} style={{ width: '100%' }} />
               </Form.Item>
             </Col>
             <Col span={8}>
-              <Form.Item name="nightShiftOperator" label="Оператор">
+              <Form.Item name="nightShiftOperator" label={t('form.operator')}>
                 <Select 
-                  placeholder="Выберите оператора"
+                  placeholder={t('shifts.select_operator')}
                   loading={operatorsLoading}
-                  notFoundContent={operatorsLoading ? <Spin size="small" /> : 'Нет данных'}
+                  notFoundContent={operatorsLoading ? <Spin size="small" /> : t('message.no_data')}
                 >
                   {nightShiftOperators.map(operator => (
                     <Select.Option key={operator.id} value={operator.name}>
@@ -283,12 +286,12 @@ export const ShiftEditModal: React.FC<ShiftEditModalProps> = ({
             </Col>
           </Row>
 
-          <Form.Item name="setupOperator" label="Оператор наладки">
+          <Form.Item name="setupOperator" label={t('shifts.setup_operator')}>
             <Select 
               allowClear 
-              placeholder="Выберите оператора наладки"
+              placeholder={t('shifts.select_operator')}
               loading={operatorsLoading}
-              notFoundContent={operatorsLoading ? <Spin size="small" /> : 'Нет данных'}
+              notFoundContent={operatorsLoading ? <Spin size="small" /> : t('message.no_data')}
             >
               {setupOperators.map(operator => (
                 <Select.Option key={operator.id} value={operator.name}>

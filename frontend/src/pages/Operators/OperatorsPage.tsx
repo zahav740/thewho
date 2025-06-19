@@ -1,9 +1,9 @@
 /**
- * @file: OperatorsPage.tsx (ИСПРАВЛЕНО)
- * @description: Страница управления операторами - исправлены TypeScript ошибки
- * @dependencies: antd, react-query, operatorsApi
+ * @file: OperatorsPage.tsx (ИСПРАВЛЕНО - ДОБАВЛЕНА СИСТЕМА ПЕРЕВОДОВ)
+ * @description: Страница управления операторами с полной поддержкой i18n
+ * @dependencies: antd, react-query, operatorsApi, useTranslation
  * @created: 2025-06-09
- * @fixed: TypeScript типизация для таблицы
+ * @fixed: Добавлена система переводов вместо хардкода текстов
  */
 import React, { useState } from 'react';
 import {
@@ -38,7 +38,7 @@ const { Title } = Typography;
 const { Option } = Select;
 
 export const OperatorsPage: React.FC = () => {
-  const { t } = useTranslation();
+  const { t, tWithParams } = useTranslation();
   const queryClient = useQueryClient();
   const [modalVisible, setModalVisible] = useState(false);
   const [editingOperator, setEditingOperator] = useState<Operator | null>(null);
@@ -68,25 +68,25 @@ export const OperatorsPage: React.FC = () => {
     mutationFn: ({ id, data }: { id: number; data: UpdateOperatorDto }) =>
       operatorsApi.update(id, data),
     onSuccess: () => {
-      message.success('Оператор обновлен');
+      message.success(t('operators.operator_updated'));
       setModalVisible(false);
       setEditingOperator(null);
       form.resetFields();
       queryClient.invalidateQueries({ queryKey: ['operators'] });
     },
     onError: (error: any) => {
-      message.error(error.message || 'Ошибка при обновлении оператора');
+      message.error(error.message || t('operators.update_error'));
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: operatorsApi.delete,
     onSuccess: () => {
-      message.success('Оператор деактивирован');
+      message.success(t('operators.operator_deactivated'));
       queryClient.invalidateQueries({ queryKey: ['operators'] });
     },
     onError: (error: any) => {
-      message.error(error.message || 'Ошибка при деактивации оператора');
+      message.error(error.message || t('operators.deactivate_error'));
     },
   });
 
@@ -147,22 +147,13 @@ export const OperatorsPage: React.FC = () => {
   };
 
   const getOperatorTypeName = (type: string) => {
-    switch (type) {
-      case 'SETUP':
-        return 'Наладка';
-      case 'PRODUCTION':
-        return 'Производство';
-      case 'BOTH':
-        return 'Все виды работ';
-      default:
-        return type;
-    }
+    return t(`operator_type.${type}_name`);
   };
 
   // ✅ Правильная типизация столбцов таблицы
   const columns: ColumnsType<Operator> = [
     {
-      title: 'Имя оператора',
+      title: t('operators.operator_name'),
       dataIndex: 'name',
       key: 'name',
       render: (name: string, record: Operator) => (
@@ -173,7 +164,7 @@ export const OperatorsPage: React.FC = () => {
       ),
     },
     {
-      title: 'Тип работ',
+      title: t('operators.operator_type'),
       dataIndex: 'operatorType',
       key: 'operatorType',
       render: (type: string) => (
@@ -186,25 +177,25 @@ export const OperatorsPage: React.FC = () => {
       ),
     },
     {
-      title: 'Статус',
+      title: t('operators.operator_status'),
       dataIndex: 'isActive',
       key: 'isActive',
       render: (isActive: boolean) => (
         <Tag color={isActive ? 'green' : 'red'}>
-          {isActive ? 'Активен' : 'Неактивен'}
+          {isActive ? t('operators.active') : t('operators.inactive')}
         </Tag>
       ),
     },
     {
-      title: 'Дата создания',
+      title: t('operators.operator_created'),
       dataIndex: 'createdAt',
       key: 'createdAt',
       render: (date: string) => new Date(date).toLocaleDateString('ru-RU'),
     },
     {
-      title: 'Действия',
+      title: t('operators.actions'),
       key: 'actions',
-      render: (text: any, record: Operator) => ( // ✅ Исправлена типизация
+      render: (text: any, record: Operator) => (
         <Space>
           <Button
             type="link"
@@ -212,14 +203,14 @@ export const OperatorsPage: React.FC = () => {
             onClick={() => handleEdit(record)}
             disabled={!record.isActive}
           >
-            Редактировать
+            {t('button.edit')}
           </Button>
           <Popconfirm
-            title="Деактивировать оператора?"
-            description="Оператор будет скрыт из списков выбора"
+            title={t('operators.deactivate_confirm')}
+            description={t('operators.deactivate_description')}
             onConfirm={() => handleDelete(record.id)}
-            okText="Да"
-            cancelText="Отмена"
+            okText={t('button.confirm')}
+            cancelText={t('button.cancel')}
             disabled={!record.isActive}
           >
             <Button
@@ -228,7 +219,7 @@ export const OperatorsPage: React.FC = () => {
               icon={<DeleteOutlined />}
               disabled={!record.isActive}
             >
-              Деактивировать
+              {t('operators.deactivate')}
             </Button>
           </Popconfirm>
         </Space>
@@ -241,10 +232,10 @@ export const OperatorsPage: React.FC = () => {
       <Card>
         <div style={{ marginBottom: '24px' }}>
           <Title level={2} style={{ margin: 0 }}>
-            👥 Управление операторами
+            👥 {t('operators.title')}
           </Title>
           <p style={{ color: '#8c8c8c', marginTop: '8px' }}>
-            Добавляйте и управляйте операторами для смен. Операторы появятся в выпадающих списках при создании записей смен.
+            {t('operators.description')}
           </p>
         </div>
 
@@ -255,13 +246,13 @@ export const OperatorsPage: React.FC = () => {
             onClick={handleCreate}
             size="large"
           >
-            Добавить оператора
+            {t('operators.add_operator')}
           </Button>
         </div>
 
         <Divider />
 
-        <Table<Operator> // ✅ Добавлена типизация для Table
+        <Table<Operator>
           columns={columns}
           dataSource={operators}
           loading={isLoading}
@@ -270,14 +261,14 @@ export const OperatorsPage: React.FC = () => {
             pageSize: 10,
             showSizeChanger: true,
             showQuickJumper: true,
-            showTotal: (total) => `Всего операторов: ${total}`,
+            showTotal: (total) => tWithParams('operators.total_operators', { total }),
           }}
         />
       </Card>
 
       {/* Модальное окно добавления/редактирования */}
       <Modal
-        title={editingOperator ? 'Редактировать оператора' : 'Добавить оператора'}
+        title={editingOperator ? t('operators.edit_operator') : t('operators.add_operator')}
         open={modalVisible}
         onCancel={() => {
           setModalVisible(false);
@@ -296,38 +287,38 @@ export const OperatorsPage: React.FC = () => {
           }}
         >
           <Form.Item
-            label="Имя оператора"
+            label={t('operators.operator_name')}
             name="name"
             rules={[
-              { required: true, message: 'Введите имя оператора' },
-              { min: 2, message: 'Имя должно содержать минимум 2 символа' },
+              { required: true, message: t('operators.name_required') },
+              { min: 2, message: t('operators.name_min_length') },
             ]}
           >
-            <Input placeholder="Например: Denis" />
+            <Input placeholder={t('operators.name_placeholder')} />
           </Form.Item>
 
           <Form.Item
-            label="Тип работ"
+            label={t('operators.operator_type')}
             name="operatorType"
-            rules={[{ required: true, message: 'Выберите тип работ' }]}
+            rules={[{ required: true, message: t('operators.type_required') }]}
           >
-            <Select placeholder="Выберите тип работ">
+            <Select placeholder={t('operators.type_placeholder')}>
               <Option value="BOTH">
                 <Space>
                   <SettingOutlined style={{ color: '#52c41a' }} />
-                  Все виды работ (наладка + производство)
+                  {t('operator_type.BOTH')}
                 </Space>
               </Option>
               <Option value="SETUP">
                 <Space>
                   <ToolOutlined style={{ color: '#fa8c16' }} />
-                  Только наладка
+                  {t('operator_type.SETUP')}
                 </Space>
               </Option>
               <Option value="PRODUCTION">
                 <Space>
                   <UserOutlined style={{ color: '#1890ff' }} />
-                  Только производство
+                  {t('operator_type.PRODUCTION')}
                 </Space>
               </Option>
             </Select>
@@ -342,14 +333,14 @@ export const OperatorsPage: React.FC = () => {
                   form.resetFields();
                 }}
               >
-                Отмена
+                {t('button.cancel')}
               </Button>
               <Button
                 type="primary"
                 htmlType="submit"
                 loading={createMutation.isPending || updateMutation.isPending}
               >
-                {editingOperator ? 'Обновить' : 'Добавить'}
+                {editingOperator ? t('button.update') : t('button.add')}
               </Button>
             </Space>
           </div>
