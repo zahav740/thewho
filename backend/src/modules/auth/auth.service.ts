@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
@@ -6,6 +6,8 @@ import * as bcrypt from 'bcryptjs';
 import { User, UserRole } from './entities/user.entity';
 import { LoginDto } from './dto/login.dto';
 import { LoginResponseDto } from './dto/login-response.dto';
+import { RegisterDto } from './dto/register.dto';
+import { RegisterResponseDto } from './dto/register-response.dto';
 
 @Injectable()
 export class AuthService {
@@ -57,6 +59,51 @@ export class AuthService {
     };
   }
 
+  async register(registerDto: RegisterDto): Promise<RegisterResponseDto> {
+    console.log('🚀 AuthService.register вызван с данными:', { 
+      username: registerDto.username, 
+      role: registerDto.role 
+    });
+    
+    // Проверяем, существует ли пользователь с таким именем
+    const existingUser = await this.userRepository.findOne({
+      where: { username: registerDto.username }
+    });
+
+    if (existingUser) {
+      console.log('❌ Пользователь уже существует');
+      throw new ConflictException('User with this username already exists');
+    }
+
+    // Создаем нового пользователя
+    const user = await this.createUser(
+      registerDto.username, 
+      registerDto.password, 
+      registerDto.role || UserRole.USER
+    );
+
+    // Генерируем JWT токен для автоматического входа после регистрации
+    const payload = { 
+      username: user.username, 
+      sub: user.id, 
+      role: user.role 
+    };
+
+    const token = this.jwtService.sign(payload);
+    console.log('✅ Пользователь зарегистрирован и токен создан успешно');
+
+    return {
+      message: 'User registered successfully',
+      user: {
+        id: user.id,
+        username: user.username,
+        role: user.role,
+        createdAt: user.createdAt,
+      },
+      access_token: token,
+    };
+  }
+
   // Временный метод для создания правильного хэша
   async generatePasswordHash(password: string): Promise<string> {
     return await bcrypt.hash(password, 10);
@@ -76,6 +123,10 @@ export class AuthService {
 
   async findUserById(id: number): Promise<User> {
     return this.userRepository.findOne({ where: { id } });
+  }
+
+  async findUserByUsername(username: string): Promise<User | null> {
+    return this.userRepository.findOne({ where: { username } });
   }
 
   async ensureAdminExists(): Promise<void> {

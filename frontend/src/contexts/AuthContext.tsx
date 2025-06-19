@@ -6,6 +6,12 @@ interface User {
   role: string;
 }
 
+interface RegisterData {
+  username: string;
+  password: string;
+  role?: string;
+}
+
 interface AuthContextType {
   user: User | null;
   token: string | null;
@@ -13,6 +19,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (token: string, user: User) => void;
   logout: () => void;
+  register: (registerData: RegisterData) => Promise<{ success: boolean; message: string; user?: User; token?: string }>;
   checkAuth: () => Promise<boolean>;
 }
 
@@ -57,6 +64,48 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setTimeout(() => {
       window.location.href = '/login';
     }, 100);
+  };
+
+  const register = async (registerData: RegisterData): Promise<{ success: boolean; message: string; user?: User; token?: string }> => {
+    try {
+      console.log('🚀 AuthContext.register вызван для пользователя:', registerData.username);
+      
+      const response = await fetch(`${API_URL}/auth/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(registerData),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        console.log('✅ Регистрация успешна, автоматически входим в систему');
+        
+        // Автоматически логиним пользователя после успешной регистрации
+        login(data.access_token, data.user);
+        
+        return {
+          success: true,
+          message: data.message || 'Registration successful',
+          user: data.user,
+          token: data.access_token
+        };
+      } else {
+        console.log('❌ Ошибка регистрации:', data.message);
+        return {
+          success: false,
+          message: data.message || 'Registration failed'
+        };
+      }
+    } catch (error) {
+      console.error('❌ Ошибка при регистрации:', error);
+      return {
+        success: false,
+        message: 'Network error. Please try again.'
+      };
+    }
   };
 
   const checkAuth = async (): Promise<boolean> => {
@@ -113,6 +162,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     isLoading,
     login,
     logout,
+    register,
     checkAuth,
   };
 

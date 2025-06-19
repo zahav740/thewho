@@ -5,6 +5,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import { ProtectedRoute } from './components/Auth/ProtectedRoute';
 import { Layout } from './components/Layout/Layout';
 import { LoginPage } from './pages/Auth/LoginPage';
+import { RegisterPage } from './pages/Auth/RegisterPage';
 import { ProductionPage } from './pages/Production/ProductionPage';
 import { DatabasePage } from './pages/Database/DatabasePage';
 import { ShiftsPage } from './pages/Shifts/ShiftsPage';
@@ -26,8 +27,9 @@ const App: React.FC = () => {
           }}
         >
           <Routes>
-            {/* Публичный маршрут для входа */}
+            {/* Публичные маршруты */}
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
             
             {/* Защищенные маршруты */}
             <Route 

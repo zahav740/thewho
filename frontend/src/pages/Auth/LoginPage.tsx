@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { Form, Input, Button, Checkbox, Card, Typography, Space, message } from 'antd';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
 import { useTranslation } from '../../i18n';
@@ -187,6 +187,15 @@ export const LoginPage: React.FC = () => {
               </Button>
             </Form.Item>
           </Form>
+
+          <div style={{ textAlign: 'center', marginTop: '16px' }}>
+            <Text type="secondary">
+              Don't have an account?{' '}
+              <Link to="/register" style={{ color: '#1890ff' }}>
+                Sign up here
+              </Link>
+            </Text>
+          </div>
 
           <div style={{ textAlign: 'center', marginTop: '24px' }}>
             <Text type="secondary" style={{ fontSize: '12px' }}>

@@ -2,7 +2,9 @@ import { Controller, Post, Body, UseGuards, Request, Get } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
+import { RegisterDto } from './dto/register.dto';
 import { LoginResponseDto } from './dto/login-response.dto';
+import { RegisterResponseDto } from './dto/register-response.dto';
 import { LocalAuthGuard } from './guards/local-auth.guard';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { Public } from '../../common/decorators/public.decorator';
@@ -35,6 +37,37 @@ export class AuthController {
       return result;
     } catch (error) {
       console.log('❌ Ошибка в AuthController.login:', error.message);
+      throw error;
+    }
+  }
+
+  @Post('register')
+  @ApiOperation({ summary: 'User registration' })
+  @ApiResponse({ 
+    status: 201, 
+    description: 'User registered successfully', 
+    type: RegisterResponseDto 
+  })
+  @ApiResponse({ 
+    status: 400, 
+    description: 'Invalid input data' 
+  })
+  @ApiResponse({ 
+    status: 409, 
+    description: 'User with this username already exists' 
+  })
+  async register(@Body() registerDto: RegisterDto): Promise<RegisterResponseDto> {
+    console.log('🔍 AuthController получил запрос на регистрацию:', { 
+      username: registerDto.username, 
+      role: registerDto.role 
+    });
+    
+    try {
+      const result = await this.authService.register(registerDto);
+      console.log('✅ Успешная регистрация пользователя');
+      return result;
+    } catch (error) {
+      console.log('❌ Ошибка в AuthController.register:', error.message);
       throw error;
     }
   }
