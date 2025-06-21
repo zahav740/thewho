@@ -15,6 +15,7 @@ import { synchronizationApi } from '../../services/synchronizationApi';
 import { useSynchronization, useResponsive, responsiveUtils } from '../../hooks';
 import { MachineAvailability } from '../../types/machine.types';
 import { MachineCard } from './components/MachineCard';
+import { MachineCardCompact } from './components/MachineCardCompact';
 import { OrderRecommendations } from './components/OrderRecommendations';
 import { PlanningModal } from '../../components/PlanningModal';
 import { QUERY_KEYS } from '../../utils/queryKeys';
@@ -37,6 +38,7 @@ export const ProductionPage: React.FC = () => {
   const [planningModalVisible, setPlanningModalVisible] = useState(false);
   const [planningMachine, setPlanningMachine] = useState<MachineAvailability | null>(null);
   const [useImprovedPlanning, setUseImprovedPlanning] = useState(true);
+  const [useCompactCards, setUseCompactCards] = useState(true);
   const [selectedOperation, setSelectedOperation] = useState<any>(null);
 
   // Адаптивные параметры
@@ -275,6 +277,23 @@ export const ProductionPage: React.FC = () => {
               </span>
             </Space>
             
+            <Space align="center" size={screenInfo.isMobile ? 'small' : 'middle'}>
+              <span style={{ fontSize: screenInfo.isMobile ? '12px' : '14px' }}>
+                Подробные карточки
+              </span>
+              <Switch 
+                checked={useCompactCards}
+                onChange={setUseCompactCards}
+                size={screenInfo.isMobile ? 'small' : 'default'}
+                style={{
+                  backgroundColor: useCompactCards ? '#52c41a' : undefined
+                }}
+              />
+              <span style={{ fontSize: screenInfo.isMobile ? '12px' : '14px' }}>
+                Компактные карточки
+              </span>
+            </Space>
+            
             <Space size={screenInfo.isMobile ? 'small' : 'middle'}>
               <Button
                 type="primary"
@@ -381,13 +400,23 @@ export const ProductionPage: React.FC = () => {
               maxColumns={{ xs: 1, sm: 2, md: 2, lg: 3, xl: 4, xxl: 5 }}
             >
               {millingMachines.map((machine) => (
-                <MachineCard
-                  key={`milling-${machine.id}`}
-                  machine={machine}
-                  isSelected={selectedMachine?.id === machine.id}
-                  onSelect={() => setSelectedMachine(machine)}
-                  onOpenPlanningModal={handleOpenPlanningModal}
-                />
+                useCompactCards ? (
+                  <MachineCardCompact
+                    key={`milling-${machine.id}`}
+                    machine={machine}
+                    isSelected={selectedMachine?.id === machine.id}
+                    onSelect={() => setSelectedMachine(machine)}
+                    onOpenPlanningModal={handleOpenPlanningModal}
+                  />
+                ) : (
+                  <MachineCard
+                    key={`milling-${machine.id}`}
+                    machine={machine}
+                    isSelected={selectedMachine?.id === machine.id}
+                    onSelect={() => setSelectedMachine(machine)}
+                    onOpenPlanningModal={handleOpenPlanningModal}
+                  />
+                )
               ))}
             </ResponsiveGrid>
           </div>
@@ -410,13 +439,23 @@ export const ProductionPage: React.FC = () => {
               maxColumns={{ xs: 1, sm: 2, md: 2, lg: 3, xl: 4, xxl: 5 }}
             >
               {turningMachines.map((machine) => (
-                <MachineCard
-                  key={`turning-${machine.id}`}
-                  machine={machine}
-                  isSelected={selectedMachine?.id === machine.id}
-                  onSelect={() => setSelectedMachine(machine)}
-                  onOpenPlanningModal={handleOpenPlanningModal}
-                />
+                useCompactCards ? (
+                  <MachineCardCompact
+                    key={`turning-${machine.id}`}
+                    machine={machine}
+                    isSelected={selectedMachine?.id === machine.id}
+                    onSelect={() => setSelectedMachine(machine)}
+                    onOpenPlanningModal={handleOpenPlanningModal}
+                  />
+                ) : (
+                  <MachineCard
+                    key={`turning-${machine.id}`}
+                    machine={machine}
+                    isSelected={selectedMachine?.id === machine.id}
+                    onSelect={() => setSelectedMachine(machine)}
+                    onOpenPlanningModal={handleOpenPlanningModal}
+                  />
+                )
               ))}
             </ResponsiveGrid>
           </div>
@@ -439,13 +478,23 @@ export const ProductionPage: React.FC = () => {
               maxColumns={{ xs: 1, sm: 2, md: 2, lg: 3, xl: 4, xxl: 5 }}
             >
               {otherMachines.map((machine) => (
-                <MachineCard
-                  key={`other-${machine.id}`}
-                  machine={machine}
-                  isSelected={selectedMachine?.id === machine.id}
-                  onSelect={() => setSelectedMachine(machine)}
-                  onOpenPlanningModal={handleOpenPlanningModal}
-                />
+                useCompactCards ? (
+                  <MachineCardCompact
+                    key={`other-${machine.id}`}
+                    machine={machine}
+                    isSelected={selectedMachine?.id === machine.id}
+                    onSelect={() => setSelectedMachine(machine)}
+                    onOpenPlanningModal={handleOpenPlanningModal}
+                  />
+                ) : (
+                  <MachineCard
+                    key={`other-${machine.id}`}
+                    machine={machine}
+                    isSelected={selectedMachine?.id === machine.id}
+                    onSelect={() => setSelectedMachine(machine)}
+                    onOpenPlanningModal={handleOpenPlanningModal}
+                  />
+                )
               ))}
             </ResponsiveGrid>
           </div>
