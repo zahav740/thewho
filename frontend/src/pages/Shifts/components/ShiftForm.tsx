@@ -54,7 +54,7 @@ export const ShiftForm: React.FC<ShiftFormProps> = ({
     defaultValues: {
       date: dayjs().format('YYYY-MM-DD'),
       shiftType: ShiftType.DAY,
-      nightShiftOperator: 'Аркадий',
+      nightShiftOperator: t('shifts.default_operator'),
     },
   });
 
@@ -156,7 +156,7 @@ export const ShiftForm: React.FC<ShiftFormProps> = ({
       reset({
         date: dayjs().format('YYYY-MM-DD'),
         shiftType: ShiftType.DAY,
-        nightShiftOperator: 'Аркадий',
+        nightShiftOperator: t('shifts.default_operator'),
       });
       setAssignedOperation(null);
     }
@@ -179,7 +179,7 @@ export const ShiftForm: React.FC<ShiftFormProps> = ({
         dayShiftOperator: shiftData.dayShiftOperator,
         dayShiftTimePerUnit: shiftData.dayShiftTimePerUnit,
         nightShiftQuantity: shiftData.nightShiftQuantity,
-        nightShiftOperator: shiftData.nightShiftOperator || 'Аркадий',
+        nightShiftOperator: shiftData.nightShiftOperator || t('shifts.default_operator'),
         nightShiftTimePerUnit: shiftData.nightShiftTimePerUnit,
         operationId: shiftData.operationId,
         machineId: shiftData.machineId,

@@ -478,7 +478,7 @@ export const ActiveMachinesMonitor: React.FC<ActiveMachinesMonitorProps> = ({ se
         };
       }, {
         dayShift: { quantity: 0, operator: '-', efficiency: 0 },
-        nightShift: { quantity: 0, operator: 'Аркадий', efficiency: 0 },
+        nightShift: { quantity: 0, operator: t('shifts.default_operator'), efficiency: 0 },
         totalTime: 0,
         operatorStats: []
       });
@@ -906,7 +906,7 @@ export const ActiveMachinesMonitor: React.FC<ActiveMachinesMonitorProps> = ({ se
                             </Text>
                             <br />
                             <Text type="secondary" style={{ fontSize: '12px' }}>
-                              {machine.currentOperationProduction?.nightShift.operator || 'Аркадий'}
+                            {machine.currentOperationProduction?.nightShift.operator || t('shifts.default_operator')}
                             </Text>
                             {(machine.currentOperationProduction?.nightShift.efficiency || 0) > 0 && (
                               <>
@@ -1137,7 +1137,7 @@ export const ActiveMachinesMonitor: React.FC<ActiveMachinesMonitorProps> = ({ se
                                   </Text>
                                   <br />
                                   <Text type="secondary" style={{ fontSize: '12px' }}>
-                                    {machine.currentOperationProduction?.nightShift.operator || 'Аркадий'}
+                                    {machine.currentOperationProduction?.nightShift.operator || t('shifts.default_operator')}
                                   </Text>
                                   {(machine.currentOperationProduction?.nightShift.efficiency || 0) > 0 && (
                                     <>

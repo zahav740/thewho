@@ -177,7 +177,7 @@ export const ShiftsList: React.FC<ShiftsListProps> = ({
           <div style={{ fontSize: '11px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '2px' }}>
               <UserOutlined style={{ fontSize: '10px' }} />
-              <strong style={{ fontSize: '11px' }}>{record.nightShiftOperator || 'Аркадий'}</strong>
+              <strong style={{ fontSize: '11px' }}>{record.nightShiftOperator || t('shifts.default_operator')}</strong>
             </div>
             <div>
               <Tag color="purple" style={{ fontSize: '10px', padding: '1px 4px' }}>

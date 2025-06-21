@@ -373,7 +373,7 @@ export const ProductionPage: React.FC = () => {
                 className="machine-group-title"
                 style={{ margin: 0 }}
               >
-                🔧 Фрезерные станки ({millingMachines.length})
+                🔧 {t('production.machines.milling')} ({millingMachines.length})
               </Typography.Title>
             </div>
             <ResponsiveGrid 
@@ -402,7 +402,7 @@ export const ProductionPage: React.FC = () => {
                 className="machine-group-title"
                 style={{ margin: 0 }}
               >
-                🔄 Токарные станки ({turningMachines.length})
+                🔄 {t('production.machines.turning')} ({turningMachines.length})
               </Typography.Title>
             </div>
             <ResponsiveGrid 
@@ -431,7 +431,7 @@ export const ProductionPage: React.FC = () => {
                 className="machine-group-title"
                 style={{ margin: 0 }}
               >
-                ⚙️ Другие станки ({otherMachines.length})
+                ⚙️ {t('production.machines.other')} ({otherMachines.length})
               </Typography.Title>
             </div>
             <ResponsiveGrid 

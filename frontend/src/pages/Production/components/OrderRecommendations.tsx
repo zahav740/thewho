@@ -13,6 +13,7 @@ import {
   PlayCircleOutlined,
   InfoCircleOutlined 
 } from '@ant-design/icons';
+import { useTranslation } from '../../../i18n';
 import { MachineAvailability } from '../../../types/machine.types';
 
 const { Title, Text } = Typography;
@@ -23,6 +24,8 @@ interface OrderRecommendationsProps {
 }
 
 export const OrderRecommendations: React.FC<OrderRecommendationsProps> = ({ machine, onOperationSelect }) => {
+  const { t } = useTranslation();
+  
   // Получаем информацию о типе станка для отображения
   const getMachineTypeInfo = (machineType: string) => {
     switch (machineType) {
@@ -57,14 +60,14 @@ export const OrderRecommendations: React.FC<OrderRecommendationsProps> = ({ mach
             {machineInfo.icon}
           </span>
           <span style={{ fontSize: '18px', fontWeight: 'bold' }}>
-            Рекомендуемые операции для станка{' '}
+            {t('orders.recommendations.title')}{' '}
             <span style={{ color: machineInfo.color }}>{machine.machineName}</span>
           </span>
           <Tag 
             color={machine.isAvailable ? 'success' : 'processing'}
             style={{ borderRadius: '12px' }}
           >
-            {machine.isAvailable ? 'Свободен' : 'Занят'}
+            {machine.isAvailable ? t('orders.recommendations.status.free') : t('orders.recommendations.status.busy')}
           </Tag>
         </Space>
       }
@@ -80,7 +83,7 @@ export const OrderRecommendations: React.FC<OrderRecommendationsProps> = ({ mach
           style={{ borderRadius: '8px' }}
           disabled={!machine.isAvailable}
         >
-          Запустить планирование
+          {t('orders.recommendations.start_planning')}
         </Button>
       }
     >
@@ -109,8 +112,8 @@ export const OrderRecommendations: React.FC<OrderRecommendationsProps> = ({ mach
             </div>
             <Text strong>
               {machine.lastFreedAt 
-                ? `Освобожден: ${new Date(machine.lastFreedAt).toLocaleString('ru-RU')}`
-                : 'Время не указано'
+                ? `${t('orders.recommendations.freed_at')} ${new Date(machine.lastFreedAt).toLocaleString('ru-RU')}`
+                : t('orders.recommendations.time_not_specified')
               }
             </Text>
           </Card>
@@ -130,10 +133,10 @@ export const OrderRecommendations: React.FC<OrderRecommendationsProps> = ({ mach
             description={
               <div>
                 <Title level={4} style={{ color: '#666', marginTop: '16px' }}>
-                  Операции загружаются...
+                  {t('orders.recommendations.loading')}
                 </Title>
                 <Text type="secondary" style={{ fontSize: '14px' }}>
-                  Система анализирует подходящие операции для станка {machine.machineName}
+                  {t('orders.recommendations.analyzing')} {machine.machineName}
                 </Text>
               </div>
             }
@@ -143,7 +146,7 @@ export const OrderRecommendations: React.FC<OrderRecommendationsProps> = ({ mach
           
           {/* Пример рекомендуемых операций */}
           <div style={{ marginTop: '20px' }}>
-            <Text strong style={{ marginBottom: '12px', display: 'block' }}>Пример рекомендуемых операций:</Text>
+            <Text strong style={{ marginBottom: '12px', display: 'block' }}>{t('orders.recommendations.examples')}</Text>
             <Space direction="vertical" style={{ width: '100%' }}>
               {/* Пример операции 1 */}
               <Card 
@@ -186,7 +189,7 @@ export const OrderRecommendations: React.FC<OrderRecommendationsProps> = ({ mach
                         borderColor: machineInfo.color
                       }}
                     >
-                      Выбрать
+                      {t('orders.recommendations.select')}
                     </Button>
                   </Col>
                 </Row>
@@ -230,7 +233,7 @@ export const OrderRecommendations: React.FC<OrderRecommendationsProps> = ({ mach
                       size="small"
                       style={{ backgroundColor: '#52c41a', borderColor: '#52c41a' }}
                     >
-                      Выбрать
+                      {t('orders.recommendations.select')}
                     </Button>
                   </Col>
                 </Row>
@@ -244,14 +247,14 @@ export const OrderRecommendations: React.FC<OrderRecommendationsProps> = ({ mach
       {machine.currentOperationId && (
         <Card 
           size="small" 
-          title="Текущая операция"
+          title={t('orders.recommendations.current_operation')}
           style={{ marginTop: '16px', borderRadius: '8px', borderColor: '#faad14' }}
         >
           <Space>
             <Tag color="orange" style={{ borderRadius: '12px' }}>
               ID: {machine.currentOperationId}
             </Tag>
-            <Text type="secondary">Станок в настоящее время выполняет эту операцию</Text>
+            <Text type="secondary">{t('orders.recommendations.machine_busy')}</Text>
           </Space>
         </Card>
       )}
