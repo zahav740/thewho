@@ -1,10 +1,11 @@
 /**
  * @file: InlinePdfViewer.tsx
- * @description: Встроенный просмотрщик PDF без отдельных модальных окон
+ * @description: Встроенный просмотрщик PDF без отдельных модальных окон (ИСПРАВЛЕННЫЙ)
  * @created: 2025-06-21
+ * @updated: 2025-06-21 - Исправлены проблемы с localhost и PDF.js
  */
 import React, { useState, useEffect } from 'react';
-import { Card, Button, Space, Alert, Typography, Spin, Switch } from 'antd';
+import { Card, Button, Space, Alert, Typography, Spin } from 'antd';
 import { 
   EyeOutlined, 
   DownloadOutlined, 
@@ -30,7 +31,7 @@ export const InlinePdfViewer: React.FC<InlinePdfViewerProps> = ({
 }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'pdfjs' | 'iframe' | 'object'>('pdfjs');
+  const [viewMode, setViewMode] = useState<'direct' | 'browser' | 'object'>('direct');
   const [pdfStatus, setPdfStatus] = useState<'checking' | 'available' | 'error'>('checking');
 
   useEffect(() => {
@@ -77,10 +78,6 @@ export const InlinePdfViewer: React.FC<InlinePdfViewerProps> = ({
 
   const handleOpenInNewTab = () => {
     window.open(pdfUrl, '_blank');
-  };
-
-  const getPdfJsUrl = () => {
-    return `https://mozilla.github.io/pdf.js/web/viewer.html?file=${encodeURIComponent(pdfUrl)}`;
   };
 
   const renderViewer = () => {
@@ -139,16 +136,8 @@ export const InlinePdfViewer: React.FC<InlinePdfViewerProps> = ({
     };
 
     switch (viewMode) {
-      case 'pdfjs':
-        return (
-          <iframe
-            src={getPdfJsUrl()}
-            style={commonStyle}
-            title={fileName}
-          />
-        );
-
-      case 'object':
+      case 'browser':
+        // Используем object элемент для встроенного просмотра браузера
         return (
           <object
             data={`${pdfUrl}#toolbar=1&navpanes=1&scrollbar=1&view=FitH`}
@@ -160,31 +149,59 @@ export const InlinePdfViewer: React.FC<InlinePdfViewerProps> = ({
               display: 'flex', 
               alignItems: 'center', 
               justifyContent: 'center',
-              border: '1px dashed #d9d9d9'
+              border: '1px dashed #d9d9d9',
+              backgroundColor: '#fafafa'
             }}>
-              <Alert
-                message="PDF не поддерживается"
-                description="Ваш браузер не может отобразить PDF"
-                type="warning"
-                action={<Button onClick={handleOpenInNewTab}>Открыть в браузере</Button>}
-              />
+              <Space direction="vertical" align="center" style={{ textAlign: 'center' }}>
+                <FileTextOutlined style={{ fontSize: '48px', color: '#bfbfbf' }} />
+                <Text type="secondary">PDF не поддерживается в браузере</Text>
+                <Button onClick={handleOpenInNewTab}>Открыть в новой вкладке</Button>
+              </Space>
             </div>
           </object>
         );
 
-      case 'iframe':
-      default:
+      case 'object':
+        // Попытка через embed элемент
         return (
-          <iframe
+          <embed
             src={`${pdfUrl}#toolbar=1&navpanes=1&scrollbar=1&view=FitH`}
+            type="application/pdf"
             style={commonStyle}
-            title={fileName}
-            onLoad={() => setLoading(false)}
-            onError={() => {
-              setError('Ошибка загрузки в iframe');
-              setLoading(false);
-            }}
           />
+        );
+
+      case 'direct':
+      default:
+        // Прямой iframe (может не работать с localhost)
+        return (
+          <div style={{ position: 'relative' }}>
+            <iframe
+              src={`${pdfUrl}#toolbar=1&navpanes=1&scrollbar=1&view=FitH`}
+              style={commonStyle}
+              title={fileName}
+              onLoad={() => setLoading(false)}
+              onError={() => {
+                setError('Ошибка загрузки в iframe');
+                setLoading(false);
+              }}
+            />
+            {/* Предупреждение для localhost */}
+            {pdfUrl.includes('localhost') && (
+              <div style={{
+                position: 'absolute',
+                top: '10px',
+                right: '10px',
+                backgroundColor: 'rgba(255, 193, 7, 0.9)',
+                padding: '4px 8px',
+                borderRadius: '4px',
+                fontSize: '11px',
+                color: '#000'
+              }}>
+                ⚠️ Может не работать с localhost
+              </div>
+            )}
+          </div>
         );
     }
   };
@@ -207,22 +224,25 @@ export const InlinePdfViewer: React.FC<InlinePdfViewerProps> = ({
             <Text style={{ fontSize: '12px' }}>Режим:</Text>
             <Button.Group size="small">
               <Button 
-                type={viewMode === 'pdfjs' ? 'primary' : 'default'}
-                onClick={() => setViewMode('pdfjs')}
+                type={viewMode === 'direct' ? 'primary' : 'default'}
+                onClick={() => setViewMode('direct')}
+                title="Прямой iframe"
               >
-                PDF.js
+                Прямой
+              </Button>
+              <Button 
+                type={viewMode === 'browser' ? 'primary' : 'default'}
+                onClick={() => setViewMode('browser')}
+                title="Встроенный просмотрщик браузера"
+              >
+                Браузер
               </Button>
               <Button 
                 type={viewMode === 'object' ? 'primary' : 'default'}
                 onClick={() => setViewMode('object')}
+                title="Embed элемент"
               >
-                Object
-              </Button>
-              <Button 
-                type={viewMode === 'iframe' ? 'primary' : 'default'}
-                onClick={() => setViewMode('iframe')}
-              >
-                iframe
+                Embed
               </Button>
             </Button.Group>
             <Button 
@@ -264,18 +284,50 @@ export const InlinePdfViewer: React.FC<InlinePdfViewerProps> = ({
         {/* PDF просмотрщик */}
         {renderViewer()}
 
-        {/* Подсказка */}
+        {/* Подсказки и кнопки быстрого доступа */}
         {pdfStatus === 'available' && (
           <div style={{ 
             marginTop: 8, 
-            padding: '8px', 
+            padding: '12px', 
             backgroundColor: '#f6ffed', 
             borderRadius: '4px',
             fontSize: '12px'
           }}>
-            <Text type="secondary">
-              💡 Если PDF не отображается, попробуйте другой режим просмотра или откройте в новой вкладке
-            </Text>
+            <Space direction="vertical" style={{ width: '100%' }}>
+              <Text type="secondary">
+                💡 <strong>Рекомендации:</strong>
+              </Text>
+              <div>
+                • Если PDF не отображается, попробуйте режим <strong>"Браузер"</strong> или <strong>"Embed"</strong>
+              </div>
+              <div>
+                • Для localhost лучше всего работает кнопка <strong>"Открыть в новой вкладке"</strong>
+              </div>
+              <Space style={{ marginTop: 8 }}>
+                <Button 
+                  size="small" 
+                  type="primary" 
+                  onClick={handleOpenInNewTab}
+                  icon={<ExpandOutlined />}
+                >
+                  Новая вкладка
+                </Button>
+                <Button 
+                  size="small" 
+                  onClick={handleDownload}
+                  icon={<DownloadOutlined />}
+                >
+                  Скачать
+                </Button>
+                <Button 
+                  size="small" 
+                  onClick={() => setViewMode('browser')}
+                  disabled={viewMode === 'browser'}
+                >
+                  Попробовать браузер
+                </Button>
+              </Space>
+            </Space>
           </div>
         )}
       </div>
