@@ -1,0 +1,158 @@
+/* Мобильные стили для интеграции в приложение */
+@import '../mobile-styles.css';
+
+/* Дополнительные адаптивные стили */
+.mobile-layout {
+  --mobile-header-height: 56px;
+  --mobile-fab-size: 56px;
+  --mobile-spacing: 12px;
+}
+
+.tablet-layout {
+  --mobile-header-height: 64px;
+  --mobile-fab-size: 64px;
+  --mobile-spacing: 16px;
+}
+
+.desktop-layout {
+  --mobile-header-height: 0px;
+  --mobile-fab-size: 0px;
+  --mobile-spacing: 24px;
+}
+
+/* Responsive container */
+.responsive-container {
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
+  padding: var(--mobile-spacing);
+}
+
+/* Touch improvements */
+.touch-device .ant-btn,
+.touch-device .ant-input,
+.touch-device .ant-select-selector {
+  min-height: 44px;
+  touch-action: manipulation;
+}
+
+/* Mobile-specific improvements */
+.mobile-device .ant-layout-content {
+  padding: var(--mobile-spacing) !important;
+  margin-top: var(--mobile-header-height) !important;
+}
+
+.mobile-device .ant-modal {
+  margin: 8px !important;
+  max-width: calc(100vw - 16px) !important;
+}
+
+.mobile-device .ant-table-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Tablet-specific improvements */
+.tablet-device .ant-layout-content {
+  padding: var(--mobile-spacing) !important;
+}
+
+.tablet-device .responsive-grid {
+  grid-template-columns: repeat(2, 1fr) !important;
+}
+
+/* Performance optimizations for mobile */
+.mobile-device * {
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+}
+
+.mobile-device .ant-card {
+  will-change: transform;
+}
+
+/* Hide desktop-only elements on mobile */
+.mobile-device .desktop-only {
+  display: none !important;
+}
+
+.desktop-device .mobile-only {
+  display: none !important;
+}
+
+/* Mobile FAB positioning */
+.mobile-device .mobile-fab-container {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Enhanced mobile forms */
+.mobile-device .ant-form-item {
+  margin-bottom: 16px;
+}
+
+.mobile-device .ant-form-item-label {
+  padding-bottom: 4px;
+}
+
+/* Safe area adjustments for modern phones */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .mobile-device .ant-layout-content {
+    padding-bottom: calc(var(--mobile-spacing) + env(safe-area-inset-bottom)) !important;
+  }
+  
+  .mobile-device .mobile-fab-container {
+    bottom: calc(20px + env(safe-area-inset-bottom));
+  }
+}
+
+/* Loading states for mobile */
+.mobile-device .ant-spin-container {
+  min-height: 200px;
+}
+
+/* Mobile search improvements */
+.mobile-device .ant-input-search {
+  border-radius: 20px;
+}
+
+/* Improved mobile drawer */
+.mobile-device .ant-drawer-content {
+  background: #001529;
+}
+
+.mobile-device .ant-drawer-body {
+  padding: 0;
+  background: #001529;
+}
+
+/* Mobile menu improvements */
+.mobile-device .ant-menu-dark {
+  background: transparent;
+}
+
+.mobile-device .ant-menu-item {
+  margin: 4px 8px;
+  border-radius: 6px;
+}
+
+/* Responsive images */
+.responsive-image {
+  width: 100%;
+  height: auto;
+  object-fit: cover;
+}
+
+/* Mobile-friendly animations */
+@media (prefers-reduced-motion: reduce) {
+  .mobile-device * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

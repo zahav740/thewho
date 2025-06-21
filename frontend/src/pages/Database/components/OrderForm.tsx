@@ -1,9 +1,9 @@
 /**
- * @file: OrderForm.tsx (ИСПРАВЛЕНА ПРОБЛЕМА С УДАЛЕНИЕМ ОПЕРАЦИЙ)
- * @description: Форма создания/редактирования заказа
- * @dependencies: antd, react-hook-form, ordersApi
+ * @file: OrderForm.tsx (С ПОДДЕРЖКОЙ PDF)
+ * @description: Форма создания/редактирования заказа с возможностью загрузки и просмотра PDF
+ * @dependencies: antd, react-hook-form, ordersApi, PdfUpload
  * @created: 2025-01-28
- * @updated: 2025-06-07 // ИСПРАВЛЕНА логика удаления операций
+ * @updated: 2025-06-21 // Добавлена поддержка PDF
  */
 import React, { useEffect, useState, useRef } from 'react';
 import {
@@ -18,15 +18,17 @@ import {
   Table,
   message,
   Spin,
+  Divider,
 } from 'antd';
-import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { PlusOutlined, DeleteOutlined, FileTextOutlined } from '@ant-design/icons';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Controller, useForm, useFieldArray } from 'react-hook-form';
 import dayjs from 'dayjs';
 import { ordersApi } from '../../../services/ordersApi';
 import { CreateOrderDto, Priority, OrderFormOperationDto } from '../../../types/order.types';
 import { OperationType } from '../../../types/operation.types';
 import { useTranslation } from '../../../hooks/useTranslation';
+import { PdfUpload } from '../../../components/common';
 
 const { Option } = Select;
 
@@ -44,9 +46,12 @@ export const OrderForm: React.FC<OrderFormProps> = ({
   onSuccess,
 }) => {
   const { t, tWithParams } = useTranslation();
+  const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [existingPdfUrl, setExistingPdfUrl] = useState<string>('');
   const isEdit = !!orderId;
-  const dataLoadedRef = useRef(false); // Флаг для предотвращения повторной загрузки
+  const dataLoadedRef = useRef(false);
 
   const { control, handleSubmit, reset, formState: { errors } } = useForm<CreateOrderDto>({
     defaultValues: {
@@ -55,14 +60,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
       deadline: dayjs().add(7, 'days').format('YYYY-MM-DD'),
       priority: Priority.MEDIUM,
       workType: '',
-      operations: [
-        {
-          operationNumber: 1,
-          operationType: OperationType.MILLING,
-          machineAxes: 3,
-          estimatedTime: 60,
-        },
-      ],
+      operations: [],
     },
   });
 
@@ -80,7 +78,6 @@ export const OrderForm: React.FC<OrderFormProps> = ({
 
   useEffect(() => {
     if (orderData && !dataLoadedRef.current) {
-      // Загружаем данные только один раз
       const parseAxisValue = (value: any): number => {
         if (typeof value === 'number') return value;
         if (typeof value === 'string') {
@@ -92,7 +89,6 @@ export const OrderForm: React.FC<OrderFormProps> = ({
       };
       
       console.log('Загружаем данные заказа:', orderData);
-      console.log('Операции из БД:', orderData.operations);
       
       reset({
         drawingNumber: orderData.drawingNumber,
@@ -107,24 +103,82 @@ export const OrderForm: React.FC<OrderFormProps> = ({
           estimatedTime: op.estimatedTime,
         })),
       });
+
+      // Устанавливаем URL существующего PDF
+      if (orderData.pdfPath) {
+        console.log('📄 PDF путь с сервера:', orderData.pdfPath);
+        const pdfUrl = ordersApi.getPdfUrlByPath(orderData.pdfPath);
+        console.log('📄 Сгенерированный PDF URL:', pdfUrl);
+        setExistingPdfUrl(pdfUrl);
+      }
       
-      dataLoadedRef.current = true; // Помечаем что данные загружены
+      dataLoadedRef.current = true;
     }
   }, [orderData, reset]);
 
-  // Сброс флага при закрытии формы
+  // Сброс данных при закрытии формы
   useEffect(() => {
     if (!visible) {
       dataLoadedRef.current = false;
+      setPdfFile(null);
+      setExistingPdfUrl('');
     }
   }, [visible]);
 
-  // Мутации для создания и обновления
+  // Мутация для загрузки PDF
+  const uploadPdfMutation = useMutation({
+    mutationFn: ({ orderId, file }: { orderId: number; file: File }) =>
+      ordersApi.uploadPdf(orderId, file),
+    onSuccess: (updatedOrder) => {
+      message.success(t('order_form.pdf_uploaded'));
+      // Обновляем кэш заказа
+      queryClient.setQueryData(['order', orderId], updatedOrder);
+      
+      // Устанавливаем новый URL PDF
+      if (updatedOrder.pdfPath) {
+        console.log('📄 Новый PDF путь:', updatedOrder.pdfPath);
+        const pdfUrl = ordersApi.getPdfUrlByPath(updatedOrder.pdfPath);
+        console.log('📄 Новый PDF URL:', pdfUrl);
+        setExistingPdfUrl(pdfUrl);
+      }
+    },
+    onError: (error: any) => {
+      console.error('Ошибка при загрузке PDF:', error);
+      message.error(t('order_form.pdf_upload_error') + ': ' + (error.response?.data?.message || error.message));
+    },
+  });
+
+  // Мутация для удаления PDF
+  const deletePdfMutation = useMutation({
+    mutationFn: (orderId: number) => ordersApi.deletePdf(orderId),
+    onSuccess: (updatedOrder) => {
+      message.success('PDF файл удален');
+      setExistingPdfUrl('');
+      // Обновляем кэш заказа
+      queryClient.setQueryData(['order', orderId], updatedOrder);
+    },
+    onError: (error: any) => {
+      console.error('Ошибка при удалении PDF:', error);
+      message.error('Ошибка при удалении PDF: ' + (error.response?.data?.message || error.message));
+    },
+  });
+
+  // Мутации для создания и обновления заказа
   const createMutation = useMutation({
     mutationFn: ordersApi.create,
-    onSuccess: () => {
+    onSuccess: async (createdOrder) => {
       message.success(t('order_form.order_created'));
-      dataLoadedRef.current = false; // Сброс флага
+      
+      // Если есть PDF файл для загрузки
+      if (pdfFile) {
+        try {
+          await uploadPdfMutation.mutateAsync({ orderId: createdOrder.id, file: pdfFile });
+        } catch (error) {
+          console.error('Ошибка загрузки PDF после создания заказа:', error);
+        }
+      }
+      
+      dataLoadedRef.current = false;
       onSuccess();
     },
     onError: (error: any) => {
@@ -136,9 +190,19 @@ export const OrderForm: React.FC<OrderFormProps> = ({
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: any }) =>
       ordersApi.update(id, data),
-    onSuccess: () => {
+    onSuccess: async (updatedOrder) => {
       message.success(t('order_form.order_updated'));
-      dataLoadedRef.current = false; // Сброс флага
+      
+      // Если есть новый PDF файл для загрузки
+      if (pdfFile) {
+        try {
+          await uploadPdfMutation.mutateAsync({ orderId: updatedOrder.id, file: pdfFile });
+        } catch (error) {
+          console.error('Ошибка загрузки PDF после обновления заказа:', error);
+        }
+      }
+      
+      dataLoadedRef.current = false;
       onSuccess();
     },
     onError: (error: any) => {
@@ -153,7 +217,6 @@ export const OrderForm: React.FC<OrderFormProps> = ({
     try {
       const formattedData = { ...data };
       
-      // Преобразуем операции для бэкенда
       if (formattedData.operations && formattedData.operations.length > 0) {
         formattedData.operations = formattedData.operations.map(op => ({
           ...op,
@@ -161,11 +224,9 @@ export const OrderForm: React.FC<OrderFormProps> = ({
           machineAxes: Number(op.machineAxes),
           estimatedTime: Number(op.estimatedTime)
         }));
-        console.log('Отправляем операции:', formattedData.operations);
       }
       
       formattedData.priority = String(formattedData.priority) as any;
-      console.log('Отформатированные данные:', formattedData);
       
       if (isEdit && orderId) {
         await updateMutation.mutateAsync({ id: orderId, data: formattedData });
@@ -187,14 +248,24 @@ export const OrderForm: React.FC<OrderFormProps> = ({
       machineAxes: 3,
       estimatedTime: 60,
     };
-    console.log('Добавляем операцию:', newOperation);
     append(newOperation);
   };
 
   const handleRemoveOperation = (index: number) => {
-    console.log(`Удаляем операцию с индексом ${index}`);
-    console.log('Операции до удаления:', fields);
     remove(index);
+  };
+
+  const handlePdfChange = (file: File | null) => {
+    setPdfFile(file);
+  };
+
+  const handlePdfRemove = () => {
+    if (isEdit && orderId && existingPdfUrl) {
+      // Удаляем существующий PDF с сервера
+      deletePdfMutation.mutate(orderId);
+    }
+    setPdfFile(null);
+    setExistingPdfUrl('');
   };
 
   const operationColumns = [
@@ -269,7 +340,6 @@ export const OrderForm: React.FC<OrderFormProps> = ({
           danger
           icon={<DeleteOutlined />}
           onClick={() => handleRemoveOperation(index)}
-          disabled={fields.length === 1}
           title={`Удалить операцию ${index + 1}`}
         />
       ),
@@ -281,7 +351,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
       title={isEdit ? t('order_form.edit_order') : t('order_form.new_order')}
       open={visible}
       onCancel={onClose}
-      width={800}
+      width={900}
       footer={[
         <Button key="cancel" onClick={onClose}>
           {t('order_form.cancel')}
@@ -295,6 +365,8 @@ export const OrderForm: React.FC<OrderFormProps> = ({
           {isEdit ? t('order_form.save') : t('order_form.create')}
         </Button>,
       ]}
+      style={{ top: 20 }}
+      bodyStyle={{ maxHeight: '80vh', overflowY: 'auto' }}
     >
       <Spin spinning={loading}>
         <Form layout="vertical">
@@ -380,7 +452,25 @@ export const OrderForm: React.FC<OrderFormProps> = ({
             />
           </Form.Item>
 
-          <Form.Item label={t('order_form.operations')} required>
+          <Divider orientation="left">
+            <FileTextOutlined style={{ marginRight: 8 }} />
+            {t('order_form.pdf_upload')}
+          </Divider>
+
+          <Form.Item label={t('order_form.pdf_upload')}>
+            <PdfUpload
+              value={existingPdfUrl}
+              onChange={handlePdfChange}
+              onRemove={handlePdfRemove}
+              disabled={uploadPdfMutation.isPending || deletePdfMutation.isPending}
+              showPreview={true}
+              maxSize={100}
+            />
+          </Form.Item>
+
+          <Divider orientation="left">{t('order_form.operations')}</Divider>
+
+          <Form.Item label={t('order_form.operations')}>
             <Table
               dataSource={fields}
               columns={operationColumns}

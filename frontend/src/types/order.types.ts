@@ -24,6 +24,7 @@ export interface Order {
   priority: Priority;
   workType?: string;
   pdfPath?: string;
+  pdfUrl?: string; // URL для просмотра PDF
   operations: Operation[];
   createdAt: string;
   updatedAt: string;

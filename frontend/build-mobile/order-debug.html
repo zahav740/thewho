@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order Debug Console</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: #f5f5f5;
+        }
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #ddd;
+            padding-bottom: 10px;
+        }
+        .card {
+            background-color: white;
+            border-radius: 5px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .step {
+            margin-bottom: 30px;
+        }
+        .step-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+            font-size: 18px;
+            color: #2c3e50;
+        }
+        .step-content {
+            padding-left: 20px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        input, select {
+            padding: 8px;
+            margin: 5px 0;
+            display: inline-block;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+            width: 200px;
+        }
+        .log-container {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            margin-top: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        .log-entry {
+            margin-bottom: 5px;
+            padding: 5px;
+            border-bottom: 1px solid #eee;
+        }
+        .success {
+            color: green;
+        }
+        .error {
+            color: red;
+        }
+        .info {
+            color: #0066cc;
+        }
+        .note {
+            background-color: #fffde7;
+            padding: 10px;
+            border-left: 4px solid #ffc107;
+            margin-bottom: 15px;
+        }
+        .tab {
+            overflow: hidden;
+            border: 1px solid #ccc;
+            background-color: #f1f1f1;
+            border-radius: 4px 4px 0 0;
+        }
+        .tab button {
+            background-color: inherit;
+            float: left;
+            border: none;
+            outline: none;
+            cursor: pointer;
+            padding: 10px 16px;
+            transition: 0.3s;
+            color: black;
+        }
+        .tab button:hover {
+            background-color: #ddd;
+        }
+        .tab button.active {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .tabcontent {
+            display: none;
+            padding: 20px;
+            border: 1px solid #ccc;
+            border-top: none;
+            border-radius: 0 0 4px 4px;
+            animation: fadeEffect 1s;
+        }
+        @keyframes fadeEffect {
+            from {opacity: 0;}
+            to {opacity: 1;}
+        }
+    </style>
+</head>
+<body>
+    <h1>Order Debug Console</h1>
+    
+    <div class="note">
+        <p>Эта страница предназначена для диагностики проблемы с ошибкой 400 Bad Request при сохранении заказов с операциями.</p>
+        <p>Используйте инструменты ниже для проверки различных форматов данных и выявления проблемы.</p>
+    </div>
+    
+    <div class="tab">
+        <button class="tablinks active" onclick="openTab(event, 'basics')">Базовые тесты</button>
+        <button class="tablinks" onclick="openTab(event, 'advanced')">Расширенные тесты</button>
+        <button class="tablinks" onclick="openTab(event, 'troubleshooting')">Поиск проблемы</button>
+    </div>
+    
+    <div id="basics" class="tabcontent" style="display: block;">
+        <div class="card">
+            <div class="step">
+                <div class="step-title">Шаг 1: Проверка соединения с бэкендом</div>
+                <div class="step-content">
+                    <button id="ping-btn">Проверить соединение</button>
+                    <div id="ping-result" class="log-container" style="display: none;"></div>
+                </div>
+            </div>
+            
+            <div class="step">
+                <div class="step-title">Шаг 2: Создание минимального заказа</div>
+                <div class="step-content">
+                    <button id="create-order-btn">Создать тестовый заказ</button>
+                    <div id="create-order-result" class="log-container" style="display: none;"></div>
+                </div>
+            </div>
+            
+            <div class="step">
+                <div class="step-title">Шаг 3: Добавление простой операции</div>
+                <div class="step-content">
+                    <input type="number" id="order-id" placeholder="ID заказа">
+                    <button id="add-operation-btn">Добавить операцию</button>
+                    <div id="add-operation-result" class="log-container" style="display: none;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="advanced" class="tabcontent">
+        <div class="card">
+            <div class="step">
+                <div class="step-title">Тестирование различных форматов данных</div>
+                <div class="step-content">
+                    <input type="number" id="order-id-advanced" placeholder="ID заказа">
+                    <select id="format-select">
+                        <option value="string">Строковый формат</option>
+                        <option value="number">Числовой формат</option>
+                        <option value="mixed">Смешанный формат</option>
+                    </select>
+                    <button id="test-format-btn">Проверить формат</button>
+                    <div id="test-format-result" class="log-container" style="display: none;"></div>
+                </div>
+            </div>
+            
+            <div class="step">
+                <div class="step-title">Применение исправления из консоли</div>
+                <div class="step-content">
+                    <p>При возникновении ошибки 400, в консоли будут сгенерированы исправления.</p>
+                    <input type="number" id="order-id-fix" placeholder="ID заказа">
+                    <select id="fix-select">
+                        <option value="1">Исправление 1: machineAxes как строка</option>
+                        <option value="2">Исправление 2: все поля как строки</option>
+                    </select>
+                    <button id="apply-fix-btn">Применить исправление</button>
+                    <div id="apply-fix-result" class="log-container" style="display: none;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="troubleshooting" class="tabcontent">
+        <div class="card">
+            <div class="step">
+                <div class="step-title">Анализ заголовков запроса</div>
+                <div class="step-content">
+                    <button id="check-headers-btn">Проверить заголовки</button>
+                    <div id="headers-result" class="log-container" style="display: none;"></div>
+                </div>
+            </div>
+            
+            <div class="step">
+                <div class="step-title">Глубокий анализ ошибки</div>
+                <div class="step-content">
+                    <p>Это действие отправит запрос, который вызовет ошибку 400, и проведет глубокий анализ ответа.</p>
+                    <input type="number" id="order-id-error" placeholder="ID заказа">
+                    <button id="analyze-error-btn">Анализировать ошибку</button>
+                    <div id="analyze-error-result" class="log-container" style="display: none;"></div>
+                </div>
+            </div>
+            
+            <div class="step">
+                <div class="step-title">Сведения о типах данных</div>
+                <div class="step-content">
+                    <button id="check-types-btn">Проверить типы данных</button>
+                    <div id="types-result" class="log-container" style="display: none;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="debug-utils.js"></script>
+    <script>
+        function openTab(evt, tabName) {
+            var i, tabcontent, tablinks;
+            tabcontent = document.getElementsByClassName("tabcontent");
+            for (i = 0; i < tabcontent.length; i++) {
+                tabcontent[i].style.display = "none";
+            }
+            tablinks = document.getElementsByClassName("tablinks");
+            for (i = 0; i < tablinks.length; i++) {
+                tablinks[i].className = tablinks[i].className.replace(" active", "");
+            }
+            document.getElementById(tabName).style.display = "block";
+            evt.currentTarget.className += " active";
+        }
+        
+        function appendLog(containerId, text, type = 'info') {
+            const container = document.getElementById(containerId);
+            container.style.display = 'block';
+            
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = text;
+            
+            container.appendChild(entry);
+            container.scrollTop = container.scrollHeight;
+        }
+        
+        function clearLog(containerId) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = '';
+        }
+        
+        function formatJson(obj) {
+            return JSON.stringify(obj, null, 2);
+        }
+        
+        // Шаг 1: Проверка соединения
+        document.getElementById('ping-btn').addEventListener('click', async () => {
+            clearLog('ping-result');
+            appendLog('ping-result', 'Проверка соединения с бэкендом...');
+            
+            try {
+                const result = await window.orderDebugTools.pingBackend();
+                if (result) {
+                    appendLog('ping-result', 'Соединение успешно установлено!', 'success');
+                    appendLog('ping-result', `Получены данные: ${formatJson(result)}`, 'info');
+                } else {
+                    appendLog('ping-result', 'Соединение не удалось установить', 'error');
+                }
+            } catch (e) {
+                appendLog('ping-result', `Ошибка: ${e.message}`, 'error');
+            }
+        });
+        
+        // Шаг 2: Создание заказа
+        document.getElementById('create-order-btn').addEventListener('click', async () => {
+            clearLog('create-order-result');
+            appendLog('create-order-result', 'Создание тестового заказа...');
+            
+            try {
+                const result = await window.orderDebugTools.createMinimalOrder();
+                if (result && result.id) {
+                    appendLog('create-order-result', `Заказ успешно создан с ID: ${result.id}`, 'success');
+                    appendLog('create-order-result', `Данные заказа: ${formatJson(result)}`, 'info');
+                } else {
+                    appendLog('create-order-result', 'Не удалось создать заказ', 'error');
+                }
+            } catch (e) {
+                appendLog('create-order-result', `Ошибка: ${e.message}`, 'error');
+            }
+        });
+        
+        // Шаг 3: Добавление операции
+        document.getElementById('add-operation-btn').addEventListener('click', async () => {
+            const orderId = document.getElementById('order-id').value;
+            if (!orderId) {
+                alert('Пожалуйста, введите ID заказа');
+                return;
+            }
+            
+            clearLog('add-operation-result');
+            appendLog('add-operation-result', `Добавление операции к заказу ${orderId}...`);
+            
+            try {
+                const result = await window.orderDebugTools.addSimpleOperation(orderId);
+                if (result) {
+                    appendLog('add-operation-result', 'Операция успешно добавлена!', 'success');
+                    appendLog('add-operation-result', `Обновленные данные заказа: ${formatJson(result)}`, 'info');
+                } else {
+                    appendLog('add-operation-result', 'Не удалось добавить операцию', 'error');
+                }
+            } catch (e) {
+                appendLog('add-operation-result', `Ошибка: ${e.message}`, 'error');
+            }
+        });
+        
+        // Расширенные тесты: Проверка форматов
+        document.getElementById('test-format-btn').addEventListener('click', async () => {
+            const orderId = document.getElementById('order-id-advanced').value;
+            const format = document.getElementById('format-select').value;
+            
+            if (!orderId) {
+                alert('Пожалуйста, введите ID заказа');
+                return;
+            }
+            
+            clearLog('test-format-result');
+            appendLog('test-format-result', `Тестирование ${format} формата для заказа ${orderId}...`);
+            
+            try {
+                const result = await window.orderDebugTools.directUpdate(orderId, format);
+                if (result) {
+                    appendLog('test-format-result', `Формат ${format} успешно принят!`, 'success');
+                    appendLog('test-format-result', `Обновленные данные заказа: ${formatJson(result)}`, 'info');
+                } else {
+                    appendLog('test-format-result', `Формат ${format} вызвал ошибку`, 'error');
+                }
+            } catch (e) {
+                appendLog('test-format-result', `Ошибка: ${e.message}`, 'error');
+            }
+        });
+        
+        // Применение исправления
+        document.getElementById('apply-fix-btn').addEventListener('click', async () => {
+            const orderId = document.getElementById('order-id-fix').value;
+            const fixNumber = document.getElementById('fix-select').value;
+            
+            if (!orderId) {
+                alert('Пожалуйста, введите ID заказа');
+                return;
+            }
+            
+            clearLog('apply-fix-result');
+            appendLog('apply-fix-result', `Применение исправления ${fixNumber} к заказу ${orderId}...`);
+            
+            try {
+                if (!window._debug) {
+                    appendLog('apply-fix-result', 'Объект window._debug не найден. Сначала вызовите ошибку 400, чтобы сгенерировать исправления.', 'error');
+                    return;
+                }
+                
+                const result = await window._debug.apply(fixNumber);
+                if (result) {
+                    appendLog('apply-fix-result', `Исправление ${fixNumber} успешно применено!`, 'success');
+                    appendLog('apply-fix-result', `Обновленные данные заказа: ${formatJson(result)}`, 'info');
+                } else {
+                    appendLog('apply-fix-result', `Исправление ${fixNumber} не сработало`, 'error');
+                }
+            } catch (e) {
+                appendLog('apply-fix-result', `Ошибка: ${e.message}`, 'error');
+            }
+        });
+        
+        // Анализ заголовков
+        document.getElementById('check-headers-btn').addEventListener('click', async () => {
+            clearLog('headers-result');
+            appendLog('headers-result', 'Анализ заголовков запроса...');
+            
+            try {
+                const response = await fetch('/api/orders?limit=1');
+                const headers = {};
+                
+                // Получаем заголовки запроса
+                const requestHeaders = {
+                    'Content-Type': 'application/json',
+                    'Accept': response.headers.get('accept') || '*/*',
+                    'User-Agent': navigator.userAgent
+                };
+                
+                // Получаем заголовки ответа
+                response.headers.forEach((value, key) => {
+                    headers[key] = value;
+                });
+                
+                appendLog('headers-result', 'Заголовки запроса:', 'info');
+                appendLog('headers-result', formatJson(requestHeaders), 'info');
+                
+                appendLog('headers-result', 'Заголовки ответа:', 'info');
+                appendLog('headers-result', formatJson(headers), 'info');
+                
+                if (headers['content-type'] && headers['content-type'].includes('application/json')) {
+                    appendLog('headers-result', 'Content-Type установлен корректно (application/json)', 'success');
+                } else {
+                    appendLog('headers-result', `Внимание: Content-Type не является application/json: ${headers['content-type']}`, 'error');
+                }
+            } catch (e) {
+                appendLog('headers-result', `Ошибка: ${e.message}`, 'error');
+            }
+        });
+        
+        // Анализ ошибки
+        document.getElementById('analyze-error-btn').addEventListener('click', async () => {
+            const orderId = document.getElementById('order-id-error').value;
+            
+            if (!orderId) {
+                alert('Пожалуйста, введите ID заказа');
+                return;
+            }
+            
+            clearLog('analyze-error-result');
+            appendLog('analyze-error-result', `Анализ ошибки для заказа ${orderId}...`);
+            
+            try {
+                // Создаем заведомо проблемный запрос
+                const problemData = {
+                    drawingNumber: `ERROR-TEST-${Date.now()}`,
+                    priority: 2,
+                    operations: [
+                        {
+                            operationNumber: 1,
+                            operationType: "milling",
+                            machineAxes: 3, // Числовой формат, который может вызвать ошибку
+                            estimatedTime: 60
+                        }
+                    ]
+                };
+                
+                appendLog('analyze-error-result', 'Отправка проблемных данных:', 'info');
+                appendLog('analyze-error-result', formatJson(problemData), 'info');
+                
+                const response = await fetch(`/api/orders/${orderId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(problemData)
+                });
+                
+                if (response.ok) {
+                    appendLog('analyze-error-result', 'Запрос выполнен успешно! Ошибка 400 не воспроизведена.', 'success');
+                    const data = await response.json();
+                    appendLog('analyze-error-result', `Данные ответа: ${formatJson(data)}`, 'info');
+                } else if (response.status === 400) {
+                    appendLog('analyze-error-result', 'Ошибка 400 Bad Request воспроизведена!', 'error');
+                    
+                    try {
+                        const errorData = await response.json();
+                        appendLog('analyze-error-result', `Данные ошибки: ${formatJson(errorData)}`, 'error');
+                        
+                        // Анализируем детали ошибки
+                        if (errorData.message && Array.isArray(errorData.message)) {
+                            errorData.message.forEach((msg, index) => {
+                                appendLog('analyze-error-result', `Проблема ${index + 1}: ${msg}`, 'error');
+                                
+                                // Проверяем на типичные проблемы с валидацией
+                                if (msg.includes('machineAxes')) {
+                                    appendLog('analyze-error-result', '➡️ Обнаружена проблема с полем machineAxes! Попробуйте изменить формат.', 'info');
+                                }
+                                if (msg.includes('must be a string')) {
+                                    appendLog('analyze-error-result', '➡️ Ожидается строковое значение! Попробуйте привести к строке.', 'info');
+                                }
+                                if (msg.includes('must be a number')) {
+                                    appendLog('analyze-error-result', '➡️ Ожидается числовое значение! Попробуйте привести к числу.', 'info');
+                                }
+                            });
+                        } else {
+                            appendLog('analyze-error-result', 'Нет подробной информации об ошибке', 'error');
+                        }
+                    } catch (e) {
+                        appendLog('analyze-error-result', 'Не удалось разобрать ответ с ошибкой', 'error');
+                    }
+                } else {
+                    appendLog('analyze-error-result', `Получен неожиданный статус: ${response.status}`, 'error');
+                }
+            } catch (e) {
+                appendLog('analyze-error-result', `Ошибка: ${e.message}`, 'error');
+            }
+        });
+        
+        // Проверка типов данных
+        document.getElementById('check-types-btn').addEventListener('click', () => {
+            clearLog('types-result');
+            appendLog('types-result', 'Анализ типов данных...');
+            
+            // Проверяем преобразование типов
+            const testCases = [
+                { value: 3, desc: 'Число 3' },
+                { value: '3', desc: 'Строка "3"' },
+                { value: '3-axis', desc: 'Строка "3-axis"' },
+                { value: null, desc: 'null' },
+                { value: undefined, desc: 'undefined' }
+            ];
+            
+            testCases.forEach(test => {
+                appendLog('types-result', `Тест: ${test.desc}`, 'info');
+                appendLog('types-result', `Тип: ${typeof test.value}`, 'info');
+                appendLog('types-result', `Number(): ${Number(test.value)}`, 'info');
+                appendLog('types-result', `String(): ${String(test.value)}`, 'info');
+                appendLog('types-result', `JSON.stringify(): ${JSON.stringify(test.value)}`, 'info');
+                appendLog('types-result', '-----------------', 'info');
+            });
+            
+            // Проверяем преобразование machineAxes
+            appendLog('types-result', 'Анализ преобразования machineAxes:', 'info');
+            
+            function formatMachineAxes(value) {
+                // Если это число или строка без "-axis", добавляем суффикс
+                if (typeof value === 'number' || 
+                    (typeof value === 'string' && !value.includes('-axis'))) {
+                    return `${value}-axis`;
+                }
+                return value;
+            }
+            
+            testCases.forEach(test => {
+                appendLog('types-result', `formatMachineAxes(${test.desc}): ${formatMachineAxes(test.value)}`, 'info');
+            });
+        });
+    </script>
+</body>
+</html>

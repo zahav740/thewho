@@ -10,7 +10,14 @@ import type { TranslationAPI, ClientTranslations } from './types';
 export type { TranslationAPI, ClientTranslations } from './types';
 
 // API URL для backend
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5100/api';
+const FORCED_API_URL = 'http://localhost:5100/api';
+const API_URL = process.env.REACT_APP_API_URL || FORCED_API_URL;
+
+console.log('🌍 I18N API URL:', API_URL);
+
+if (API_URL.includes('5200')) {
+  console.error('❌ I18N: Обнаружен неправильный порт 5200!');
+}
 
 /**
  * Получить переводы с сервера

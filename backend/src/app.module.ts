@@ -28,6 +28,7 @@ import { SynchronizationModule } from './modules/synchronization/synchronization
 import { AuthModule } from './modules/auth/auth.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { HeaderSizeMiddleware } from './common/middleware/header-size.middleware';
+import { StaticFilesMiddleware } from './common/middleware/static-files.middleware';
 import { OrdersDataMiddleware } from './modules/orders/orders.middleware';
 
 @Module({
@@ -87,6 +88,11 @@ export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
     consumer
       .apply(HeaderSizeMiddleware)
+      .forRoutes('*');
+      
+    // Применяем StaticFilesMiddleware для PDF файлов
+    consumer
+      .apply(StaticFilesMiddleware)
       .forRoutes('*');
       
     // Применяем OrdersDataMiddleware только к маршрутам заказов

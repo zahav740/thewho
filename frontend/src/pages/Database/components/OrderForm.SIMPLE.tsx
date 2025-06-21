@@ -1,6 +1,7 @@
 /**
- * @file: OrderForm.SIMPLE.tsx - ПРОСТАЯ РАБОЧАЯ ВЕРСИЯ
- * @description: Упрощенная форма без сложной отладки с поддержкой переводов
+ * @file: OrderForm.SIMPLE.tsx - ИСПРАВЛЕННАЯ ВЕРСИЯ С PDF ДИАГНОСТИКОЙ
+ * @description: Упрощенная форма с исправленной поддержкой PDF и диагностикой
+ * @updated: 2025-06-21 - Исправлены проблемы с PDF превью
  */
 import React, { useEffect, useState } from 'react';
 import {
@@ -15,17 +16,23 @@ import {
   Table,
   message,
   Spin,
+  Tabs,
+  Divider,
+  Alert,
 } from 'antd';
-import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
+import { PlusOutlined, DeleteOutlined, FilePdfOutlined, BugOutlined } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Controller, useForm, useFieldArray } from 'react-hook-form';
 import dayjs from 'dayjs';
 import { ordersApi } from '../../../services/ordersApi';
-import { CreateOrderDto, Priority } from '../../../types/order.types'; // OrderFormOperationDto неиспользуем
+import { pdfApi } from '../../../services/pdfApi';
+import { CreateOrderDto, Priority } from '../../../types/order.types';
 import { OperationType } from '../../../types/operation.types';
 import { useTranslation } from '../../../i18n';
+import { PdfUpload } from '../../../components/common/PdfUpload';
 
 const { Option } = Select;
+const { TabPane } = Tabs;
 
 interface OrderFormProps {
   visible: boolean;
@@ -42,26 +49,22 @@ export const OrderForm: React.FC<OrderFormProps> = ({
 }) => {
   const { t, tWithParams } = useTranslation();
   const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState('1');
+  const [currentPdfPath, setCurrentPdfPath] = useState<string | undefined>();
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
   const isEdit = !!orderId;
   const queryClient = useQueryClient();
 
-  console.log('🔧 OrderForm rendered:', { visible, orderId, isEdit });
+  console.log('🔧 OrderForm (ИСПРАВЛЕННАЯ PDF) rendered:', { visible, orderId, isEdit });
 
-  const { control, handleSubmit, reset, formState: { errors } } = useForm<CreateOrderDto>({ // setValue, getValues неиспользуемы
+  const { control, handleSubmit, reset, formState: { errors } } = useForm<CreateOrderDto>({
     defaultValues: {
       drawingNumber: '',
       quantity: 1,
       deadline: dayjs().add(7, 'days').format('YYYY-MM-DD'),
       priority: Priority.MEDIUM,
       workType: '',
-      operations: [
-        {
-          operationNumber: 1,
-          operationType: OperationType.MILLING,
-          machineAxes: 3,
-          estimatedTime: 60,
-        },
-      ],
+      operations: [],
     },
   });
 
@@ -82,7 +85,6 @@ export const OrderForm: React.FC<OrderFormProps> = ({
     if (orderData && visible && isEdit) {
       console.log('📥 Loading data into form:', orderData);
       
-      // Простой сброс с данными
       reset({
         drawingNumber: orderData.drawingNumber || '',
         quantity: orderData.quantity || 1,
@@ -96,15 +98,12 @@ export const OrderForm: React.FC<OrderFormProps> = ({
               machineAxes: Number(op.machineAxes) || 3,
               estimatedTime: Number(op.estimatedTime) || 60,
             }))
-          : [
-              {
-                operationNumber: 1,
-                operationType: OperationType.MILLING,
-                machineAxes: 3,
-                estimatedTime: 60,
-              }
-            ],
+          : [],
       });
+
+      // Загружаем информацию о PDF
+      console.log('📄 PDF path from order data:', orderData.pdfPath);
+      setCurrentPdfPath(orderData.pdfPath);
     }
   }, [orderData, visible, isEdit, reset]);
 
@@ -118,23 +117,32 @@ export const OrderForm: React.FC<OrderFormProps> = ({
         deadline: dayjs().add(7, 'days').format('YYYY-MM-DD'),
         priority: Priority.MEDIUM,
         workType: '',
-        operations: [
-          {
-            operationNumber: 1,
-            operationType: OperationType.MILLING,
-            machineAxes: 3,
-            estimatedTime: 60,
-          },
-        ],
+        operations: [],
       });
+      setCurrentPdfPath(undefined);
+      setPdfFile(null);
+      setActiveTab('1');
     }
   }, [visible, reset]);
 
   // Создание заказа
   const createMutation = useMutation({
     mutationFn: ordersApi.create,
-    onSuccess: () => {
+    onSuccess: async (newOrder) => {
       message.success(t('order_form.order_created'));
+      
+      // Если есть PDF файл для загрузки, загружаем его
+      if (pdfFile && newOrder.id) {
+        try {
+          console.log('📁 Uploading PDF for new order:', newOrder.id);
+          await pdfApi.uploadPdf(newOrder.id, pdfFile);
+          message.success('PDF файл также загружен');
+        } catch (error) {
+          console.error('❌ PDF upload error for new order:', error);
+          message.warning('Заказ создан, но PDF файл не загружен');
+        }
+      }
+      
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       onSuccess();
     },
@@ -147,8 +155,21 @@ export const OrderForm: React.FC<OrderFormProps> = ({
   // Обновление заказа
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: any }) => ordersApi.update(id, data),
-    onSuccess: () => {
+    onSuccess: async () => {
       message.success(t('order_form.order_updated'));
+      
+      // Если есть PDF файл для загрузки, загружаем его
+      if (pdfFile && orderId) {
+        try {
+          console.log('📁 Uploading PDF for updated order:', orderId);
+          await pdfApi.uploadPdf(orderId, pdfFile);
+          message.success('PDF файл также обновлен');
+        } catch (error) {
+          console.error('❌ PDF upload error for updated order:', error);
+          message.warning('Заказ обновлен, но PDF файл не загружен');
+        }
+      }
+      
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       queryClient.invalidateQueries({ queryKey: ['order', orderId] });
       onSuccess();
@@ -204,6 +225,45 @@ export const OrderForm: React.FC<OrderFormProps> = ({
   const handleRemoveOperation = (index: number) => {
     console.log('➖ Removing operation:', index);
     remove(index);
+  };
+
+  // PDF Upload Handler (исправленный)
+  const handlePdfChange = (file: File | null) => {
+    console.log('📄 PDF file changed:', file?.name);
+    setPdfFile(file);
+  };
+
+  // PDF Remove Handler (исправленный)
+  const handlePdfRemove = async () => {
+    if (!orderId) {
+      setPdfFile(null);
+      return;
+    }
+
+    try {
+      console.log('🗑️ Removing PDF for order:', orderId);
+      const result = await pdfApi.deletePdf(orderId);
+      
+      if (result.success) {
+        setCurrentPdfPath(undefined);
+        queryClient.invalidateQueries({ queryKey: ['order', orderId] });
+        queryClient.invalidateQueries({ queryKey: ['orders'] });
+        message.success('PDF файл удален');
+      } else {
+        throw new Error(result.message);
+      }
+    } catch (error) {
+      console.error('❌ PDF remove error:', error);
+      message.error('Ошибка при удалении PDF файла');
+    }
+  };
+
+  // Функция для получения URL PDF
+  const getCurrentPdfUrl = () => {
+    if (currentPdfPath) {
+      return pdfApi.getPdfUrlByPath(currentPdfPath);
+    }
+    return '';
   };
 
   const operationColumns = [
@@ -278,7 +338,6 @@ export const OrderForm: React.FC<OrderFormProps> = ({
           danger
           icon={<DeleteOutlined />}
           onClick={() => handleRemoveOperation(index)}
-          disabled={fields.length === 1}
         />
       ),
     },
@@ -289,7 +348,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
       title={isEdit ? t('order_form.edit_order') : t('order_form.new_order')}
       open={visible}
       onCancel={onClose}
-      width={800}
+      width={900}
       footer={[
         <Button key="cancel" onClick={onClose}>
           {t('order_form.cancel')}
@@ -305,100 +364,162 @@ export const OrderForm: React.FC<OrderFormProps> = ({
       ]}
     >
       <Spin spinning={loading || orderLoading}>
-        <Form layout="vertical">
-          <Form.Item
-            label={t('order_form.drawing_number')}
-            required
-            validateStatus={errors.drawingNumber ? 'error' : ''}
-            help={errors.drawingNumber?.message}
+        <Tabs activeKey={activeTab} onChange={setActiveTab} type="card">
+          {/* Вкладка 1: Основная информация */}
+          <TabPane 
+            tab={
+              <Space>
+                <span>📋</span>
+                <span>Основная информация</span>
+              </Space>
+            } 
+            key="1"
           >
-            <Controller
-              name="drawingNumber"
-              control={control}
-              rules={{ required: t('order_form.required_field') }}
-              render={({ field }) => (
-                <Input {...field} placeholder={t('order_form.drawing_placeholder')} />
-              )}
-            />
-          </Form.Item>
+            <Form layout="vertical">
+              <Form.Item
+                label={t('order_form.drawing_number')}
+                required
+                validateStatus={errors.drawingNumber ? 'error' : ''}
+                help={errors.drawingNumber?.message}
+              >
+                <Controller
+                  name="drawingNumber"
+                  control={control}
+                  rules={{ required: t('order_form.required_field') }}
+                  render={({ field }) => (
+                    <Input {...field} placeholder={t('order_form.drawing_placeholder')} />
+                  )}
+                />
+              </Form.Item>
 
-          <Space size="large" style={{ width: '100%' }}>
-            <Form.Item label={t('order_form.quantity')} required>
-              <Controller
-                name="quantity"
-                control={control}
-                rules={{ required: t('order_form.required_field'), min: 1 }}
-                render={({ field }) => (
-                  <InputNumber {...field} min={1} style={{ width: 120 }} />
-                )}
-              />
-            </Form.Item>
-
-            <Form.Item label={t('order_form.priority')} required>
-              <Controller
-                name="priority"
-                control={control}
-                rules={{ required: t('order_form.required_field') }}
-                render={({ field }) => (
-                  <Select {...field} style={{ width: 150 }}>
-                    <Option value={Priority.HIGH}>{t('priority.high')}</Option>
-                    <Option value={Priority.MEDIUM}>{t('priority.medium')}</Option>
-                    <Option value={Priority.LOW}>{t('priority.low')}</Option>
-                  </Select>
-                )}
-              />
-            </Form.Item>
-
-            <Form.Item label={t('order_form.deadline')} required>
-              <Controller
-                name="deadline"
-                control={control}
-                rules={{ required: t('order_form.required_field') }}
-                render={({ field }) => (
-                  <DatePicker
-                    {...field}
-                    format="DD.MM.YYYY"
-                    value={field.value ? dayjs(field.value) : null}
-                    onChange={(date) => field.onChange(date?.format('YYYY-MM-DD'))}
+              <Space size="large" style={{ width: '100%' }}>
+                <Form.Item label={t('order_form.quantity')} required>
+                  <Controller
+                    name="quantity"
+                    control={control}
+                    rules={{ required: t('order_form.required_field'), min: 1 }}
+                    render={({ field }) => (
+                      <InputNumber {...field} min={1} style={{ width: 120 }} />
+                    )}
                   />
+                </Form.Item>
+
+                <Form.Item label={t('order_form.priority')} required>
+                  <Controller
+                    name="priority"
+                    control={control}
+                    rules={{ required: t('order_form.required_field') }}
+                    render={({ field }) => (
+                      <Select {...field} style={{ width: 150 }}>
+                        <Option value={Priority.HIGH}>{t('priority.high')}</Option>
+                        <Option value={Priority.MEDIUM}>{t('priority.medium')}</Option>
+                        <Option value={Priority.LOW}>{t('priority.low')}</Option>
+                      </Select>
+                    )}
+                  />
+                </Form.Item>
+
+                <Form.Item label={t('order_form.deadline')} required>
+                  <Controller
+                    name="deadline"
+                    control={control}
+                    rules={{ required: t('order_form.required_field') }}
+                    render={({ field }) => (
+                      <DatePicker
+                        {...field}
+                        format="DD.MM.YYYY"
+                        value={field.value ? dayjs(field.value) : null}
+                        onChange={(date) => field.onChange(date?.format('YYYY-MM-DD'))}
+                      />
+                    )}
+                  />
+                </Form.Item>
+              </Space>
+
+              <Form.Item label={t('order_form.work_type')}>
+                <Controller
+                  name="workType"
+                  control={control}
+                  render={({ field }) => (
+                    <Input {...field} placeholder={t('order_form.work_type_placeholder')} />
+                  )}
+                />
+              </Form.Item>
+
+              <Form.Item label={t('order_form.operations')}>
+                <Table
+                  dataSource={fields}
+                  columns={operationColumns}
+                  rowKey="id"
+                  pagination={false}
+                  size="small"
+                  footer={() => (
+                    <Button
+                      type="dashed"
+                      onClick={handleAddOperation}
+                      icon={<PlusOutlined />}
+                      block
+                    >
+                      {t('order_form.add_operation')}
+                    </Button>
+                  )}
+                />
+                <div style={{ marginTop: 8, color: '#666', fontSize: '12px' }}>
+                  {tWithParams('order_form.operations_count', { count: fields.length })}
+                </div>
+              </Form.Item>
+            </Form>
+          </TabPane>
+
+          {/* Вкладка 2: PDF Документация (ИСПРАВЛЕННАЯ) */}
+          <TabPane 
+            tab={
+              <Space>
+                <FilePdfOutlined />
+                <span>PDF Документация</span>
+                {currentPdfPath && (
+                  <span style={{ 
+                    backgroundColor: '#52c41a', 
+                    color: 'white', 
+                    borderRadius: '50%', 
+                    width: '8px', 
+                    height: '8px', 
+                    display: 'inline-block' 
+                  }} />
                 )}
+              </Space>
+            } 
+            key="2"
+          >
+            <div style={{ padding: '16px 0' }}>
+              <Alert
+                message="Диагностика PDF"
+                description={
+                  <div style={{ fontSize: '12px' }}>
+                    <div>🔍 Current PDF path: {currentPdfPath || 'не установлен'}</div>
+                    <div>📁 PDF file selected: {pdfFile?.name || 'не выбран'}</div>
+                    <div>🆔 Order ID: {orderId || 'новый заказ'}</div>
+                    <div>📄 URL: {currentPdfPath ? getCurrentPdfUrl() : 'не доступен'}</div>
+                  </div>
+                }
+                type="info"
+                showIcon
+                style={{ marginBottom: 16 }}
               />
-            </Form.Item>
-          </Space>
 
-          <Form.Item label={t('order_form.work_type')}>
-            <Controller
-              name="workType"
-              control={control}
-              render={({ field }) => (
-                <Input {...field} placeholder={t('order_form.work_type_placeholder')} />
-              )}
-            />
-          </Form.Item>
-
-          <Form.Item label={t('order_form.operations')} required>
-            <Table
-              dataSource={fields}
-              columns={operationColumns}
-              rowKey="id"
-              pagination={false}
-              size="small"
-              footer={() => (
-                <Button
-                  type="dashed"
-                  onClick={handleAddOperation}
-                  icon={<PlusOutlined />}
-                  block
-                >
-                  {t('order_form.add_operation')}
-                </Button>
-              )}
-            />
-            <div style={{ marginTop: 8, color: '#666', fontSize: '12px' }}>
-              {tWithParams('order_form.operations_count', { count: fields.length })}
+              {/* ✅ ИСПРАВЛЕНО: Используем PdfUpload с правильными параметрами */}
+              <PdfUpload
+                value={getCurrentPdfUrl()}
+                onChange={handlePdfChange}
+                onRemove={handlePdfRemove}
+                disabled={loading}
+                showPreview={true}
+                accept=".pdf,application/pdf"
+                maxSize={100}
+              />
             </div>
-          </Form.Item>
-        </Form>
+          </TabPane>
+        </Tabs>
       </Spin>
     </Modal>
   );

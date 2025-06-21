@@ -145,7 +145,9 @@ export const ordersApi = {
 
   // Удалить заказ
   delete: async (id: number): Promise<void> => {
-    await api.delete(`/orders/${id}`);
+    console.log('🗑️ API: Удаляем заказ с ID:', id);
+    const response = await api.delete(`/orders/${id}`);
+    console.log('✅ API: Заказ успешно удалён:', response.status);
   },
 
   // Удалить выбранные заказы
@@ -252,9 +254,22 @@ export const ordersApi = {
     return response.data;
   },
 
-  // Получить PDF файл заказа
+  // Получить PDF файл заказа по ID
   getPdfUrl: (orderId: number): string => {
     return `${api.defaults.baseURL}/orders/${orderId}/pdf`;
+  },
+
+  // Получить PDF файл по пути
+  getPdfUrlByPath: (pdfPath: string): string => {
+    // Извлекаем только имя файла из полного пути
+    const filename = pdfPath.split('/').pop() || pdfPath;
+    return `${api.defaults.baseURL}/orders/pdf/${filename}`;
+  },
+
+  // Удалить PDF файл заказа
+  deletePdf: async (orderId: number): Promise<Order> => {
+    const response = await api.delete(`/orders/${orderId}/pdf`);
+    return response.data;
   },
 };
 

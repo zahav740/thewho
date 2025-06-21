@@ -1,0 +1,32 @@
+🔧 БЫСТРОЕ ИСПРАВЛЕНИЕ ПОРТА FRONTEND
+=====================================
+
+На сервере через SSH выполните:
+
+cd /var/upload/
+
+# Остановка frontend
+pm2 delete crm-frontend
+
+# Исправление .env файла
+cd frontend
+echo 'PORT=5201' > .env
+echo 'REACT_APP_API_URL=https://kasuf.xyz/api' >> .env
+cd ..
+
+# Обновление PM2 конфигурации
+sed -i 's/args: .*/args: "-s build -l 5201",/' ecosystem.config.js
+sed -i 's/PORT: 5101/PORT: 5201/' ecosystem.config.js
+
+# Запуск frontend на новом порту
+pm2 start ecosystem.config.js --only crm-frontend
+pm2 save
+
+# Проверка
+pm2 status
+curl http://localhost:5201
+
+✅ ГОТОВО! Frontend теперь на порту 5201
+
+Если нужна автоматическая версия:
+./fix-frontend-port.sh

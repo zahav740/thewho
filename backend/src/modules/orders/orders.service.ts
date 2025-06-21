@@ -250,16 +250,43 @@ export class OrdersService {
     
     const numericId = parseInt(id, 10);
     if (isNaN(numericId)) {
+      console.error(`Некорректный ID: ${id}`);
       throw new NotFoundException(`Некорректный ID заказа: ${id}`);
     }
 
-    const result = await this.orderRepository.delete(numericId);
+    // Проверяем, что заказ существует
+    const order = await this.orderRepository.findOne({
+      where: { id: numericId },
+      relations: ['operations']
+    });
     
-    if (result.affected === 0) {
+    if (!order) {
+      console.error(`Заказ с ID ${id} не найден`);
       throw new NotFoundException(`Заказ с ID ${id} не найден`);
     }
-    
-    console.log(`OrdersService.remove: Заказ ${id} удален`);
+
+    console.log(`Найден заказ ${order.drawingNumber} с ${order.operations?.length || 0} операциями`);
+
+    try {
+      // Сначала удаляем все операции вручную (в качестве гарантии)
+      if (order.operations && order.operations.length > 0) {
+        console.log(`Удаляем ${order.operations.length} операций`);
+        await this.operationRepository.delete({ order: { id: numericId } });
+        console.log('Операции удалены');
+      }
+      
+      // Теперь удаляем сам заказ
+      const result = await this.orderRepository.delete(numericId);
+      
+      if (result.affected === 0) {
+        throw new Error('Заказ не был удалён');
+      }
+      
+      console.log(`✅ Заказ ${id} успешно удалён`);
+    } catch (error) {
+      console.error(`❌ Ошибка при удалении заказа ${id}:`, error);
+      throw new InternalServerErrorException(`Ошибка при удалении заказа: ${error.message}`);
+    }
   }
 
   async removeBatch(ids: string[]): Promise<number> {
@@ -296,6 +323,37 @@ export class OrdersService {
     await this.orderRepository.update(numericId, { pdfPath: filename });
     
     return order;
+  }
+
+  async deletePdf(id: string): Promise<Order> {
+    console.log(`OrdersService.deletePdf: Удаление PDF для заказа ${id}`);
+    
+    const order = await this.findOne(id);
+    
+    // Удаляем файл с диска (если он есть)
+    if (order.pdfPath) {
+      try {
+        const fs = require('fs');
+        const path = require('path');
+        const filePath = path.join('./uploads/pdf', order.pdfPath);
+        
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+          console.log(`✅ Файл ${order.pdfPath} удален с диска`);
+        }
+      } catch (error) {
+        console.error(`⚠️ Ошибка удаления файла ${order.pdfPath}:`, error);
+        // Не прерываем выполнение - обновляем БД в любом случае
+      }
+    }
+    
+    // Обнуляем поле в БД
+    const numericId = parseInt(id, 10);
+    await this.orderRepository.update(numericId, { pdfPath: null });
+    
+    // Возвращаем обновленный заказ
+    const updatedOrder = await this.findOne(id);
+    return updatedOrder;
   }
 
   private enrichOrder(order: Order): Order {

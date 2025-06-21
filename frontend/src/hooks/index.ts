@@ -5,3 +5,4 @@ export { useGlobalSync } from './useGlobalSync';
 export { useSynchronization } from './useSynchronization';
 export { useResponsive, responsiveUtils } from './useResponsive';
 export { useApiClient } from './useApiClient';
+export { useMobile } from './useMobile';

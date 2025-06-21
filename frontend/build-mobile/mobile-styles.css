@@ -1,0 +1,571 @@
+/* Мобильная версия TheWho CRM */
+
+/* ===========================================
+   МОБИЛЬНЫЕ СТИЛИ (≤768px)
+   =========================================== */
+
+@media (max-width: 768px) {
+  /* Базовые настройки */
+  html {
+    zoom: 1.0 !important;
+    font-size: 16px !important;
+  }
+  
+  body {
+    overflow-x: hidden !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  
+  /* === НАВИГАЦИЯ === */
+  .ant-layout-sider {
+    position: fixed !important;
+    left: -250px !important;
+    top: 0 !important;
+    height: 100vh !important;
+    z-index: 1001 !important;
+    transition: left 0.3s ease !important;
+    width: 250px !important;
+    background: #001529 !important;
+  }
+  
+  .ant-layout-sider.mobile-open {
+    left: 0 !important;
+  }
+  
+  .ant-layout-sider .ant-layout-sider-children {
+    height: 100% !important;
+    overflow-y: auto !important;
+  }
+  
+  /* Мобильная шапка */
+  .mobile-header {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    height: 60px !important;
+    background: #001529 !important;
+    z-index: 1000 !important;
+    display: flex !important;
+    align-items: center !important;
+    padding: 0 16px !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important;
+  }
+  
+  .mobile-menu-btn {
+    background: none !important;
+    border: none !important;
+    color: white !important;
+    font-size: 20px !important;
+    padding: 8px !important;
+    border-radius: 4px !important;
+    cursor: pointer !important;
+  }
+  
+  .mobile-title {
+    color: white !important;
+    font-size: 18px !important;
+    font-weight: 600 !important;
+    margin-left: 12px !important;
+    flex: 1 !important;
+  }
+  
+  /* Основной контент */
+  .ant-layout {
+    margin-top: 60px !important;
+  }
+  
+  .ant-layout-content {
+    padding: 16px 12px !important;
+    margin: 0 !important;
+    min-height: calc(100vh - 60px) !important;
+  }
+  
+  /* Оверлей для закрытия меню */
+  .mobile-overlay {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    background: rgba(0,0,0,0.5) !important;
+    z-index: 999 !important;
+    display: none !important;
+  }
+  
+  .mobile-overlay.active {
+    display: block !important;
+  }
+  
+  /* === КНОПКИ === */
+  .ant-btn {
+    min-height: 48px !important;
+    padding: 12px 16px !important;
+    font-size: 16px !important;
+    border-radius: 8px !important;
+    width: 100% !important;
+    margin-bottom: 8px !important;
+  }
+  
+  .ant-btn-sm {
+    min-height: 40px !important;
+    padding: 8px 12px !important;
+    font-size: 14px !important;
+    width: auto !important;
+  }
+  
+  /* Группы кнопок */
+  .ant-btn-group {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+  }
+  
+  .ant-btn-group .ant-btn {
+    border-radius: 8px !important;
+    margin: 0 !important;
+  }
+  
+  /* === ПОЛЯ ВВОДА === */
+  .ant-input,
+  .ant-input-number,
+  .ant-input-affix-wrapper {
+    min-height: 48px !important;
+    padding: 12px 16px !important;
+    font-size: 16px !important;
+    border-radius: 8px !important;
+    border: 2px solid #d9d9d9 !important;
+  }
+  
+  .ant-input:focus,
+  .ant-input-affix-wrapper-focused {
+    border-color: #1890ff !important;
+    box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2) !important;
+  }
+  
+  /* === СЕЛЕКТЫ === */
+  .ant-select {
+    width: 100% !important;
+  }
+  
+  .ant-select-selector {
+    min-height: 48px !important;
+    padding: 8px 16px !important;
+    border: 2px solid #d9d9d9 !important;
+    border-radius: 8px !important;
+  }
+  
+  .ant-select-selection-item {
+    font-size: 16px !important;
+    line-height: 32px !important;
+  }
+  
+  /* === ТАБЛИЦЫ === */
+  .ant-table-wrapper {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+  
+  .ant-table {
+    min-width: 600px !important;
+  }
+  
+  .ant-table-thead > tr > th {
+    padding: 12px 8px !important;
+    font-size: 14px !important;
+    white-space: nowrap !important;
+  }
+  
+  .ant-table-tbody > tr > td {
+    padding: 12px 8px !important;
+    font-size: 14px !important;
+    word-break: break-word !important;
+  }
+  
+  /* Мобильная карточка для таблиц */
+  .mobile-table-card {
+    background: white !important;
+    border: 1px solid #f0f0f0 !important;
+    border-radius: 8px !important;
+    padding: 16px !important;
+    margin-bottom: 12px !important;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+  }
+  
+  .mobile-table-card-title {
+    font-size: 16px !important;
+    font-weight: 600 !important;
+    margin-bottom: 8px !important;
+    color: #262626 !important;
+  }
+  
+  .mobile-table-card-content {
+    font-size: 14px !important;
+    color: #666 !important;
+    line-height: 1.5 !important;
+  }
+  
+  /* === КАРТОЧКИ === */
+  .ant-card {
+    margin-bottom: 16px !important;
+    border-radius: 12px !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1) !important;
+  }
+  
+  .ant-card-head {
+    padding: 16px !important;
+    font-size: 18px !important;
+    border-bottom: 1px solid #f0f0f0 !important;
+  }
+  
+  .ant-card-body {
+    padding: 16px !important;
+  }
+  
+  /* === ФОРМЫ === */
+  .ant-form-item {
+    margin-bottom: 20px !important;
+  }
+  
+  .ant-form-item-label {
+    padding-bottom: 8px !important;
+  }
+  
+  .ant-form-item-label > label {
+    font-size: 16px !important;
+    font-weight: 500 !important;
+    color: #262626 !important;
+  }
+  
+  /* Горизонтальные формы на мобильных становятся вертикальными */
+  .ant-form-horizontal .ant-form-item-label {
+    text-align: left !important;
+    padding-bottom: 8px !important;
+  }
+  
+  .ant-form-horizontal .ant-form-item-control {
+    margin-left: 0 !important;
+  }
+  
+  /* === МОДАЛЬНЫЕ ОКНА === */
+  .ant-modal {
+    max-width: calc(100vw - 32px) !important;
+    margin: 16px auto !important;
+    top: 0 !important;
+  }
+  
+  .ant-modal-content {
+    border-radius: 12px !important;
+    max-height: calc(100vh - 32px) !important;
+    overflow-y: auto !important;
+  }
+  
+  .ant-modal-header {
+    padding: 20px !important;
+    border-radius: 12px 12px 0 0 !important;
+  }
+  
+  .ant-modal-title {
+    font-size: 18px !important;
+    font-weight: 600 !important;
+  }
+  
+  .ant-modal-body {
+    padding: 20px !important;
+    font-size: 16px !important;
+    max-height: calc(100vh - 200px) !important;
+    overflow-y: auto !important;
+  }
+  
+  .ant-modal-footer {
+    padding: 16px 20px !important;
+    text-align: center !important;
+  }
+  
+  .ant-modal-footer .ant-btn {
+    margin: 4px !important;
+    width: calc(50% - 8px) !important;
+  }
+  
+  /* === КАЛЕНДАРЬ === */
+  .ant-picker-calendar {
+    border: none !important;
+  }
+  
+  .ant-picker-calendar-header {
+    padding: 8px 16px !important;
+  }
+  
+  .ant-picker-calendar-date {
+    margin: 2px !important;
+    border-radius: 6px !important;
+  }
+  
+  .ant-picker-calendar-date-content {
+    min-height: 60px !important;
+    padding: 4px !important;
+    font-size: 12px !important;
+  }
+  
+  /* === НАВИГАЦИОННОЕ МЕНЮ === */
+  .ant-menu {
+    background: transparent !important;
+    border: none !important;
+  }
+  
+  .ant-menu-item {
+    height: 56px !important;
+    line-height: 56px !important;
+    margin: 4px 8px !important;
+    border-radius: 8px !important;
+    padding: 0 16px !important;
+  }
+  
+  .ant-menu-item-selected {
+    background-color: #1890ff !important;
+    color: white !important;
+  }
+  
+  .ant-menu-item:not(.ant-menu-item-selected):hover {
+    background-color: #1890ff20 !important;
+  }
+  
+  /* === УВЕДОМЛЕНИЯ === */
+  .ant-notification {
+    margin-right: 16px !important;
+    margin-top: 70px !important;
+  }
+  
+  .ant-message {
+    margin-top: 70px !important;
+  }
+  
+  /* === СТАТИСТИЧЕСКИЕ КАРТОЧКИ === */
+  .stats-grid {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+  }
+  
+  .stats-card {
+    background: white !important;
+    border-radius: 12px !important;
+    padding: 20px !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1) !important;
+    text-align: center !important;
+  }
+  
+  .stats-number {
+    font-size: 32px !important;
+    font-weight: 700 !important;
+    color: #1890ff !important;
+    margin-bottom: 8px !important;
+  }
+  
+  .stats-label {
+    font-size: 14px !important;
+    color: #666 !important;
+  }
+  
+  /* === СКРЫТИЕ ЭЛЕМЕНТОВ НА МОБИЛЬНЫХ === */
+  .desktop-only {
+    display: none !important;
+  }
+  
+  /* === ДЕЙСТВИЯ С ЭЛЕМЕНТАМИ === */
+  .mobile-actions {
+    display: flex !important;
+    gap: 8px !important;
+    margin-top: 12px !important;
+  }
+  
+  .mobile-actions .ant-btn {
+    flex: 1 !important;
+    margin-bottom: 0 !important;
+  }
+  
+  /* === ПОИСК === */
+  .mobile-search {
+    margin-bottom: 16px !important;
+  }
+  
+  .mobile-search .ant-input-affix-wrapper {
+    border-radius: 12px !important;
+    background: #f5f5f5 !important;
+    border: none !important;
+  }
+  
+  /* === ФАБЫ (FLOATING ACTION BUTTONS) === */
+  .mobile-fab {
+    position: fixed !important;
+    bottom: 20px !important;
+    right: 20px !important;
+    width: 60px !important;
+    height: 60px !important;
+    border-radius: 50% !important;
+    background: #1890ff !important;
+    color: white !important;
+    border: none !important;
+    box-shadow: 0 4px 12px rgba(24, 144, 255, 0.4) !important;
+    font-size: 24px !important;
+    z-index: 1000 !important;
+    cursor: pointer !important;
+    transition: all 0.3s ease !important;
+  }
+  
+  .mobile-fab:hover {
+    transform: scale(1.1) !important;
+    box-shadow: 0 6px 16px rgba(24, 144, 255, 0.5) !important;
+  }
+  
+  /* === СВАЙПЫ === */
+  .swipe-item {
+    position: relative !important;
+    overflow: hidden !important;
+  }
+  
+  .swipe-actions {
+    position: absolute !important;
+    right: 0 !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    background: #ff4d4f !important;
+    color: white !important;
+    display: flex !important;
+    align-items: center !important;
+    padding: 0 20px !important;
+    transform: translateX(100%) !important;
+    transition: transform 0.3s ease !important;
+  }
+  
+  .swipe-item.swiped .swipe-actions {
+    transform: translateX(0) !important;
+  }
+}
+
+/* ===========================================
+   ПЛАНШЕТЫ (768px - 1024px)
+   =========================================== */
+
+@media (min-width: 768px) and (max-width: 1024px) {
+  html {
+    zoom: 1.1 !important;
+    font-size: 15px !important;
+  }
+  
+  .ant-layout-content {
+    padding: 20px !important;
+  }
+  
+  .ant-btn {
+    min-height: 44px !important;
+    font-size: 15px !important;
+  }
+  
+  .ant-input {
+    min-height: 44px !important;
+    font-size: 15px !important;
+  }
+  
+  /* Адаптация сетки для планшетов */
+  .tablet-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 16px !important;
+  }
+  
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+/* ===========================================
+   ДОПОЛНИТЕЛЬНЫЕ МОБИЛЬНЫЕ УТИЛИТЫ
+   =========================================== */
+
+@media (max-width: 768px) {
+  /* Сенсорные улучшения */
+  * {
+    -webkit-tap-highlight-color: rgba(24, 144, 255, 0.2) !important;
+    -webkit-touch-callout: none !important;
+    -webkit-user-select: none !important;
+    user-select: none !important;
+  }
+  
+  input, textarea {
+    -webkit-user-select: text !important;
+    user-select: text !important;
+  }
+  
+  /* Улучшение скроллинга */
+  .scrollable {
+    -webkit-overflow-scrolling: touch !important;
+    overflow-y: auto !important;
+  }
+  
+  /* Безопасные зоны для iPhone X+ */
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top) !important;
+  }
+  
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom) !important;
+  }
+  
+  /* Отключение зума при фокусе на input */
+  input[type="text"],
+  input[type="number"],
+  input[type="email"],
+  input[type="password"],
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+  
+  /* Мобильные карусели */
+  .mobile-carousel {
+    overflow-x: auto !important;
+    display: flex !important;
+    gap: 12px !important;
+    padding-bottom: 8px !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+  
+  .mobile-carousel::-webkit-scrollbar {
+    height: 4px !important;
+  }
+  
+  .mobile-carousel::-webkit-scrollbar-track {
+    background: #f1f1f1 !important;
+    border-radius: 2px !important;
+  }
+  
+  .mobile-carousel::-webkit-scrollbar-thumb {
+    background: #1890ff !important;
+    border-radius: 2px !important;
+  }
+  
+  /* Мобильные вкладки */
+  .mobile-tabs {
+    display: flex !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    border-bottom: 1px solid #f0f0f0 !important;
+  }
+  
+  .mobile-tab {
+    min-width: 120px !important;
+    padding: 12px 20px !important;
+    text-align: center !important;
+    border-bottom: 2px solid transparent !important;
+    color: #666 !important;
+    cursor: pointer !important;
+    white-space: nowrap !important;
+  }
+  
+  .mobile-tab.active {
+    color: #1890ff !important;
+    border-bottom-color: #1890ff !important;
+  }
+}

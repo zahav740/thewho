@@ -1,0 +1,162 @@
+/**
+ * @file: TestPdfViewer.tsx
+ * @description: Тестовый компонент для проверки работы PDF просмотра
+ * @created: 2025-06-21
+ */
+import React, { useState } from 'react';
+import { Button, Card, Space, message, Input, Typography } from 'antd';
+import { FilePdfOutlined, TestTubeOutlined } from '@ant-design/icons';
+
+const { Text } = Typography;
+
+export const TestPdfViewer: React.FC = () => {
+  const [testUrl, setTestUrl] = useState('http://localhost:5100/api/orders/pdf/test.pdf');
+  const [showPreview, setShowPreview] = useState(false);
+
+  const createTestPdf = () => {
+    // Создаем простой PDF для тестирования
+    const testPdfContent = `%PDF-1.4
+1 0 obj
+<<
+/Type /Catalog
+/Pages 2 0 R
+>>
+endobj
+
+2 0 obj
+<<
+/Type /Pages
+/Kids [3 0 R]
+/Count 1
+>>
+endobj
+
+3 0 obj
+<<
+/Type /Page
+/Parent 2 0 R
+/MediaBox [0 0 612 792]
+/Contents 4 0 R
+>>
+endobj
+
+4 0 obj
+<<
+/Length 44
+>>
+stream
+BT
+/F1 12 Tf
+72 720 Td
+(Test PDF Document) Tj
+ET
+endstream
+endobj
+
+xref
+0 5
+0000000000 65535 f 
+0000000010 00000 n 
+0000000053 00000 n 
+0000000110 00000 n 
+0000000191 00000 n 
+trailer
+<<
+/Size 5
+/Root 1 0 R
+>>
+startxref
+284
+%%EOF`;
+
+    const blob = new Blob([testPdfContent], { type: 'application/pdf' });
+    const url = URL.createObjectURL(blob);
+    setTestUrl(url);
+    message.success('Тестовый PDF создан');
+  };
+
+  const testBackendPdf = () => {
+    setTestUrl('http://localhost:5100/api/orders/pdf/test-document.pdf');
+    setShowPreview(true);
+  };
+
+  return (
+    <Card 
+      title={
+        <Space>
+          <TestTubeOutlined />
+          <span>Тестирование PDF просмотра</span>
+        </Space>
+      }
+      style={{ margin: '20px', maxWidth: '800px' }}
+    >
+      <Space direction="vertical" style={{ width: '100%' }}>
+        <Text strong>URL для тестирования:</Text>
+        <Input 
+          value={testUrl} 
+          onChange={(e) => setTestUrl(e.target.value)}
+          placeholder="Введите URL PDF файла"
+        />
+        
+        <Space>
+          <Button 
+            type="primary" 
+            onClick={() => setShowPreview(true)}
+            icon={<FilePdfOutlined />}
+          >
+            Показать PDF
+          </Button>
+          <Button onClick={createTestPdf}>
+            Создать тестовый PDF
+          </Button>
+          <Button onClick={testBackendPdf}>
+            Тест backend PDF
+          </Button>
+          <Button 
+            danger 
+            onClick={() => setShowPreview(false)}
+          >
+            Скрыть
+          </Button>
+        </Space>
+
+        {showPreview && (
+          <Card 
+            title="PDF Превью" 
+            style={{ marginTop: '16px' }}
+            bodyStyle={{ padding: '16px' }}
+          >
+            <div style={{ 
+              width: '100%', 
+              height: '500px', 
+              border: '1px solid #d9d9d9', 
+              borderRadius: '8px',
+              overflow: 'hidden'
+            }}>
+              <iframe
+                src={testUrl}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  border: 'none',
+                }}
+                title="Test PDF Preview"
+                onLoad={() => {
+                  console.log('✅ PDF загружен в iframe:', testUrl);
+                  message.success('PDF успешно загружен');
+                }}
+                onError={(e) => {
+                  console.error('❌ Ошибка загрузки PDF:', e);
+                  message.error('Ошибка загрузки PDF');
+                }}
+              />
+            </div>
+            <div style={{ marginTop: '8px', fontSize: '12px', color: '#666' }}>
+              <Text code>{testUrl}</Text>
+            </div>
+          </Card>
+        )}
+      </Space>
+    </Card>
+  );
+};

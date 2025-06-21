@@ -86,9 +86,15 @@ export class OrdersController {
   @ApiOperation({ summary: 'Удалить заказ' })
   async remove(@Param('id') id: string): Promise<void> {
     try {
-      return await this.ordersService.remove(id);
+      console.log(`🗑️ OrdersController.remove: Получен запрос на удаление заказа с ID: ${id}`);
+      await this.ordersService.remove(id);
+      console.log(`✅ OrdersController.remove: Заказ ${id} успешно удалён`);
     } catch (error) {
-      console.error(`Orders remove error for id ${id}:`, error);
+      console.error(`❌ OrdersController.remove error for id ${id}:`, {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
       throw error;
     }
   }
@@ -266,10 +272,27 @@ export class OrdersController {
   @UseInterceptors(
     FileInterceptor('file', {
       storage: diskStorage({
-        destination: './uploads/pdf',
+        destination: (req, file, cb) => {
+          const path = require('path');
+          const fs = require('fs');
+          
+          // Создаем абсолютный путь к папке uploads/pdf
+          const uploadDir = path.join(process.cwd(), 'uploads', 'pdf');
+          
+          // Создаем папку если её нет
+          if (!fs.existsSync(uploadDir)) {
+            fs.mkdirSync(uploadDir, { recursive: true });
+            console.log(`📁 Создана папка для PDF: ${uploadDir}`);
+          }
+          
+          console.log(`📁 Сохранение PDF в: ${uploadDir}`);
+          cb(null, uploadDir);
+        },
         filename: (req, file, cb) => {
           const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-          cb(null, `${uniqueSuffix}${extname(file.originalname)}`);
+          const filename = `${uniqueSuffix}${extname(file.originalname)}`;
+          console.log(`📄 Имя PDF файла: ${filename}`);
+          cb(null, filename);
         },
       }),
       fileFilter: (req, file, cb) => {
@@ -301,12 +324,30 @@ export class OrdersController {
         originalname: file.originalname,
         filename: file.filename,
         size: file.size,
-        path: file.path
+        path: file.path,
+        destination: file.destination
       });
       
       if (!file || !file.filename) {
         throw new Error('Ошибка сохранения PDF файла');
       }
+      
+      // Проверяем, что файл реально сохранился
+      const path = require('path');
+      const fs = require('fs');
+      const fullPath = path.join(process.cwd(), 'uploads', 'pdf', file.filename);
+      
+      if (!fs.existsSync(fullPath)) {
+        console.error(`❌ PDF файл не сохранился: ${fullPath}`);
+        throw new Error('Ошибка сохранения PDF файла на диск');
+      }
+      
+      const stats = fs.statSync(fullPath);
+      console.log(`✅ PDF файл сохранен успешно:`, {
+        filename: file.filename,
+        path: fullPath,
+        size: stats.size
+      });
       
       const result = await this.ordersService.uploadPdf(id, file.filename);
       console.log(`✅ PDF успешно загружен для заказа ${id}`);
@@ -325,10 +366,169 @@ export class OrdersController {
     @Res() res: Response,
   ): Promise<void> {
     const order = await this.ordersService.findOne(id);
-    if (!order.pdfUrl) {
+    if (!order.pdfPath) {
       res.status(404).send('PDF файл не найден');
       return;
     }
-    res.sendFile(order.pdfUrl, { root: './uploads/pdf' });
+    res.sendFile(order.pdfPath, { root: './uploads/pdf' });
+  }
+
+  @Get('pdf/:filename')
+  @ApiOperation({ summary: 'Получить PDF файл по имени файла' })
+  async getPdfByFilename(
+    @Param('filename') filename: string,
+    @Res() res: Response,
+  ): Promise<void> {
+    try {
+      const path = require('path');
+      const fs = require('fs');
+      
+      console.log(`🔴 DEBUG: Получен запрос на PDF: ${filename}`);
+      console.log(`🔴 DEBUG: process.cwd() = ${process.cwd()}`);
+      
+      // Используем абсолютный путь от корня проекта
+      const searchPaths = [
+        path.join(process.cwd(), 'uploads', 'pdf', filename),
+        path.join(process.cwd(), 'backend', 'uploads', 'pdf', filename),
+        path.join(__dirname, '../../../uploads/pdf', filename),
+        path.resolve('./uploads/pdf', filename),
+        path.resolve('./backend/uploads/pdf', filename)
+      ];
+      
+      console.log(`🔴 DEBUG: Поиск файла в путях:`);
+      
+      let foundPath = null;
+      for (let i = 0; i < searchPaths.length; i++) {
+        const searchPath = searchPaths[i];
+        const exists = fs.existsSync(searchPath);
+        console.log(`🔴   ${i + 1}. ${searchPath} -> ${exists ? '✅ НАЙДЕН' : '❌ НЕТ'}`);
+        
+        if (exists && !foundPath) {
+          foundPath = searchPath;
+        }
+      }
+      
+      if (!foundPath) {
+        console.error(`❌ PDF файл не найден ни в одном из путей`);
+        
+        res.status(404).json({ 
+          message: 'PDF файл не найден', 
+          filename,
+          searchedPaths: searchPaths,
+          cwd: process.cwd(),
+          __dirname
+        });
+        return;
+      }
+      
+      console.log(`✅ PDF файл найден: ${foundPath}`);
+      
+      // Проверяем размер файла
+      const stats = fs.statSync(foundPath);
+      console.log(`📊 Размер файла: ${stats.size} байт`);
+      
+      // Устанавливаем правильные заголовки для PDF
+      res.set({
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `inline; filename="${filename}"`,
+        'Content-Length': stats.size.toString(),
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+        'X-Frame-Options': 'SAMEORIGIN',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET',
+        'Access-Control-Allow-Headers': 'Content-Type'
+      });
+      
+      console.log(`📄 Отправка PDF файла: ${filename}`);
+      res.sendFile(foundPath);
+      
+    } catch (error) {
+      console.error(`❌ Ошибка при отправке PDF файла ${filename}:`, {
+        error: error.message,
+        stack: error.stack,
+        filename
+      });
+      res.status(500).json({ 
+        message: 'Ошибка сервера при получении PDF', 
+        error: error.message,
+        filename 
+      });
+    }
+  }
+
+  @Get('debug/pdf/:filename')
+  @ApiOperation({ summary: 'Диагностика PDF файла' })
+  async debugPdf(
+    @Param('filename') filename: string,
+  ): Promise<any> {
+    try {
+      const path = require('path');
+      const fs = require('fs');
+      
+      const searchPaths = [
+        path.join(process.cwd(), 'uploads', 'pdf', filename),
+        path.join(process.cwd(), 'backend', 'uploads', 'pdf', filename),
+        path.join(__dirname, '../../../uploads/pdf', filename),
+        path.resolve('./uploads/pdf', filename),
+        path.resolve('./backend/uploads/pdf', filename)
+      ];
+      
+      const results = searchPaths.map(searchPath => {
+        const exists = fs.existsSync(searchPath);
+        let stats = null;
+        
+        if (exists) {
+          try {
+            stats = fs.statSync(searchPath);
+          } catch (e) {
+            stats = { error: e.message };
+          }
+        }
+        
+        return {
+          path: searchPath,
+          exists,
+          stats: stats ? {
+            size: stats.size,
+            isFile: stats.isFile?.(),
+            isDirectory: stats.isDirectory?.(),
+            modified: stats.mtime,
+          } : null
+        };
+      });
+      
+      return {
+        filename,
+        cwd: process.cwd(),
+        __dirname,
+        searchResults: results,
+        foundFiles: results.filter(r => r.exists)
+      };
+    } catch (error) {
+      return {
+        error: error.message,
+        stack: error.stack
+      };
+    }
+  }
+
+  @Delete(':id/pdf')
+  @ApiOperation({ summary: 'ПРОДАКШЕН: Удалить PDF файл заказа' })
+  async deletePdf(
+    @Param('id') id: string,
+  ): Promise<Order> {
+    try {
+      console.log(`📁 ПРОДАКШЕН: Удаление PDF для заказа ${id}`);
+      
+      const result = await this.ordersService.deletePdf(id);
+      console.log(`✅ PDF успешно удален для заказа ${id}`);
+      
+      return result;
+    } catch (error) {
+      console.error(`❌ Ошибка удаления PDF для заказа ${id}:`, error);
+      throw error;
+    }
   }
 }

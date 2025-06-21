@@ -1,0 +1,22 @@
+✅ ЧЕК-ЛИСТ РАЗВЕРТЫВАНИЯ НА BEGET
+
+□ 1. Скопировать frontend-beget.zip в beget-deploy/frontend/
+□ 2. Скопировать backend-beget.zip в beget-deploy/backend/
+□ 3. Загрузить всё из beget-deploy/ в /var/upload/ на сервере
+□ 4. Настроить Nginx в панели Beget (kasuf.xyz.nginx.conf)
+□ 5. SSH подключение к серверу: cd /var/upload/
+□ 6. Дать права: chmod +x deploy-all.sh
+□ 7. Запустить: ./deploy-all.sh
+□ 8. Проверить: pm2 status
+□ 9. Тест: curl https://kasuf.xyz/health
+□ 10. Готово! 🚀
+
+ВАЖНЫЕ ПОРТЫ:
+- Backend: 5200
+- Frontend: 5201
+- Домен: https://kasuf.xyz
+
+ОСНОВНЫЕ КОМАНДЫ:
+pm2 status
+pm2 logs
+pm2 restart all

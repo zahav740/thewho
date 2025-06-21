@@ -6,7 +6,6 @@ import { useTranslation } from '../../i18n';
 import { useAuth } from '../../contexts/AuthContext';
 import { useUsernameSearch } from '../../hooks/useUsernameSearch';
 import { LanguageSwitcher } from '../../components/LanguageSwitcher/LanguageSwitcher';
-import './LoginPage.css';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -28,6 +27,32 @@ export const RegisterPage: React.FC = () => {
   const { t } = useTranslation();
   const { register, isAuthenticated } = useAuth();
   const { searchResults, isLoading: isSearching, searchUsernames, clearResults } = useUsernameSearch();
+
+  // ПОЛНОСТЬЮ УДАЛЯЕМ ПРОБЛЕМНЫЕ СТИЛИ
+  useEffect(() => {
+    // НЕ добавляем никаких классов к body!
+    // НЕ добавляем никаких глобальных стилей!
+    
+    // Возвращаем body к нормальному состоянию
+    document.body.style.position = '';
+    document.body.style.width = '';
+    document.body.style.height = '';
+    document.body.style.margin = '';
+    document.body.style.padding = '';
+    document.body.style.overflow = '';
+    
+    // Убираем все проблемные классы
+    document.body.classList.remove('login-page');
+    
+    return () => {
+      // При выходе тоже очищаем
+      document.body.classList.remove('login-page');
+      const registerStyles = document.getElementById('register-page-styles');
+      if (registerStyles) {
+        registerStyles.remove();
+      }
+    };
+  }, []);
 
   // Если пользователь уже авторизован, перенаправляем его
   useEffect(() => {
@@ -157,26 +182,51 @@ export const RegisterPage: React.FC = () => {
     }
   };
 
+  // ПРОСТЫЕ БЕЗОПАСНЫЕ СТИЛИ - только inline, не затрагивают body
+  const pageWrapperStyles: React.CSSProperties = {
+    minHeight: '100vh',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    padding: '20px',
+    boxSizing: 'border-box'
+  };
+
+  const cardContainerStyles: React.CSSProperties = {
+    width: '100%',
+    maxWidth: '400px',
+    position: 'relative'
+  };
+
+  const cardStyles: React.CSSProperties = {
+    width: '100%',
+    boxShadow: '0 10px 30px rgba(0, 0, 0, 0.3)',
+    borderRadius: '12px',
+    border: 'none',
+    overflow: 'hidden'
+  };
+
+  const languageSwitcherStyles: React.CSSProperties = {
+    position: 'absolute',
+    top: '-60px',
+    right: '0px',
+    zIndex: 1000
+  };
+
   return (
-    <div className="login-page">
-      <div className="login-container">
-        <div style={{ position: 'absolute', top: '20px', right: '20px' }}>
+    <div style={pageWrapperStyles}>
+      <div style={cardContainerStyles}>
+        <div style={languageSwitcherStyles}>
           <LanguageSwitcher />
         </div>
         
-        <Card
-          style={{
-            width: '100%',
-            maxWidth: '400px',
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-            borderRadius: '12px'
-          }}
-        >
+        <Card style={cardStyles}>
           <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-            <Title level={2} style={{ marginBottom: '8px' }}>
+            <Title level={2} style={{ marginBottom: '8px', fontSize: '28px', fontWeight: 600 }}>
               Production CRM
             </Title>
-            <Text type="secondary">
+            <Text type="secondary" style={{ fontSize: '16px' }}>
               Create New Account
             </Text>
           </div>
@@ -186,6 +236,7 @@ export const RegisterPage: React.FC = () => {
             onFinish={handleSubmit}
             layout="vertical"
             size="large"
+            style={{ width: '100%' }}
           >
             <Form.Item
               name="username"
@@ -199,6 +250,7 @@ export const RegisterPage: React.FC = () => {
                 }
               ]}
               {...getUsernameValidationStatus()}
+              style={{ marginBottom: '24px' }}
             >
               <AutoComplete
                 options={getUsernameOptions(form.getFieldValue('username') || '')}
@@ -227,6 +279,7 @@ export const RegisterPage: React.FC = () => {
                   placeholder="Enter username"
                   disabled={isLoading}
                   autoComplete="username"
+                  style={{ height: '48px', fontSize: '16px' }}
                 />
               </AutoComplete>
             </Form.Item>
@@ -238,12 +291,14 @@ export const RegisterPage: React.FC = () => {
                 { required: true, message: 'Please enter password' },
                 { min: 6, message: 'Password must be at least 6 characters' }
               ]}
+              style={{ marginBottom: '24px' }}
             >
               <Input.Password
                 prefix={<LockOutlined />}
                 placeholder="Enter password"
                 disabled={isLoading}
                 autoComplete="new-password"
+                style={{ height: '48px', fontSize: '16px' }}
               />
             </Form.Item>
 
@@ -262,12 +317,14 @@ export const RegisterPage: React.FC = () => {
                   },
                 }),
               ]}
+              style={{ marginBottom: '24px' }}
             >
               <Input.Password
                 prefix={<SafetyOutlined />}
                 placeholder="Confirm password"
                 disabled={isLoading}
                 autoComplete="new-password"
+                style={{ height: '48px', fontSize: '16px' }}
               />
             </Form.Item>
 
@@ -275,24 +332,31 @@ export const RegisterPage: React.FC = () => {
               name="role"
               label="Role"
               initialValue="user"
+              style={{ marginBottom: '24px' }}
             >
               <Select
                 placeholder="Select role"
                 disabled={isLoading}
+                style={{ height: '48px', fontSize: '16px' }}
               >
                 <Option value="user">User</Option>
                 <Option value="admin">Admin</Option>
               </Select>
             </Form.Item>
 
-            <Form.Item>
+            <Form.Item style={{ marginBottom: '16px' }}>
               <Button
                 type="primary"
                 htmlType="submit"
                 loading={isLoading}
                 block
                 disabled={usernameStatus === 'taken'}
-                style={{ height: '48px', fontSize: '16px' }}
+                style={{ 
+                  height: '48px', 
+                  fontSize: '16px', 
+                  fontWeight: 600,
+                  borderRadius: '8px'
+                }}
               >
                 Create Account
               </Button>

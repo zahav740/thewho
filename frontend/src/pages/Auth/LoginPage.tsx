@@ -6,7 +6,6 @@ import { useTranslation } from '../../i18n';
 import { useAuth } from '../../contexts/AuthContext';
 import { useUsernameSearch } from '../../hooks/useUsernameSearch';
 import { LanguageSwitcher } from '../../components/LanguageSwitcher/LanguageSwitcher';
-import './LoginPage.css';
 
 const { Title, Text } = Typography;
 
@@ -16,7 +15,7 @@ interface LoginFormData {
   remember?: boolean;
 }
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5100/api';
+const API_URL = process.env.REACT_APP_API_URL || '/api';
 
 export const LoginPage: React.FC = () => {
   const [form] = Form.useForm();
@@ -25,6 +24,32 @@ export const LoginPage: React.FC = () => {
   const { t } = useTranslation();
   const { login, isAuthenticated } = useAuth();
   const { searchResults, isLoading: isSearching, searchUsernames, clearResults } = useUsernameSearch();
+
+  // ПОЛНОСТЬЮ УДАЛЯЕМ ПРОБЛЕМНЫЕ СТИЛИ
+  useEffect(() => {
+    // НЕ добавляем никаких классов к body!
+    // НЕ добавляем никаких глобальных стилей!
+    
+    // Возвращаем body к нормальному состоянию
+    document.body.style.position = '';
+    document.body.style.width = '';
+    document.body.style.height = '';
+    document.body.style.margin = '';
+    document.body.style.padding = '';
+    document.body.style.overflow = '';
+    
+    // Убираем все проблемные классы
+    document.body.classList.remove('login-page');
+    
+    return () => {
+      // При выходе тоже очищаем
+      document.body.classList.remove('login-page');
+      const loginStyles = document.getElementById('login-page-styles');
+      if (loginStyles) {
+        loginStyles.remove();
+      }
+    };
+  }, []);
 
   // Если пользователь уже авторизован, перенаправляем его
   useEffect(() => {
@@ -141,26 +166,51 @@ export const LoginPage: React.FC = () => {
     }
   };
 
+  // ПРОСТЫЕ БЕЗОПАСНЫЕ СТИЛИ - только inline, не затрагивают body
+  const pageWrapperStyles: React.CSSProperties = {
+    minHeight: '100vh',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    padding: '20px',
+    boxSizing: 'border-box'
+  };
+
+  const cardContainerStyles: React.CSSProperties = {
+    width: '100%',
+    maxWidth: '400px',
+    position: 'relative'
+  };
+
+  const cardStyles: React.CSSProperties = {
+    width: '100%',
+    boxShadow: '0 10px 30px rgba(0, 0, 0, 0.3)',
+    borderRadius: '12px',
+    border: 'none',
+    overflow: 'hidden'
+  };
+
+  const languageSwitcherStyles: React.CSSProperties = {
+    position: 'absolute',
+    top: '-60px',
+    right: '0px',
+    zIndex: 1000
+  };
+
   return (
-    <div className="login-page">
-      <div className="login-container">
-        <div style={{ position: 'absolute', top: '20px', right: '20px' }}>
+    <div style={pageWrapperStyles}>
+      <div style={cardContainerStyles}>
+        <div style={languageSwitcherStyles}>
           <LanguageSwitcher />
         </div>
         
-        <Card
-          style={{
-            width: '100%',
-            maxWidth: '400px',
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-            borderRadius: '12px'
-          }}
-        >
+        <Card style={cardStyles}>
           <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-            <Title level={2} style={{ marginBottom: '8px' }}>
+            <Title level={2} style={{ marginBottom: '8px', fontSize: '28px', fontWeight: 600 }}>
               Production CRM
             </Title>
-            <Text type="secondary">
+            <Text type="secondary" style={{ fontSize: '16px' }}>
               {t('auth.login')}
             </Text>
           </div>
@@ -170,6 +220,7 @@ export const LoginPage: React.FC = () => {
             onFinish={handleSubmit}
             layout="vertical"
             size="large"
+            style={{ width: '100%' }}
           >
             <Form.Item
               name="username"
@@ -177,6 +228,7 @@ export const LoginPage: React.FC = () => {
               rules={[
                 { required: true, message: t('auth.username') + ' ' + t('shifts.required_field') }
               ]}
+              style={{ marginBottom: '24px' }}
             >
               <AutoComplete
                 options={getUsernameOptions(form.getFieldValue('username') || '')}
@@ -189,7 +241,7 @@ export const LoginPage: React.FC = () => {
                   clearResults();
                 }}
                 style={{ width: '100%' }}
-                dropdownStyle={{ maxHeight: '300px' }}
+                popupClassName="username-autocomplete-popup"
                 notFoundContent={isSearching ? <Spin size="small" /> : null}
               >
                 <Input
@@ -197,7 +249,9 @@ export const LoginPage: React.FC = () => {
                   suffix={isSearching ? <Spin size="small" /> : <SearchOutlined style={{ color: '#bfbfbf' }} />}
                   placeholder={t('auth.username')}
                   disabled={isLoading}
-                  autoComplete="username"
+                  autoComplete="off"
+                  data-form-type="other"
+                  style={{ height: '48px', fontSize: '16px' }}
                 />
               </AutoComplete>
             </Form.Item>
@@ -208,29 +262,38 @@ export const LoginPage: React.FC = () => {
               rules={[
                 { required: true, message: t('auth.password') + ' ' + t('shifts.required_field') }
               ]}
+              style={{ marginBottom: '24px' }}
             >
               <Input.Password
                 prefix={<LockOutlined />}
                 placeholder={t('auth.password')}
                 disabled={isLoading}
-                autoComplete="current-password"
+                autoComplete="new-password"
+                data-form-type="other"
+                style={{ height: '48px', fontSize: '16px' }}
               />
             </Form.Item>
 
             <Form.Item
               name="remember"
               valuePropName="checked"
+              style={{ marginBottom: '24px' }}
             >
               <Checkbox>{t('auth.remember_me')}</Checkbox>
             </Form.Item>
 
-            <Form.Item>
+            <Form.Item style={{ marginBottom: '16px' }}>
               <Button
                 type="primary"
                 htmlType="submit"
                 loading={isLoading}
                 block
-                style={{ height: '48px', fontSize: '16px' }}
+                style={{ 
+                  height: '48px', 
+                  fontSize: '16px', 
+                  fontWeight: 600,
+                  borderRadius: '8px'
+                }}
               >
                 {t('auth.login')}
               </Button>

@@ -1,0 +1,42 @@
+# =====================================
+# ЭКСТРЕННОЕ ИСПРАВЛЕНИЕ API URL
+# =====================================
+
+# Проблема: Frontend пытается подключиться к localhost:5100/api
+# Решение: Заменить API URL прямо в собранных файлах
+
+cd /var/upload/frontend
+
+# Остановка frontend
+pm2 stop crm-frontend
+
+# Замена API URL в собранных JS файлах
+find build/ -name "*.js" -exec sed -i 's|localhost:5100/api|kasuf.xyz/api|g' {} \;
+find build/ -name "*.js" -exec sed -i 's|localhost:5101/api|kasuf.xyz/api|g' {} \;
+find build/ -name "*.js" -exec sed -i 's|http://localhost:5100|https://kasuf.xyz|g' {} \;
+find build/ -name "*.js" -exec sed -i 's|http://localhost:5101|https://kasuf.xyz|g' {} \;
+
+# Замена в HTML файлах
+find build/ -name "*.html" -exec sed -i 's|localhost:5100/api|kasuf.xyz/api|g' {} \;
+
+# Проверка результата
+echo "Проверка замены:"
+grep -r "localhost:510" build/ || echo "✅ Все localhost заменены!"
+grep -r "kasuf.xyz/api" build/ | head -2
+
+cd /var/upload
+
+# Обновление PM2 на порт 5201
+sed -i 's/-l 5101/-l 5201/' ecosystem.config.js
+
+# Запуск на правильном порту
+pm2 restart crm-frontend
+pm2 status
+
+# Тест
+curl http://localhost:5201
+
+# =====================================
+# РЕЗУЛЬТАТ: Frontend должен подключаться 
+# к https://kasuf.xyz/api вместо localhost:5100
+# =====================================

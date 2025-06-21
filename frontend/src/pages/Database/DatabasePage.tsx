@@ -61,10 +61,15 @@ export const DatabasePage: React.FC = () => {
 
   const handleDeleteOrder = async (orderId: number) => {
     try {
+      console.log('🗑️ Удаляем заказ с ID:', orderId);
       await ordersApi.delete(orderId);
       message.success(t('message.success.deleted'));
+      // Принудительно обновляем список заказов
       queryClient.invalidateQueries({ queryKey: ['orders'] });
+      await refetch(); // Принудительно перезагружаем данные
+      console.log('✅ Заказ успешно удалён и список обновлён');
     } catch (error) {
+      console.error('❌ Ошибка при удалении заказа:', error);
       message.error(t('message.error.delete'));
     }
   };
@@ -98,7 +103,8 @@ export const DatabasePage: React.FC = () => {
       
       // Check backend
       try {
-        const healthCheck = await fetch('http://localhost:5100/api/orders', {
+        const apiUrl = process.env.REACT_APP_API_URL || '/api';
+        const healthCheck = await fetch(`${apiUrl}/orders`, {
           method: 'GET',
           headers: { 'Content-Type': 'application/json' }
         });

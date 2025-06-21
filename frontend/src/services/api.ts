@@ -8,7 +8,24 @@
 import axios from 'axios';
 import { formatOrderData } from '../utils/operation-formatter';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5100/api'; // 🔄 Исправлено на порт 5100
+// 🔍 DEBUG: Показываем все переменные окружения
+console.log('🔍 DEBUG API SETTINGS:', {
+  'process.env.REACT_APP_API_URL': process.env.REACT_APP_API_URL,
+  'process.env.NODE_ENV': process.env.NODE_ENV,
+  'process.env.REACT_APP_ENVIRONMENT': process.env.REACT_APP_ENVIRONMENT,
+  'window.location.origin': typeof window !== 'undefined' ? window.location.origin : 'SSR'
+});
+
+// 📍 Принудительно устанавливаем API_BASE_URL
+const FORCED_API_URL = 'http://localhost:5100/api';
+const API_BASE_URL = process.env.REACT_APP_API_URL || FORCED_API_URL;
+
+console.log('🎯 Окончательный API_BASE_URL:', API_BASE_URL);
+
+if (API_BASE_URL.includes('5200')) {
+  console.error('❌ ОПАСНО! Обнаружен неправильный порт 5200 в API_BASE_URL!');
+  console.error('❌ Принудительно переопределяем на localhost:5100');
+}
 
 export const api = axios.create({
   baseURL: API_BASE_URL,

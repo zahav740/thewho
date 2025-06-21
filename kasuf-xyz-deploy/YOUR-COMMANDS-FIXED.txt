@@ -1,0 +1,45 @@
+# ========================================
+# ВАШИ КОМАНДЫ ДЛЯ frontend-production.zip
+# НО С ПРАВИЛЬНЫМ ПОРТОМ 5201
+# ========================================
+
+# Переход в директорию frontend
+cd /var/upload/frontend
+
+# Остановка frontend
+pm2 stop crm-frontend
+
+# Удаление старой сборки
+rm -rf build
+
+# Создание директории build  
+mkdir build
+
+# Распаковка архива frontend-production.zip
+unzip -o frontend-production.zip -d build/
+
+# Проверка содержимого
+ls -la build/
+
+# ВАЖНО: Обновление PM2 конфигурации на порт 5201
+cd /var/upload
+
+# Убедитесь что в ecosystem.config.js указан порт 5201:
+# Найдите строку: args: '-s build -l 5101'
+# Замените на:     args: '-s build -l 5201'
+
+# Или выполните автоматическую замену:
+sed -i 's/-l 5101/-l 5201/' ecosystem.config.js
+sed -i 's/-l 5100/-l 5201/' ecosystem.config.js
+
+# Перезапуск frontend на порту 5201
+pm2 restart crm-frontend
+
+# Проверка
+pm2 status
+curl http://localhost:5201
+
+# ========================================
+# РЕЗУЛЬТАТ: Frontend работает на порту 5201
+# Сайт доступен на https://kasuf.xyz
+# ========================================
