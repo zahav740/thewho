@@ -20,6 +20,7 @@ import type { MenuProps } from 'antd';
 import { useTranslation } from '../../i18n';
 import { LanguageSwitcher } from '../LanguageSwitcher/LanguageSwitcher';
 import { UserInfo } from '../Auth/UserInfo';
+import { MobileConnectionStatus } from '../MobileConnectionStatus';
 
 const { Header, Sider, Content } = AntLayout;
 const { Title } = Typography;
@@ -183,6 +184,9 @@ export const Layout: React.FC = () => {
 
         {/* Основной контент */}
         <AntLayout style={{ marginLeft: 0 }}>
+          {/* Статус подключения для мобильных */}
+          <MobileConnectionStatus />
+          
           <Header style={{ 
             background: '#fff', 
             padding: '0 16px 0 70px', // Отступ для кнопки меню

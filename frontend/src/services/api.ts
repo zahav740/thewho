@@ -1,145 +1,149 @@
 /**
  * @file: api.ts
- * @description: Базовая настройка API клиента
+ * @description: Улучшенная настройка API клиента с поддержкой мобильных устройств
  * @dependencies: axios
  * @created: 2025-01-28
- * @updated: 2025-06-01 // Добавлена надежная обработка форматирования операций
+ * @updated: 2025-06-21 - Добавлена поддержка мобильного доступа
  */
 import axios from 'axios';
 import { formatOrderData } from '../utils/operation-formatter';
+import { getApiUrl, getApiUrlSync, checkCurrentConnection, refreshApiUrl } from '../config/api.config';
 
-// 🔍 DEBUG: Показываем все переменные окружения
-console.log('🔍 DEBUG API SETTINGS:', {
-  'process.env.REACT_APP_API_URL': process.env.REACT_APP_API_URL,
-  'process.env.NODE_ENV': process.env.NODE_ENV,
-  'process.env.REACT_APP_ENVIRONMENT': process.env.REACT_APP_ENVIRONMENT,
-  'window.location.origin': typeof window !== 'undefined' ? window.location.origin : 'SSR'
-});
+// Создаем экземпляр axios с базовой конфигурацией
+const createApiInstance = (baseURL: string) => {
+  const instance = axios.create({
+    baseURL,
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    withCredentials: false,
+    timeout: 15000, // Увеличенный таймаут для мобильных сетей
+  });
 
-// 📍 Принудительно устанавливаем API_BASE_URL
-const FORCED_API_URL = 'http://localhost:5100/api';
-const API_BASE_URL = process.env.REACT_APP_API_URL || FORCED_API_URL;
-
-console.log('🎯 Окончательный API_BASE_URL:', API_BASE_URL);
-
-if (API_BASE_URL.includes('5200')) {
-  console.error('❌ ОПАСНО! Обнаружен неправильный порт 5200 в API_BASE_URL!');
-  console.error('❌ Принудительно переопределяем на localhost:5100');
-}
-
-export const api = axios.create({
-  baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-  withCredentials: false, // Отключаем отправку cookies для уменьшения размера заголовков
-  timeout: 10000, // 10 секунд таймаут
-});
-
-// Interceptor для логирования запросов и форматирования данных
-api.interceptors.request.use(
-  (config) => {
-    if (config.method === 'put' || config.method === 'post') {
+  // Interceptor для логирования запросов
+  instance.interceptors.request.use(
+    (config) => {
       console.log('🔍 API REQUEST:', {
         url: config.url,
-        method: config.method.toUpperCase(),
-        data: config.data,
-        headers: config.headers,
+        method: config.method?.toUpperCase(),
+        baseURL: config.baseURL,
+        fullURL: `${config.baseURL}${config.url}`,
       });
       
-      // Форматируем данные, если это объект
-      if (config.data && typeof config.data === 'object' && !(config.data instanceof FormData)) {
-        // Используем универсальный форматтер для приведения данных к нужному формату
-        const formattedData = formatOrderData(config.data);
-        config.data = formattedData;
-        
-        console.log('🔄 Отформатированные данные:', config.data);
-      }
-    }
-    return config;
-  },
-  (error) => {
-    console.error('❌ API REQUEST ERROR:', error);
-    return Promise.reject(error);
-  }
-);
-
-// Interceptor для обработки ответов
-api.interceptors.response.use(
-  (response) => {
-    console.log('✅ API RESPONSE:', {
-      status: response.status,
-      url: response.config.url,
-      method: response.config.method?.toUpperCase(),
-      data: response.data,
-    });
-    return response;
-  },
-  (error) => {
-    if (error.response) {
-      // Сервер ответил с ошибкой
-      console.error('❌ API ERROR:', {
-        status: error.response.status,
-        url: error.config.url,
-        method: error.config.method?.toUpperCase(),
-        data: error.response.data,
-        requestData: error.config.data,
-      });
-      
-      // Попытка повторить запрос с измененным форматом данных при ошибке 400 или 500
-      if (
-        (error.response.status === 400 || error.response.status === 500) && 
-        error.config && 
-        !error.config.__isRetryRequest &&
-        (error.config.method === 'put' || error.config.method === 'post') &&
-        typeof error.config.data === 'object'
-      ) {
-        console.log('⚠️ Попытка повторить запрос с альтернативным форматом данных...');
-        
-        try {
-          // Клонируем конфигурацию для повторного запроса
-          const newConfig = { ...error.config };
-          newConfig.__isRetryRequest = true;
-          
-          // Парсим данные запроса
-          const originalData = JSON.parse(newConfig.data);
-          
-          // Применяем альтернативное форматирование
-          if (originalData.operations && Array.isArray(originalData.operations)) {
-            originalData.operations = originalData.operations.map((op: any) => ({
-              ...op,
-              // Принудительно преобразуем все числовые поля в строки
-              operationNumber: String(op.operationNumber),
-              machineAxes: typeof op.machineAxes === 'number' ? `${op.machineAxes}-axis` : op.machineAxes,
-              estimatedTime: String(op.estimatedTime)
-            }));
-          }
-          
-          // Преобразуем priority в строку
-          if (originalData.priority !== undefined) {
-            originalData.priority = String(originalData.priority);
-          }
-          
-          // Обновляем данные запроса
-          newConfig.data = JSON.stringify(originalData);
-          
-          console.log('🔄 Повторная попытка с данными:', newConfig.data);
-          
-          // Отправляем запрос повторно
-          return axios(newConfig);
-        } catch (retryError) {
-          console.error('❌ Ошибка при попытке повторить запрос:', retryError);
+      // Форматируем данные для PUT/POST запросов
+      if ((config.method === 'put' || config.method === 'post') && config.data) {
+        if (typeof config.data === 'object' && !(config.data instanceof FormData)) {
+          const formattedData = formatOrderData(config.data);
+          config.data = formattedData;
+          console.log('🔄 Отформатированные данные:', config.data);
         }
       }
-    } else if (error.request) {
-      // Запрос был отправлен, но ответа не получено
-      console.error('❌ NETWORK ERROR:', error.request);
-    } else {
-      // Что-то произошло при настройке запроса
-      console.error('❌ ERROR:', error.message);
+      
+      return config;
+    },
+    (error) => {
+      console.error('❌ API REQUEST ERROR:', error);
+      return Promise.reject(error);
     }
-    return Promise.reject(error);
-  }
-);
+  );
 
+  // Interceptor для обработки ответов
+  instance.interceptors.response.use(
+    (response) => {
+      console.log('✅ API RESPONSE:', {
+        status: response.status,
+        url: response.config.url,
+        method: response.config.method?.toUpperCase(),
+      });
+      return response;
+    },
+    async (error) => {
+      console.error('❌ API ERROR:', {
+        status: error.response?.status,
+        url: error.config?.url,
+        method: error.config?.method?.toUpperCase(),
+        message: error.message,
+        code: error.code,
+      });
+
+      // Если ошибка сети и это мобильное устройство, пробуем переподключиться
+      if (
+        (error.code === 'NETWORK_ERROR' || error.code === 'ECONNREFUSED' || !error.response) &&
+        /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+      ) {
+        console.log('📱 Мобильное устройство: попытка переподключения...');
+        
+        try {
+          const newApiUrl = await refreshApiUrl();
+          console.log(`🔄 Попытка с новым URL: ${newApiUrl}`);
+          
+          // Обновляем baseURL текущего экземпляра
+          instance.defaults.baseURL = newApiUrl;
+          
+          // Повторяем запрос с новым URL
+          if (error.config && !error.config.__isRetryRequest) {
+            error.config.__isRetryRequest = true;
+            error.config.baseURL = newApiUrl;
+            return instance(error.config);
+          }
+        } catch (reconnectError) {
+          console.error('❌ Ошибка переподключения:', reconnectError);
+        }
+      }
+
+      return Promise.reject(error);
+    }
+  );
+
+  return instance;
+};
+
+// Инициализируем API с начальным URL
+let api = createApiInstance(getApiUrlSync());
+
+// Функция для обновления API instance с новым URL
+export const updateApiInstance = async (): Promise<void> => {
+  try {
+    const newUrl = await getApiUrl();
+    api = createApiInstance(newUrl);
+    console.log(`🔄 API instance обновлен с URL: ${newUrl}`);
+  } catch (error) {
+    console.error('❌ Ошибка обновления API instance:', error);
+  }
+};
+
+// Функция для проверки и восстановления соединения
+export const ensureApiConnection = async (): Promise<boolean> => {
+  try {
+    const isConnected = await checkCurrentConnection();
+    
+    if (!isConnected) {
+      console.log('🔄 Соединение потеряно, попытка восстановления...');
+      await updateApiInstance();
+      return await checkCurrentConnection();
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('❌ Ошибка проверки соединения:', error);
+    return false;
+  }
+};
+
+// Автоматическая инициализация
+(async () => {
+  try {
+    await updateApiInstance();
+    console.log('✅ API успешно инициализирован');
+  } catch (error) {
+    console.error('❌ Ошибка инициализации API:', error);
+  }
+})();
+
+// Экспортируем главный API instance
+export { api };
 export default api;
+
+// Дополнительные утилиты
+export const getCurrentApiUrl = (): string => api.defaults.baseURL || '';
+export const isApiHealthy = checkCurrentConnection;
