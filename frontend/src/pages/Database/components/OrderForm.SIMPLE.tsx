@@ -20,7 +20,7 @@ import {
   Divider,
   Alert,
 } from 'antd';
-import { PlusOutlined, DeleteOutlined, FilePdfOutlined, BugOutlined } from '@ant-design/icons';
+import { PlusOutlined, DeleteOutlined, FilePdfOutlined, BugOutlined, UploadOutlined, ExpandOutlined } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Controller, useForm, useFieldArray } from 'react-hook-form';
 import dayjs from 'dayjs';
@@ -29,7 +29,7 @@ import { pdfApi } from '../../../services/pdfApi';
 import { CreateOrderDto, Priority } from '../../../types/order.types';
 import { OperationType } from '../../../types/operation.types';
 import { useTranslation } from '../../../i18n';
-import { PdfUpload } from '../../../components/common/PdfUpload';
+import { InlinePdfViewer } from '../../../components/common/InlinePdfViewer';
 
 const { Option } = Select;
 const { TabPane } = Tabs;
@@ -507,16 +507,98 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                 style={{ marginBottom: 16 }}
               />
 
-              {/* ✅ ИСПРАВЛЕНО: Используем PdfUpload с правильными параметрами */}
-              <PdfUpload
-                value={getCurrentPdfUrl()}
-                onChange={handlePdfChange}
-                onRemove={handlePdfRemove}
-                disabled={loading}
-                showPreview={true}
-                accept=".pdf,application/pdf"
-                maxSize={100}
-              />
+              {/* Кнопки управления PDF */}
+              <Space style={{ marginBottom: 16, width: '100%', justifyContent: 'center' }}>
+                <Button
+                  type="primary"
+                  icon={<UploadOutlined />}
+                  onClick={() => {
+                    const input = document.createElement('input');
+                    input.type = 'file';
+                    input.accept = '.pdf';
+                    input.onchange = (e) => {
+                      const file = (e.target as HTMLInputElement).files?.[0];
+                      if (file) {
+                        handlePdfChange(file);
+                      }
+                    };
+                    input.click();
+                  }}
+                  disabled={loading}
+                >
+                  {currentPdfPath ? 'Заменить PDF' : 'Загрузить PDF'}
+                </Button>
+
+                {currentPdfPath && (
+                  <Button
+                    danger
+                    icon={<DeleteOutlined />}
+                    onClick={handlePdfRemove}
+                    disabled={loading}
+                  >
+                    Удалить PDF
+                  </Button>
+                )}
+
+                {currentPdfPath && (
+                  <Button
+                    icon={<ExpandOutlined />}
+                    onClick={() => window.open(getCurrentPdfUrl(), '_blank')}
+                  >
+                    Открыть в браузере
+                  </Button>
+                )}
+              </Space>
+
+              {/* Встроенный просмотрщик PDF */}
+              {currentPdfPath ? (
+                <InlinePdfViewer
+                  pdfUrl={getCurrentPdfUrl()}
+                  fileName={currentPdfPath.split('/').pop() || 'document.pdf'}
+                  height={500}
+                  showControls={true}
+                />
+              ) : (
+                <div style={{ 
+                  textAlign: 'center', 
+                  padding: '60px', 
+                  backgroundColor: '#fafafa', 
+                  borderRadius: '8px',
+                  border: '1px dashed #d9d9d9'
+                }}>
+                  <FilePdfOutlined style={{ fontSize: '64px', color: '#bfbfbf', marginBottom: '16px' }} />
+                  <div style={{ color: '#8c8c8c', fontSize: '16px', marginBottom: '8px' }}>
+                    PDF документация
+                  </div>
+                  <div style={{ color: '#bfbfbf', fontSize: '14px', marginBottom: '16px' }}>
+                    {!isEdit || !orderId 
+                      ? 'Сначала сохраните заказ, затем сможете загрузить PDF файлы'
+                      : 'Нажмите "Загрузить PDF" чтобы добавить документацию'
+                    }
+                  </div>
+                  {isEdit && orderId && (
+                    <Button
+                      type="primary"
+                      size="large"
+                      icon={<UploadOutlined />}
+                      onClick={() => {
+                        const input = document.createElement('input');
+                        input.type = 'file';
+                        input.accept = '.pdf';
+                        input.onchange = (e) => {
+                          const file = (e.target as HTMLInputElement).files?.[0];
+                          if (file) {
+                            handlePdfChange(file);
+                          }
+                        };
+                        input.click();
+                      }}
+                    >
+                      Загрузить PDF
+                    </Button>
+                  )}
+                </div>
+              )}
             </div>
           </TabPane>
         </Tabs>
