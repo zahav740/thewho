@@ -184,24 +184,25 @@ export const OrdersList: React.FC<OrdersListProps> = ({
     {
       title: t('database.actions'),
       key: 'actions',
-      width: 160,
+      width: 80,
       align: 'center',
       render: (_: any, record: Order) => (
-        <Space size="large" style={{ justifyContent: 'center', width: '100%' }}>
+        <Space size="small" style={{ justifyContent: 'center', width: '100%' }}>
           <Button
-            type="primary"
-            ghost
-            icon={<EditOutlined style={{ fontSize: '32px' }} />}
+            type="text"
+            icon={<EditOutlined style={{ color: '#1890ff', fontSize: '16px' }} />}
             onClick={() => onEdit(record.id)}
-            size="large"
+            size="small"
             style={{ 
-              width: '50px',
-              height: '50px',
+              width: '32px',
+              height: '32px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              borderRadius: '8px',
-              borderWidth: '2px'
+              borderRadius: '6px',
+              padding: 0,
+              background: 'rgba(24, 144, 255, 0.1)',
+              border: 'none'
             }}
             title={t('button.edit')}
           />
@@ -213,19 +214,19 @@ export const OrdersList: React.FC<OrdersListProps> = ({
             cancelText={t('database.cancel_button')}
           >
             <Button 
-              type="primary"
-              danger
-              ghost
-              icon={<DeleteOutlined style={{ fontSize: '32px' }} />} 
-              size="large"
+              type="text"
+              icon={<DeleteOutlined style={{ color: '#ff4d4f', fontSize: '16px' }} />} 
+              size="small"
               style={{ 
-                width: '50px',
-                height: '50px',
+                width: '32px',
+                height: '32px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                borderRadius: '8px',
-                borderWidth: '2px'
+                borderRadius: '6px',
+                padding: 0,
+                background: 'rgba(255, 77, 79, 0.1)',
+                border: 'none'
               }}
               title={t('button.delete')}
             />

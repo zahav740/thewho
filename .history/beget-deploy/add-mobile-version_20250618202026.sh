@@ -217,7 +217,7 @@ cat > /var/www/thewho/frontend/build/mobile-styles.css << 'EOF'
   }
   
   .mobile-fab:hover {
-    transform: scale(0.9) !important;
+    transform: scale(1.1) !important;
   }
   
   /* === БЕЗОПАСНЫЕ ЗОНЫ === */

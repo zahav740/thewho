@@ -257,16 +257,15 @@ export const Layout: React.FC = () => {
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          // НЕ используем sticky - может вызывать проблемы
-          // position: 'sticky',
-          // top: 0,
+          height: '64px', // Фиксированная высота
+          minHeight: '64px',
           zIndex: 99
         }}>
           <Title level={3} style={{ margin: '16px 0' }}>
             {getPageTitle(location.pathname, t)}
           </Title>
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <LanguageSwitcher variant="adaptive" size="small" />
+            <LanguageSwitcher variant="compact" size="middle" />
             <UserInfo />
           </div>
         </Header>

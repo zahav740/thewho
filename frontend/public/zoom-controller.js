@@ -24,7 +24,7 @@
         `;
         
         // Получаем текущий масштаб
-        const currentZoom = parseFloat(document.documentElement.style.zoom) || 1.2;
+        const currentZoom = parseFloat(document.documentElement.style.zoom) || 1.0;
         
         // Создаем элементы управления
         controller.innerHTML = `
@@ -83,11 +83,13 @@
         if (display) {
             display.textContent = Math.round(zoom * 100) + '%';
         }
+        
+        console.log('🔍 Масштаб установлен: ' + Math.round(zoom * 100) + '%');
     }
     
     function getZoom() {
         const saved = localStorage.getItem('crm-zoom-level');
-        return saved ? parseFloat(saved) : 1.2;
+        return saved ? parseFloat(saved) : 1.0;
     }
     
     function increaseZoom() {
@@ -103,7 +105,7 @@
     }
     
     function resetZoom() {
-        setZoom(1.2);
+        setZoom(1.0);
     }
     
     // Инициализация

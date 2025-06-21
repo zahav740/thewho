@@ -1,30 +1,30 @@
 /* Адаптивное масштабирование для TheWho CRM */
 
-/* Базовое увеличение масштаба на 20% */
+/* Нормальный масштаб 100% для всех экранов */
 html {
-  zoom: 1.2;
+  zoom: 1.0;
   font-size: 16px;
 }
 
-/* Адаптивное масштабирование под разные разрешения */
+/* Адаптивные размеры шрифтов для разных разрешений */
 @media (max-width: 1366px) {
-  html { zoom: 1.0; font-size: 14px; }
+  html { font-size: 14px; }
 }
 
 @media (min-width: 1367px) and (max-width: 1600px) {
-  html { zoom: 1.1; font-size: 15px; }
+  html { font-size: 15px; }
 }
 
 @media (min-width: 1601px) and (max-width: 1920px) {
-  html { zoom: 1.2; font-size: 16px; }
+  html { font-size: 16px; }
 }
 
 @media (min-width: 1921px) and (max-width: 2560px) {
-  html { zoom: 1.3; font-size: 17px; }
+  html { font-size: 17px; }
 }
 
 @media (min-width: 2561px) {
-  html { zoom: 1.5; font-size: 18px; }
+  html { font-size: 18px; }
 }
 
 /* Улучшенная читаемость текста */
@@ -169,7 +169,6 @@ body {
 /* Адаптивность для мобильных устройств */
 @media (max-width: 768px) {
   html { 
-    zoom: 1.0; 
     font-size: 16px; 
   }
   
@@ -196,28 +195,23 @@ body {
 /* Адаптивность для планшетов */
 @media (min-width: 768px) and (max-width: 1024px) {
   html { 
-    zoom: 1.1; 
     font-size: 15px; 
   }
 }
 
-/* Настройки для высоких DPI дисплеев */
+/* Настройки для высоких DPI дисплеев (без изменения масштаба) */
 @media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
-  html {
-    zoom: 1.3;
-  }
-  
   body {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 }
 
-/* Кастомные классы для управления масштабом */
-.zoom-small { zoom: 0.9 !important; }
-.zoom-normal { zoom: 1.0 !important; }
-.zoom-large { zoom: 1.2 !important; }
-.zoom-xlarge { zoom: 1.4 !important; }
+/* Кастомные классы для управления масштабом (опционально) */
+.zoom-small { transform: scale(0.9) !important; }
+.zoom-normal { transform: scale(1.0) !important; }
+.zoom-large { transform: scale(1.1) !important; }
+.zoom-xlarge { transform: scale(1.2) !important; }
 
 /* Улучшение производительности анимаций */
 * {

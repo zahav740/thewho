@@ -31,15 +31,14 @@ export const UserInfo: React.FC = () => {
   };
 
   return (
-    <Space size="small" style={{ display: 'flex', alignItems: 'center' }}>
+    <Space size="middle" style={{ display: 'flex', alignItems: 'center' }}>
       {/* Информация о пользователе */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-        <Avatar icon={<UserOutlined />} size="small" />
-        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <Avatar icon={<UserOutlined />} />
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
           <span style={{ fontWeight: '500', fontSize: '14px' }}>{user.username}</span>
-          <span style={{ fontSize: '11px', color: '#999', opacity: 0.8 }}>•</span>
-          <span style={{ fontSize: '11px', color: '#999', textTransform: 'uppercase' }}>
-            {user.role === 'admin' ? 'ADM' : 'USR'}
+          <span style={{ fontSize: '12px', color: '#666', textTransform: 'uppercase' }}>
+            {getRoleText(user.role)}
           </span>
         </div>
       </div>
@@ -51,13 +50,13 @@ export const UserInfo: React.FC = () => {
           danger
           icon={<LogoutOutlined />}
           onClick={handleLogout}
-          size="small"
+          size="middle"
           style={{
-            minWidth: '70px',
-            height: '28px',
-            borderRadius: '4px',
+            minWidth: '80px',
+            height: '32px',
+            borderRadius: '6px',
             fontWeight: '500',
-            fontSize: '12px'
+            fontSize: '14px'
           }}
         >
           Logout

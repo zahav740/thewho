@@ -415,7 +415,7 @@
   }
   
   .mobile-fab:hover {
-    transform: scale(0.9) !important;
+    transform: scale() !important;
     box-shadow: 0 6px 16px rgba(24, 144, 255, 0.5) !important;
   }
   

@@ -82,6 +82,7 @@ export const LanguageSwitcher: React.FC<LanguageSwitcherProps> = ({
           type={currentLanguage === 'ru' ? 'primary' : 'default'}
           onClick={() => handleLanguageChange('ru')}
           size={size}
+          style={{ height: '32px', minWidth: '40px', fontSize: '14px' }}
         >
           🇷🇺
         </Button>
@@ -89,6 +90,7 @@ export const LanguageSwitcher: React.FC<LanguageSwitcherProps> = ({
           type={currentLanguage === 'en' ? 'primary' : 'default'}
           onClick={() => handleLanguageChange('en')}
           size={size}
+          style={{ height: '32px', minWidth: '40px', fontSize: '14px' }}
         >
           🇺🇸
         </Button>

@@ -113,23 +113,30 @@ root.render(
         locale={ruRU}
         theme={{
           token: {
-            // Адаптивные токены для мобильных
-            fontSize: isMobileDevice ? 14 : 16,
-            borderRadius: isMobileDevice ? 6 : 8,
-            paddingLG: isMobileDevice ? 16 : 24,
-            marginLG: isMobileDevice ? 16 : 24,
+            // Уменьшаем все размеры для компактности
+            fontSize: 12, // Меньше шрифт
+            borderRadius: 4,
+            paddingLG: 12,
+            marginLG: 12,
+            controlHeight: 28, // Меньше высота элементов
           },
           components: {
             Button: {
-              controlHeight: isMobileDevice ? 40 : 32,
-              paddingInline: isMobileDevice ? 16 : 12,
+              controlHeight: isMobileDevice ? 40 : 24, // Маленькие кнопки
+              paddingInline: isMobileDevice ? 16 : 8,
+              fontSize: isMobileDevice ? 14 : 12,
             },
             Input: {
-              controlHeight: isMobileDevice ? 40 : 32,
-              paddingInline: isMobileDevice ? 12 : 8,
+              controlHeight: isMobileDevice ? 40 : 24, // Маленькие поля
+              paddingInline: isMobileDevice ? 12 : 6,
+              fontSize: isMobileDevice ? 14 : 12,
             },
             Card: {
-              paddingLG: isMobileDevice ? 12 : 24,
+              paddingLG: isMobileDevice ? 12 : 12, // Меньше паддинги
+            },
+            Table: {
+              cellPaddingBlock: 6, // Меньше паддинг в таблице
+              fontSize: 12,
             },
           },
         }}
