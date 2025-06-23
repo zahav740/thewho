@@ -25,7 +25,8 @@
     "web-vitals": "^3.5.1"
   },
   "scripts": {
-    "start": "set PORT=5101 && react-scripts start",
+    "start": "set BROWSER=default && set PORT=5101 && react-scripts start",
+    "start-no-browser": "set BROWSER=none && set PORT=5101 && react-scripts start",
     "start-mobile": "set HOST=0.0.0.0 && set PORT=5101 && set REACT_APP_MOBILE=true && react-scripts start",
     "start-mobile-local": "set REACT_APP_ENV=mobile.local && set HOST=0.0.0.0 && set PORT=5101 && react-scripts start",
     "build": "react-scripts build",

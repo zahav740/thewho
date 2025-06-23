@@ -14,12 +14,13 @@ import { MachinesController } from './machines.controller';
 import { MachinesService } from './machines.service';
 import { MachinesStatusController } from './machines-status.controller';
 import { MachineAssignmentController } from './machine-assignment.controller';
+import { MachinesEnhancedController } from './machines.controller.enhanced';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Machine, Operation, Order]),
   ],
-  controllers: [MachinesController, MachinesStatusController, MachineAssignmentController],
+  controllers: [MachinesController, MachinesStatusController, MachineAssignmentController, MachinesEnhancedController],
   providers: [MachinesService],
   exports: [MachinesService],
 })

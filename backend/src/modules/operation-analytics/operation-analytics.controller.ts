@@ -5,7 +5,7 @@
  * @created: 2025-06-11
  * @fixed: 2025-06-11 - Исправлены поля для поиска операций и смен
  */
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import { Controller, Get, Param, Query, Logger } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between, In } from 'typeorm';
@@ -17,6 +17,8 @@ import { ShiftRecord } from '../../database/entities/shift-record.entity';
 @ApiTags('operation-analytics')
 @Controller('operation-analytics')
 export class OperationAnalyticsController {
+  private readonly logger = new Logger(OperationAnalyticsController.name);
+  
   constructor(
     @InjectRepository(Machine)
     private readonly machineRepository: Repository<Machine>,
@@ -36,7 +38,8 @@ export class OperationAnalyticsController {
     @Query('endDate') endDate?: string,
   ) {
     try {
-      console.log(`Получение аналитики для станка ${machineId}`);
+      this.logger.log(`🔍 Получение аналитики для станка ${machineId}`);
+      console.log(`🔍 Получение аналитики для станка ${machineId}`);
 
       // 1. Получаем информацию о станке
       const machine = await this.machineRepository.findOne({
@@ -51,17 +54,29 @@ export class OperationAnalyticsController {
       }
 
       // 2. Находим текущую активную операцию на станке
-      // ВАЖНО: В операциях используем поле assignedMachine
+      // ВАЖНО: В операциях используем поле assignedMachine с различными статусами
+      console.log(`🔍 Поиск активной операции для станка ${machineId}`);
+      
       const currentOperation = await this.operationRepository.findOne({
-        where: {
-          assignedMachine: machineId,
-          status: 'IN_PROGRESS'
-        },
+        where: [
+          {
+            assignedMachine: machineId,
+            status: In(['IN_PROGRESS', 'ASSIGNED', 'in_progress', 'assigned'])
+          }
+        ],
         relations: ['order'],
         order: { createdAt: 'DESC' }
       });
 
+      console.log(`📊 Найденная операция:`, currentOperation ? {
+        id: currentOperation.id,
+        operationNumber: currentOperation.operationNumber,
+        status: currentOperation.status,
+        assignedMachine: currentOperation.assignedMachine
+      } : 'не найдена');
+
       if (!currentOperation || !currentOperation.order) {
+        console.log(`❌ Операция не найдена для станка ${machineId}`);
         return {
           status: 'no_operation',
           message: 'Нет текущей операции на станке'

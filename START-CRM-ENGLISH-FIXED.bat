@@ -4,7 +4,7 @@ setlocal enabledelayedexpansion
 echo ====================================
 echo PRODUCTION CRM - START SCRIPT (FIXED)
 echo ====================================
-echo VERSION: 1.0.1 (Development Mode)
+echo VERSION: 1.0.2 (Auto-Browser Fixed)
 echo DATE: %date% %time%
 echo.
 
@@ -214,6 +214,9 @@ echo ⏳ Waiting 3 seconds for React to fully initialize...
 timeout /t 3 >nul
 
 :open_browser_manual
+echo.
+echo 📱 Opening application in browser...
+start "" "http://localhost:%FRONTEND_PORT%"
 
 echo.
 echo ====================================
@@ -238,6 +241,7 @@ echo Backend Port:     %PORT%
 echo Frontend Port:    %FRONTEND_PORT%
 echo Hot Reload:       ENABLED
 echo TypeScript:       ENABLED
+echo ESLint:           ENABLED
 echo Auto Browser:     ENABLED ✅
 echo Current Time:     %date% %time%
 echo.
@@ -246,6 +250,7 @@ echo - Backend is running with nodemon (auto-restart)
 echo - Frontend has hot reload enabled
 echo - TypeScript compilation is real-time
 echo - ESLint warnings will be shown
+echo - Source maps are enabled for debugging
 echo - Browser opens automatically when ready ✅
 echo.
 echo 🔍 Monitoring:
@@ -254,17 +259,8 @@ echo - Frontend logs: Check Frontend terminal window
 echo - Database logs: Check PostgreSQL logs
 echo - Browser DevTools: F12 for debugging
 echo.
+echo ✅ All development services are running!
 echo ✅ Browser should have opened automatically!
-echo.
-echo 🌍 Frontend will open automatically in your browser
-echo    URL: http://localhost:%FRONTEND_PORT%
-echo.
-echo ⏳ Waiting for frontend to compile and start...
-timeout /t 10 >nul
-
-echo 📱 Opening application in browser...
-start http://localhost:%FRONTEND_PORT%
-
 echo.
 echo 🎉 CRM Development Environment is now running!
 echo.
@@ -272,6 +268,7 @@ echo 💡 Tips:
 echo - Save files to trigger hot reload
 echo - Check terminal windows for logs
 echo - Backend changes restart automatically
+echo - Frontend changes reload in browser
 echo - Browser opened automatically at: http://localhost:%FRONTEND_PORT%
 echo.
 echo Keep this window open to monitor the system.

@@ -32,11 +32,14 @@ export const machinesApi = {
   // Получить актуальный статус всех станков (новое!)
   getAllWithStatus: async (): Promise<MachineAvailability[]> => {
     try {
-      const response = await api.get('/machines/status/all');
+      console.log('🔍 Получение станков с реальным статусом операций');
+      const response = await api.get('/machines-enhanced/status/all'); // ✅ Исправлен путь
+      console.log('✅ Получены данные с реальным статусом:', response.data);
       return response.data;
     } catch (error) {
       console.error('machinesApi.getAllWithStatus error:', error);
       // Откат к старому API при ошибке
+      console.log('⚠️ Откат к базовому API getAll()');
       return await machinesApi.getAll();
     }
   },
