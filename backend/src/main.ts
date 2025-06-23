@@ -9,6 +9,19 @@ import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { AuthService } from './modules/auth/auth.service';
+import * as dotenv from 'dotenv';
+import * as path from 'path';
+
+// Загружаем переменные окружения из соответствующего файла
+if (process.env.NODE_ENV === 'production') {
+  dotenv.config({ path: path.join(__dirname, '..', '.env.production') });
+} else {
+  dotenv.config();
+}
+
+console.log('PRODUCTION BACKEND STARTING ON PORT', process.env.PORT || 5100, '...');
+console.log('Database:', `postgresql://${process.env.DB_USERNAME}:${process.env.DB_PASSWORD?.substring(0, 3)}***@${process.env.DB_HOST}:${process.env.DB_PORT}/${process.env.DB_NAME}`);
+console.log('Environment:', process.env.NODE_ENV);
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -16,7 +29,7 @@ async function bootstrap() {
   // Глобальный префикс для API
   app.setGlobalPrefix('api');
 
-  // Включаем CORS с поддержкой всех портов localhost
+  // Включаем CORS с поддержкой localhost и production доменов
   app.enableCors({
     origin: [
       'http://localhost',
@@ -24,11 +37,14 @@ async function bootstrap() {
       'http://localhost:3000', // React dev server
       'http://localhost:3001', // Backend port
       'http://localhost:5100', // Production backend port
-      'http://localhost:5101'  // Production frontend port
-    ],
-    credentials: false,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-    allowedHeaders: ['Content-Type', 'Accept', 'Authorization'],
+      'http://localhost:5101', // Production frontend port
+      'https://kasuf.xyz', // Production domain
+      'https://www.kasuf.xyz', // Production domain with www
+      process.env.CORS_ORIGIN
+    ].filter(Boolean),
+    credentials: true, // Включаем для JWT cookies
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Accept', 'Authorization', 'X-Requested-With'],
     maxAge: 86400, // 24 часа
   });
 

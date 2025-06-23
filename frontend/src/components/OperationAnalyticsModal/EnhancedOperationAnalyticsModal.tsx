@@ -65,7 +65,7 @@ export const EnhancedOperationAnalyticsModal: React.FC<EnhancedOperationAnalytic
       try {
         // Автоматически определяем порт backend
         const baseUrl = await getApiUrl();
-        const response = await fetch(`${baseUrl}/api/operation-analytics/machine/${machine.id}`, {
+        const response = await fetch(`${baseUrl}/operation-analytics/machine/${machine.id}`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',

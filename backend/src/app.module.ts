@@ -11,6 +11,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { MulterModule } from '@nestjs/platform-express';
 import { APP_GUARD } from '@nestjs/core';
 import { Reflector } from '@nestjs/core';
+import { createDatabaseConfig } from './config/database.config';
 import { MachinesModule } from './modules/machines/machines.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { OperationsModule } from './modules/operations/operations.module';
@@ -21,7 +22,7 @@ import { FilesModule } from './modules/files/files.module';
 import { HealthModule } from './modules/health/health.module';
 import { PlanningModule } from './modules/planning/planning.module';
 import { TestModule } from './modules/test/test.module';
-import { PetsModule } from './modules/pets/pets.module';
+
 import { TranslationsModule } from './modules/translations/translations.module';
 import { OperationAnalyticsModule } from './modules/operation-analytics/operation-analytics.module';
 import { SynchronizationModule } from './modules/synchronization/synchronization.module';
@@ -44,21 +45,7 @@ import { OrdersDataMiddleware } from './modules/orders/orders.middleware';
         files: 10, // максимум 10 файлов за раз
       },
     }),
-    TypeOrmModule.forRoot({
-      type: 'postgres',
-      host: process.env.DB_HOST || 'localhost',
-      port: parseInt(process.env.DB_PORT, 10) || 5432,
-      username: process.env.DB_USERNAME || 'postgres',
-      password: process.env.DB_PASSWORD || 'magarel',
-      database: process.env.DB_NAME || 'thewho',
-      entities: [__dirname + '/database/entities/*.entity{.ts,.js}', __dirname + '/modules/*/entities/*.entity{.ts,.js}'],
-      synchronize: false, // Отключаем автоматическую синхронизацию, используем миграции
-      logging: process.env.NODE_ENV === 'development',
-      // Добавляем настройки для работы с существующей БД
-      autoLoadEntities: true,
-      retryAttempts: 3,
-      retryDelay: 3000,
-    }),
+    TypeOrmModule.forRoot(createDatabaseConfig()),
     MachinesModule,
     OrdersModule,
     OperationsModule,
@@ -69,7 +56,7 @@ import { OrdersDataMiddleware } from './modules/orders/orders.middleware';
     PlanningModule,
     HealthModule,
     TestModule,
-    PetsModule,
+
     TranslationsModule, // Модуль переводов
     OperationAnalyticsModule, // Модуль аналитики операций
     SynchronizationModule, // 🆕 Модуль синхронизации Production ↔ Shifts
