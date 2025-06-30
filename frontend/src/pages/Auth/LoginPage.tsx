@@ -217,10 +217,12 @@ export const LoginPage: React.FC = () => {
 
           <Form
             form={form}
+            name="loginForm"
             onFinish={handleSubmit}
             layout="vertical"
             size="large"
             style={{ width: '100%' }}
+            autoComplete="off"
           >
             <Form.Item
               name="username"
@@ -241,7 +243,7 @@ export const LoginPage: React.FC = () => {
                   clearResults();
                 }}
                 style={{ width: '100%' }}
-                popupClassName="username-autocomplete-popup"
+                classNames={{ popup: { root: 'username-autocomplete-popup' } }}
                 notFoundContent={isSearching ? <Spin size="small" /> : null}
               >
                 <Input

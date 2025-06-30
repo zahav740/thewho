@@ -15,7 +15,8 @@ import { ActiveOperationsPage } from './pages/ActiveOperations';
 import { OperatorsPage } from './pages/Operators';
 import { TranslationsPage } from './pages/Translations';
 import { TranslationTestPage } from './pages/TranslationTest/TranslationTestPage';
-import { LanguageSwitcherDemo } from './components/LanguageSwitcher/LanguageSwitcherDemo';
+import { KPIAnalyticsPage } from './pages/Analytics/KPIAnalyticsPage';
+import { ComprehensiveAnalyticsPage } from './pages/Analytics/ComprehensiveAnalyticsPage';
 
 const App: React.FC = () => {
   return (
@@ -51,7 +52,8 @@ const App: React.FC = () => {
                 <Route path="operators" element={<OperatorsPage />} />
                 <Route path="translations" element={<TranslationsPage />} />
                 <Route path="translation-test" element={<TranslationTestPage />} />
-                <Route path="language-demo" element={<LanguageSwitcherDemo />} />
+                <Route path="analytics" element={<KPIAnalyticsPage />} />
+                <Route path="analytics-comprehensive" element={<ComprehensiveAnalyticsPage />} />
               </Route>
             </Routes>
           </Router>

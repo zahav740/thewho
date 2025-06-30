@@ -15,3 +15,5 @@ export * from './shift-record.entity';
 export * from './machine-availability.entity';
 export * from './operation-progress.entity';
 export * from './pdf-file.entity';
+export * from './file-hash.entity';
+export * from './pdf-revision.entity';

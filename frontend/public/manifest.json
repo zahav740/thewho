@@ -2,25 +2,7 @@
   "short_name": "TheWho CRM",
   "name": "TheWho Production CRM System",
   "description": "Система управления производством TheWho",
-  "icons": [
-    {
-      "src": "favicon.ico",
-      "sizes": "64x64 32x32 24x24 16x16",
-      "type": "image/x-icon"
-    },
-    {
-      "src": "logo192.png",
-      "type": "image/png",
-      "sizes": "192x192",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "logo512.png",
-      "type": "image/png",
-      "sizes": "512x512",
-      "purpose": "any maskable"
-    }
-  ],
+  "icons": [],
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
@@ -50,28 +32,28 @@
       "short_name": "База",
       "description": "Управление базой данных",
       "url": "/database",
-      "icons": [{ "src": "logo192.png", "sizes": "192x192" }]
+      "icons": []
     },
     {
       "name": "Производство",
       "short_name": "Производство", 
       "description": "Мониторинг производства",
       "url": "/production",
-      "icons": [{ "src": "logo192.png", "sizes": "192x192" }]
+      "icons": []
     },
     {
       "name": "Смены",
       "short_name": "Смены",
       "description": "Управление сменами",
       "url": "/shifts", 
-      "icons": [{ "src": "logo192.png", "sizes": "192x192" }]
+      "icons": []
     },
     {
       "name": "Календарь",
       "short_name": "Календарь",
       "description": "Планирование работ",
       "url": "/calendar",
-      "icons": [{ "src": "logo192.png", "sizes": "192x192" }]
+      "icons": []
     }
   ],
   "prefer_related_applications": false,

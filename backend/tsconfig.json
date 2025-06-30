@@ -17,5 +17,12 @@
     "strictBindCallApply": false,
     "forceConsistentCasingInFileNames": false,
     "noFallthroughCasesInSwitch": false
-  }
+  },
+  "exclude": [
+    "src/main.security.ts",
+    "src/main.beget.ts",
+    "src/modules/security/**/*",
+    "node_modules",
+    "dist"
+  ]
 }

@@ -141,6 +141,23 @@ export class AuthController {
     };
   }
 
+  // Простой тестовый endpoint для проверки что auth controller работает
+  @Get('test')
+  @ApiOperation({ summary: 'Test auth controller' })
+  testAuth() {
+    console.log('🧪 Auth test endpoint вызван');
+    return {
+      message: 'Auth controller is working!',
+      timestamp: new Date().toISOString(),
+      endpoints: [
+        'POST /auth/login',
+        'POST /auth/register', 
+        'GET /auth/profile',
+        'GET /auth/test'
+      ]
+    };
+  }
+
   // Временный endpoint для генерации правильного хэша
   @Post('generate-hash')
   @ApiOperation({ summary: 'Generate password hash (temporary)' })

@@ -2,10 +2,11 @@
  * @file: FixedProductionCalendar.tsx
  * @description: Исправленный современный календарь производства с разделением на фрезерные и токарные станки
  * @created: 2025-06-17
- * @updated: 2025-06-18 - Добавлено разделение станков по типам (фрезерные и токарные)
+ * @updated: 2025-06-23 - Добавлена поддержка переводов
  */
 import React, { useState, useEffect } from 'react';
 import { Tabs } from 'antd';
+import { useTranslation } from '../../../i18n';
 
 interface CalendarProps {
   filter: {
@@ -52,6 +53,7 @@ const fetchMachineSummary = async (startDate: string, endDate: string) => {
 };
 
 export const FixedProductionCalendar: React.FC<CalendarProps> = ({ filter }) => {
+  const { t } = useTranslation();
   const [selectedOperation, setSelectedOperation] = useState<any>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -532,7 +534,7 @@ export const FixedProductionCalendar: React.FC<CalendarProps> = ({ filter }) => 
             margin: '0 auto 20px'
           }} />
           <div style={{ fontSize: '18px', color: '#666', fontWeight: '500' }}>
-            Загрузка современного календаря...
+            {t('calendar.loading_calendar')}
           </div>
           <style>
             {`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}
@@ -562,9 +564,9 @@ export const FixedProductionCalendar: React.FC<CalendarProps> = ({ filter }) => 
           maxWidth: '400px'
         }}>
           <div style={{ fontSize: '64px', marginBottom: '20px' }}>📊</div>
-          <h2 style={{ color: '#262626', marginBottom: '12px' }}>Нет данных</h2>
+          <h2 style={{ color: '#262626', marginBottom: '12px' }}>{t('calendar.no_data')}</h2>
           <p style={{ color: '#8c8c8c', marginBottom: '24px' }}>
-            Нет активных станков или операций в выбранном периоде
+            {t('calendar.no_data_desc')}
           </p>
           <button
             onClick={loadData}
@@ -579,7 +581,7 @@ export const FixedProductionCalendar: React.FC<CalendarProps> = ({ filter }) => 
               fontWeight: '500'
             }}
           >
-            🔄 Обновить
+            🔄 {t('calendar.refresh')}
           </button>
         </div>
       </div>

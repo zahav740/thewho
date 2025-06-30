@@ -63,17 +63,21 @@ export const getOptimalApiUrl = async (): Promise<string> => {
       const commonIPs = ['192.168.1.100', '192.168.0.100', '192.168.1.101'];
       
       for (const ip of commonIPs) {
-        try {
-          const response = await fetch(`http://${ip}:5100/api/health`, { 
-            method: 'GET',
-            signal: AbortSignal.timeout(2000)
-          });
-          if (response.ok) {
-            console.log(`✅ Найден backend на ${ip}:5100`);
-            return `http://${ip}:5100/api`;
+        // Пробуем разные порты
+        const ports = [5200, 5100, 3001];
+        for (const port of ports) {
+          try {
+            const response = await fetch(`http://${ip}:${port}/api/auth/test`, { 
+              method: 'GET',
+              signal: AbortSignal.timeout(2000)
+            });
+            if (response.ok) {
+              console.log(`✅ Найден backend на ${ip}:${port}`);
+              return `http://${ip}:${port}/api`;
+            }
+          } catch {
+            // Пробуем другие endpoints
           }
-        } catch {
-          // Игнорируем ошибки, продолжаем поиск
         }
       }
       
@@ -93,11 +97,49 @@ export const getOptimalApiUrl = async (): Promise<string> => {
 // Функция для тестирования доступности API
 export const testApiConnection = async (apiUrl: string): Promise<boolean> => {
   try {
-    const response = await fetch(`${apiUrl}/health`, {
-      method: 'GET',
-      signal: AbortSignal.timeout(5000)
-    });
-    return response.ok;
+    // Сначала пробуем auth/test endpoint (если доступен)
+    try {
+      const authResponse = await fetch(`${apiUrl}/auth/test`, {
+        method: 'GET',
+        signal: AbortSignal.timeout(3000)
+      });
+      if (authResponse.ok) {
+        console.log(`✅ Auth endpoint работает: ${apiUrl}/auth/test`);
+        return true;
+      }
+    } catch {
+      // Игнорируем ошибку auth/test
+    }
+    
+    // Затем пробуем health endpoint
+    try {
+      const healthResponse = await fetch(`${apiUrl}/health`, {
+        method: 'GET',
+        signal: AbortSignal.timeout(3000)
+      });
+      if (healthResponse.ok) {
+        console.log(`✅ Health endpoint работает: ${apiUrl}/health`);
+        return true;
+      }
+    } catch {
+      // Игнорируем ошибку health
+    }
+    
+    // В крайнем случае пробуем translations endpoint
+    try {
+      const translationsResponse = await fetch(`${apiUrl}/translations/client`, {
+        method: 'GET',
+        signal: AbortSignal.timeout(3000)
+      });
+      if (translationsResponse.ok) {
+        console.log(`✅ Translations endpoint работает: ${apiUrl}/translations/client`);
+        return true;
+      }
+    } catch {
+      // Игнорируем ошибку translations
+    }
+    
+    return false;
   } catch {
     return false;
   }
@@ -106,9 +148,10 @@ export const testApiConnection = async (apiUrl: string): Promise<boolean> => {
 // Функция для автоматического поиска доступного backend
 export const findAvailableBackend = async (): Promise<string> => {
   const candidates = [
-    'http://localhost:5100/api',
+    'http://localhost:5100/api', // Наш основной порт
     'http://localhost:3001/api',
     'http://localhost:5101/api',
+    'http://localhost:5200/api',
   ];
   
   // Если мобильное устройство, добавляем IP-адреса

@@ -15,6 +15,7 @@ import {
   UserOutlined,
   GlobalOutlined,
   MenuOutlined,
+  BarChartOutlined,
 } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
 import { useTranslation } from '../../i18n';
@@ -93,10 +94,16 @@ export const Layout: React.FC = () => {
       onClick: () => navigate('/operators'),
     },
     {
-      key: '/translations',
-      icon: <GlobalOutlined />,
-      label: t('menu.translations'),
-      onClick: () => navigate('/translations'),
+      key: '/analytics',
+      icon: <BarChartOutlined />,
+      label: '📊 Аналитика KPI/OEE',
+      onClick: () => navigate('/analytics'),
+    },
+    {
+      key: '/analytics-comprehensive',
+      icon: <BarChartOutlined />,
+      label: '📈 Полная аналитика',
+      onClick: () => navigate('/analytics-comprehensive'),
     },
   ];
 
@@ -299,6 +306,10 @@ function getPageTitle(pathname: string, t: (key: string) => string): string {
       return t('page.calendar.title');
     case '/operators':
       return t('page.operators.title');
+    case '/analytics':
+      return '📊 Аналитика KPI и OEE';
+    case '/analytics-comprehensive':
+      return '📈 Полная аналитика производства';
     case '/translations':
       return t('translations.title');
     default:

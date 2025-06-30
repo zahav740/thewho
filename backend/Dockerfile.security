@@ -1,0 +1,91 @@
+# Multi-stage build для безопасности и минимального размера
+FROM node:18-alpine AS builder
+
+# Создаем непривилегированного пользователя
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nestjs -u 1001
+
+# Устанавливаем рабочую директорию
+WORKDIR /app
+
+# Копируем файлы зависимостей
+COPY package*.json ./
+COPY tsconfig*.json ./
+
+# Устанавливаем зависимости
+RUN npm ci --only=production && \
+    npm cache clean --force
+
+# Копируем исходный код
+COPY src/ ./src/
+
+# Собираем приложение
+RUN npm run build
+
+# Production stage
+FROM node:18-alpine AS production
+
+# Обновляем пакеты и устанавливаем только необходимые
+RUN apk update && \
+    apk upgrade && \
+    apk add --no-cache \
+    dumb-init \
+    curl \
+    ca-certificates && \
+    rm -rf /var/cache/apk/*
+
+# Создаем непривилегированного пользователя
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nestjs -u 1001
+
+# Создаем необходимые директории
+RUN mkdir -p /app/dist /app/uploads /app/logs && \
+    chown -R nestjs:nodejs /app
+
+# Устанавливаем рабочую директорию
+WORKDIR /app
+
+# Копируем зависимости из builder stage
+COPY --from=builder --chown=nestjs:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=nestjs:nodejs /app/dist ./dist
+COPY --from=builder --chown=nestjs:nodejs /app/package*.json ./
+
+# Копируем дополнительные файлы
+COPY --chown=nestjs:nodejs .env.production ./
+
+# Настройки безопасности
+# Убираем ненужные пакеты и права
+RUN apk del apk-tools && \
+    rm -rf /var/cache/apk/* /tmp/* /var/tmp/* && \
+    find /app -type f -exec chmod 644 {} \; && \
+    find /app -type d -exec chmod 755 {} \;
+
+# Переключаемся на непривилегированного пользователя
+USER nestjs
+
+# Настройки Node.js для безопасности
+ENV NODE_ENV=production
+ENV NODE_OPTIONS="--max-old-space-size=512 --max-http-header-size=8192"
+
+# Ограничения ресурсов
+ENV UV_THREADPOOL_SIZE=4
+
+# Отключаем информацию о версии
+ENV NODE_NO_WARNINGS=1
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:3000/api/health || exit 1
+
+# Указываем порт (только для документации)
+EXPOSE 3000
+
+# Запускаем приложение через dumb-init для правильной обработки сигналов
+ENTRYPOINT ["dumb-init", "--"]
+CMD ["node", "dist/src/main.js"]
+
+# Метки для отслеживания
+LABEL maintainer="CRM Team"
+LABEL version="1.0.0"
+LABEL description="Production CRM Backend - Secure Build"
+LABEL security.scan="enabled"

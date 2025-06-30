@@ -1,0 +1,85 @@
+# Multi-stage build для безопасности
+FROM node:18-alpine AS builder
+
+# Устанавливаем рабочую директорию
+WORKDIR /app
+
+# Копируем файлы зависимостей
+COPY package*.json ./
+
+# Устанавливаем зависимости
+RUN npm ci --only=production && \
+    npm cache clean --force
+
+# Копируем исходный код
+COPY . .
+
+# Аргументы сборки
+ARG REACT_APP_API_URL
+ARG REACT_APP_ENVIRONMENT
+
+# Устанавливаем переменные окружения для сборки
+ENV REACT_APP_API_URL=$REACT_APP_API_URL
+ENV REACT_APP_ENVIRONMENT=$REACT_APP_ENVIRONMENT
+ENV NODE_ENV=production
+ENV GENERATE_SOURCEMAP=false
+
+# Собираем приложение
+RUN npm run build
+
+# Production stage с Nginx
+FROM nginx:1.25-alpine AS production
+
+# Обновляем пакеты
+RUN apk update && \
+    apk upgrade && \
+    apk add --no-cache \
+    curl \
+    ca-certificates && \
+    rm -rf /var/cache/apk/*
+
+# Создаем непривилегированного пользователя для nginx
+RUN addgroup -g 101 -S nginx || true && \
+    adduser -S -D -H -u 101 -h /var/cache/nginx -s /sbin/nologin -G nginx nginx || true
+
+# Удаляем дефолтную конфигурацию nginx
+RUN rm -f /etc/nginx/conf.d/default.conf
+
+# Копируем кастомную конфигурацию nginx
+COPY nginx.security.conf /etc/nginx/conf.d/default.conf
+
+# Копируем собранное приложение
+COPY --from=builder --chown=nginx:nginx /app/build /usr/share/nginx/html
+
+# Настройки безопасности для файлов
+RUN find /usr/share/nginx/html -type f -exec chmod 644 {} \; && \
+    find /usr/share/nginx/html -type d -exec chmod 755 {} \;
+
+# Создаем директории для логов и кэша
+RUN mkdir -p /var/log/nginx /var/cache/nginx /var/run && \
+    chown -R nginx:nginx /var/log/nginx /var/cache/nginx /var/run
+
+# Копируем конфигурацию nginx с улучшенной безопасностью
+COPY nginx.conf /etc/nginx/nginx.conf
+
+# Удаляем ненужные файлы и пакеты
+RUN rm -rf /var/cache/apk/* /tmp/* /var/tmp/*
+
+# Переключаемся на непривилегированного пользователя
+USER nginx
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost/health || exit 1
+
+# Указываем порт
+EXPOSE 80
+
+# Запускаем nginx
+CMD ["nginx", "-g", "daemon off;"]
+
+# Метки
+LABEL maintainer="CRM Team"
+LABEL version="1.0.0"
+LABEL description="Production CRM Frontend - Secure Build"
+LABEL security.scan="enabled"

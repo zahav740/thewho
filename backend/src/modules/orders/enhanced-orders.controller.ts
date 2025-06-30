@@ -21,7 +21,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiConsumes } from '@nestjs/swagger';
 import { Response } from 'express';
 import type { Express } from 'express';
-import { OrdersService } from './orders.service';
+import { OrdersService, EnrichedOrder } from './orders.service';
 import { EnhancedExcelImportService, ImportSettings, EnhancedImportResult } from './enhanced-excel-import.service';
 import { ExcelPreviewService, ExcelPreviewResult, ExcelOrderPreview, ImportSelection } from './excel-preview.service';
 import { CreateOrderDto } from './dto/create-order.dto';
@@ -40,7 +40,13 @@ export class EnhancedOrdersController {
 
   @Get()
   @ApiOperation({ summary: 'Получить все заказы с фильтрацией и пагинацией' })
-  async findAll(@Query() filterDto: OrdersFilterDto) {
+  async findAll(@Query() filterDto: OrdersFilterDto): Promise<{
+    data: EnrichedOrder[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
     return this.ordersService.findAll(filterDto);
   }
 

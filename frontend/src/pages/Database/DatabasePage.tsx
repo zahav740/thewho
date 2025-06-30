@@ -6,7 +6,7 @@
  * @updated: 2025-06-18 - Добавлена полная адаптивность для всех устройств
  */
 import React, { useState } from 'react';
-import { Button, Row, Col, message, Space, Tooltip } from 'antd';
+import { Button, Row, Col, message, Space, Tooltip, Modal } from 'antd';
 import { 
   PlusOutlined, 
   ReloadOutlined, 
@@ -21,7 +21,8 @@ import { OrdersFilter } from '../../types/order.types';
 import { OrdersList } from './components/OrdersList';
 import { OrderForm } from './components/OrderForm.SIMPLE';
 import { CSVImportModal } from './components/CSVImportModal';
-import { EnhancedExcelImporter } from '../../components/ExcelUploader/EnhancedExcelImporter';
+import AdvancedExcelUploader from '../../components/ExcelUploader/AdvancedExcelUploader';
+// import { EnhancedExcelImporter } from '../../components/ExcelUploader/EnhancedExcelImporter'; // Заменено на AdvancedExcelUploader
 import { useTranslation } from '../../i18n';
 import { 
   ResponsiveContainer, 
@@ -36,7 +37,8 @@ export const DatabasePage: React.FC = () => {
   const screenInfo = useResponsive();
   const [showOrderForm, setShowOrderForm] = useState(false);
   const [showCSVImport, setShowCSVImport] = useState(false);
-  const [showEnhancedExcelImport, setShowEnhancedExcelImport] = useState(false);
+  const [showAdvancedExcelImport, setShowAdvancedExcelImport] = useState(false);
+  // const [showEnhancedExcelImport, setShowEnhancedExcelImport] = useState(false); // Заменено
   const [editingOrderId, setEditingOrderId] = useState<number | undefined>();
   const [filter, setFilter] = useState<OrdersFilter>({ page: 1, limit: 10 });
   const queryClient = useQueryClient();
@@ -87,6 +89,52 @@ export const DatabasePage: React.FC = () => {
   const handleCSVImportSuccess = () => {
     queryClient.invalidateQueries({ queryKey: ['orders'] });
     message.success(t('message.success.csv_imported'));
+  };
+
+  const handleAdvancedExcelUpload = async (file: File, settings: any) => {
+    try {
+      console.log('🚀 Новый импорт Excel с выбором колонок:', { fileName: file.name, settings });
+
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('settings', JSON.stringify(settings));
+
+      const response = await fetch('/api/orders/import-excel-with-mapping', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `Ошибка сервера: ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+      // Обновляем список заказов
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      
+      message.success(
+        <div>
+          <CheckCircleOutlined /> Импорт завершен успешно!
+          <div style={{ fontSize: '12px', marginTop: '4px' }}>
+            Создано: {result.data.created}, Обновлено: {result.data.updated}
+          </div>
+        </div>
+      );
+      
+      return result;
+    } catch (error: any) {
+      console.error('❌ Ошибка импорта с маппингом:', error);
+      
+      message.error(
+        <div>
+          <WarningOutlined /> Ошибка импорта: {error.message}
+        </div>
+      );
+      
+      throw error;
+    }
   };
 
   const handleEnhancedExcelImportSuccess = (result: any) => {
@@ -224,23 +272,23 @@ export const DatabasePage: React.FC = () => {
               </Button>
             </Tooltip>
             
-            {/* Enhanced Excel import */}
-            <Tooltip title={t('tooltip.excel_2_enhanced')}>
+            {/* Новый Excel импорт с выбором колонок */}
+            <Tooltip title="Новый импорт Excel с возможностью выбора любых колонок">
               <Button
                 type="primary"
                 icon={<FileExcelOutlined />}
-                onClick={() => setShowEnhancedExcelImport(true)}
+                onClick={() => setShowAdvancedExcelImport(true)}
                 size={componentSize}
                 style={{ 
-                  background: 'linear-gradient(45deg, #667eea, #764ba2)',
+                  background: 'linear-gradient(45deg, #52c41a, #389e0d)',
                   border: 'none',
                   width: screenInfo.isMobile ? '100%' : 'auto',
                   height: screenInfo.isMobile ? 44 : 'auto',
                   marginBottom: screenInfo.isMobile ? 8 : 0
                 }}
               >
-                {screenInfo.isMobile ? t('database.excel_2_0') : t('database.excel_2_0')}
-                <CheckCircleOutlined style={{ marginLeft: 4, color: '#52c41a' }} />
+                {screenInfo.isMobile ? '🆕 Excel (выбор колонок)' : '🆕 Excel (выбор колонок)'}
+                <CheckCircleOutlined style={{ marginLeft: 4, color: 'white' }} />
               </Button>
             </Tooltip>
             
@@ -315,12 +363,22 @@ export const DatabasePage: React.FC = () => {
         onSuccess={handleCSVImportSuccess}
       />
 
-      {/* Enhanced Excel import */}
-      <EnhancedExcelImporter
-        visible={showEnhancedExcelImport}
-        onClose={() => setShowEnhancedExcelImport(false)}
-        onSuccess={handleEnhancedExcelImportSuccess}
-      />
+      {/* Новый Excel импорт с выбором колонок */}
+      <Modal
+        title="🆕 Новый импорт Excel с выбором колонок"
+        open={showAdvancedExcelImport}
+        onCancel={() => setShowAdvancedExcelImport(false)}
+        width={1200}
+        footer={null}
+        destroyOnClose
+      >
+        <AdvancedExcelUploader
+          onUpload={handleAdvancedExcelUpload}
+          maxFileSize={50}
+          title="🆕 Новый импорт Excel с выбором колонок"
+          description="Выберите любые колонки из вашего Excel файла и настройте соответствие полям заказа. Система автоматически проанализирует структуру файла."
+        />
+      </Modal>
     </ResponsiveContainer>
   );
 };

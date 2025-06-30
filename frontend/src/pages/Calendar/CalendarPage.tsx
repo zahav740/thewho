@@ -3,7 +3,7 @@
  * @description: Адаптивная страница производственного календаря с разделением на фрезерные и токарные станки
  * @dependencies: FixedProductionCalendar, MachineUtilization, UpcomingDeadlines, ResponsiveGrid
  * @created: 2025-01-28
- * @updated: 2025-06-18 - Добавлена адаптивность и разделение станков по типам
+ * @updated: 2025-06-23 - Добавлена поддержка переводов
  */
 import React, { useState } from 'react';
 import { Row, Col, DatePicker, Space, Tabs, Typography, Alert } from 'antd';
@@ -19,11 +19,13 @@ import {
   ResponsiveActions 
 } from '../../components/ResponsiveGrid';
 import { useResponsive, responsiveUtils } from '../../hooks';
+import { useTranslation } from '../../i18n';
 
 const { RangePicker } = DatePicker;
 const { Text } = Typography;
 
 export const CalendarPage: React.FC = () => {
+  const { t } = useTranslation();
   const screenInfo = useResponsive();
   const componentSize = responsiveUtils.getComponentSize(screenInfo);
   const [dateRange, setDateRange] = useState<[Dayjs, Dayjs]>([
@@ -50,9 +52,9 @@ export const CalendarPage: React.FC = () => {
     <ResponsiveContainer className="calendar-page">
       {/* Информация о календаре */}
       <Alert
-        message="⚡ Производственный календарь с разделением по типам станков"
+        message={t('calendar.modern_calendar')}
         description={
-          <Text>Современный календарь с интеграцией PostgreSQL и разделением на 🔧 фрезерные и ⚙️ токарные станки.</Text>
+          <Text>{t('calendar.modern_calendar')}</Text>
         }
         type="success"
         showIcon
@@ -66,7 +68,7 @@ export const CalendarPage: React.FC = () => {
         justify="start"
         style={{ marginBottom: 16 }}
       >
-        <span style={{ fontSize: screenInfo.isMobile ? '14px' : '16px' }}>Период:</span>
+        <span style={{ fontSize: screenInfo.isMobile ? '14px' : '16px' }}>{t('calendar.period')}:</span>
         <RangePicker
           value={dateRange}
           onChange={handleDateRangeChange}
@@ -78,10 +80,10 @@ export const CalendarPage: React.FC = () => {
             minWidth: screenInfo.isMobile ? '280px' : '300px'
           }}
           presets={[
-            { label: 'Текущая неделя', value: [dayjs().startOf('week'), dayjs().endOf('week')] },
-            { label: 'Следующая неделя', value: [dayjs().add(1, 'week').startOf('week'), dayjs().add(1, 'week').endOf('week')] },
-            { label: '2 недели', value: [dayjs().startOf('week'), dayjs().endOf('week').add(1, 'week')] },
-            { label: 'Текущий месяц', value: [dayjs().startOf('month'), dayjs().endOf('month')] },
+            { label: t('calendar.current_week'), value: [dayjs().startOf('week'), dayjs().endOf('week')] },
+            { label: t('calendar.next_week'), value: [dayjs().add(1, 'week').startOf('week'), dayjs().add(1, 'week').endOf('week')] },
+            { label: t('calendar.two_weeks'), value: [dayjs().startOf('week'), dayjs().endOf('week').add(1, 'week')] },
+            { label: t('calendar.current_month'), value: [dayjs().startOf('month'), dayjs().endOf('month')] },
           ]}
         />
       </ResponsiveActions>
@@ -97,7 +99,7 @@ export const CalendarPage: React.FC = () => {
                 label: (
                   <span style={{ fontSize: screenInfo.isMobile ? '12px' : '14px' }}>
                     <CalendarOutlined />
-                    ⚡ Производственный календарь
+                    ⚡ {t('calendar.production_calendar')}
                   </span>
                 ),
                 children: <FixedProductionCalendar filter={filter} />
@@ -107,7 +109,7 @@ export const CalendarPage: React.FC = () => {
                 label: (
                   <span style={{ fontSize: screenInfo.isMobile ? '12px' : '14px' }}>
                     <BarChartOutlined />
-                    {screenInfo.isMobile ? 'Загрузка' : 'Загруженность станков'}
+                    {screenInfo.isMobile ? t('calendar.utilization') : t('calendar.machine_utilization')}
                   </span>
                 ),
                 children: <MachineUtilization filter={filter} />
@@ -117,7 +119,7 @@ export const CalendarPage: React.FC = () => {
                 label: (
                   <span style={{ fontSize: screenInfo.isMobile ? '12px' : '14px' }}>
                     <AlertOutlined />
-                    {screenInfo.isMobile ? 'Сроки' : 'Предстоящие сроки'}
+                    {screenInfo.isMobile ? t('calendar.deadlines') : t('calendar.upcoming_deadlines')}
                   </span>
                 ),
                 children: <UpcomingDeadlines />
@@ -129,15 +131,15 @@ export const CalendarPage: React.FC = () => {
 
       {/* Информация о календаре */}
       <Alert
-        message="⚡ Современный производственный календарь"
+        message={t('calendar.modern_features')}
         description={
           <div>
-            <Text>• Полная интеграция с базой данных PostgreSQL</Text><br/>
-            <Text>• Современный дизайн без зависимостей от внешних библиотек</Text><br/>
-            <Text>• Кликабельные ячейки с детальной информацией об операциях</Text><br/>
-            <Text>• Реальное отображение данных из production CRM</Text><br/>
-            <Text>• Интерактивные карточки станков с мини-календарями</Text><br/>
-            <Text>• Статистика загрузки и эффективности в реальном времени</Text>
+            <Text>• {t('calendar.features.integration')}</Text><br/>
+            <Text>• {t('calendar.features.design')}</Text><br/>
+            <Text>• {t('calendar.features.clickable')}</Text><br/>
+            <Text>• {t('calendar.features.realtime')}</Text><br/>
+            <Text>• {t('calendar.features.interactive')}</Text><br/>
+            <Text>• {t('calendar.features.statistics')}</Text>
           </div>
         }
         type="info"

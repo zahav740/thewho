@@ -23,18 +23,10 @@ export class OrderFileSystemService {
   private readonly ordersPath: string;
 
   constructor() {
-    // Попробуем несколько вариантов пути
-    const possiblePaths = [
-      join(process.cwd(), 'uploads', 'orders'),
-      join(__dirname, '..', '..', '..', '..', 'uploads', 'orders'),
-      resolve('uploads', 'orders'),
-      'C:\\Users\\kasuf\\Downloads\\TheWho\\production-crm\\uploads\\orders'
-    ];
-    
-    this.ordersPath = possiblePaths[0]; // По умолчанию
+    // Определяем путь к директории uploads/orders
+    this.ordersPath = join(process.cwd(), 'uploads', 'orders');
     this.logger.log(`OrderFileSystemService initialized with path: ${this.ordersPath}`);
     this.logger.log(`Current working directory: ${process.cwd()}`);
-    this.logger.log(`__dirname: ${__dirname}`);
     
     this.ensureOrdersDirectory();
   }
@@ -52,30 +44,9 @@ export class OrderFileSystemService {
       this.logger.log(`Found ${items.length} items in directory: ${items.join(', ')}`);
       
     } catch (error) {
-      this.logger.error(`ERROR: Cannot access orders directory at: ${this.ordersPath}`);
-      this.logger.error('Error details:', error.message);
+      this.logger.warn(`Orders directory does not exist, creating: ${this.ordersPath}`);
       
-      // Попробуем другие пути
-      const possiblePaths = [
-        join(process.cwd(), 'uploads', 'orders'),
-        join(__dirname, '..', '..', '..', '..', 'uploads', 'orders'),
-        resolve('uploads', 'orders'),
-        'C:\\Users\\kasuf\\Downloads\\TheWho\\production-crm\\uploads\\orders'
-      ];
-      
-      for (const testPath of possiblePaths) {
-        try {
-          await fs.access(testPath);
-          this.logger.log(`FOUND alternative path: ${testPath}`);
-          // Обновляем путь
-          (this as any).ordersPath = testPath;
-          return;
-        } catch {
-          this.logger.log(`Path not found: ${testPath}`);
-        }
-      }
-      
-      // Если ни один путь не найден, создаем папку
+      // Создаем папку
       await fs.mkdir(this.ordersPath, { recursive: true });
       this.logger.log(`Created orders directory: ${this.ordersPath}`);
     }
