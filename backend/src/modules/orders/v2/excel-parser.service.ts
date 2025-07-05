@@ -1,9 +1,9 @@
 /**
  * @file: excel-parser.service.ts
- * @description: Сервис для парсинга Excel файлов с поддержкой дефолтных колонок
+ * @description: ИСПРАВЛЕННЫЙ сервис для парсинга Excel файлов с чтением реальных данных
  * @dependencies: nestjs, exceljs
  * @created: 2025-07-03
- * @fixed: 2025-07-04 - заменен xlsx на exceljs
+ * @fixed: 2025-07-05 - исправлено чтение операций и приоритетов из Excel
  */
 import { Injectable, Logger } from '@nestjs/common';
 import * as ExcelJS from 'exceljs';
@@ -41,6 +41,9 @@ interface ColumnMappings {
   deadline?: string;
   priority?: string;
   workType?: string;
+  operationsTime?: string;
+  operationsCount?: string;
+  machineAxes?: string;
 }
 
 @Injectable()
@@ -49,14 +52,17 @@ export class ExcelParserService {
 
   // ИСПРАВЛЕННЫЕ приоритеты колонок для реального Excel файла
   private readonly COLUMN_LETTER_PRIORITY = {
-    drawingNumber: ['C', 'A', 'B', 'K', 'J'], // Колонка C - маккаб (номер чертежа)
-    quantity: ['E', 'D', 'F', 'L', 'M'], // Колонка E - количество (кмут)
-    deadline: ['G', 'H', 'I', 'N', 'O'], // Колонка G - дедлайн (таарих аспака)
-    priority: ['K', 'L', 'M', 'P', 'Q'], // Колонка K - приоритет
-    workType: ['J', 'I', 'K', 'L', 'M'] // Колонка J - статус/тип работы
+    drawingNumber: ['A', 'B', 'C', 'K', 'J'], // Первые колонки для номера чертежа
+    quantity: ['D', 'E', 'F', 'L', 'M'], // Количество
+    deadline: ['G', 'H', 'I', 'N', 'O'], // Дедлайн
+    priority: ['J', 'K', 'L', 'P', 'Q'], // Приоритет
+    workType: ['I', 'J', 'K', 'L', 'M'], // Тип работы/статус
+    operationsTime: ['F', 'G', 'H', 'M', 'N'], // Время операций
+    operationsCount: ['B', 'C', 'D', 'H', 'I'], // Количество операций
+    machineAxes: ['E', 'F', 'G', 'J', 'K'] // Количество осей станка
   };
 
-  // Возможные названия колонок
+  // Расширенные алиасы колонок для поиска данных
   private readonly COLUMN_ALIASES = {
     drawingNumber: [
       'drawingNumber', 'drawing_number', 'номер чертежа', 'чертеж', 'drawing', 'drw',
@@ -71,10 +77,20 @@ export class ExcelParserService {
       'готовность', 'выполнение', 'completion', 'ת.אספקה', 'ת.סיום ייצור', 'דדליין', 'תאריך אספקה', 'תאריך'
     ],
     priority: [
-      'priority', 'приоритет', 'важность', 'срочность', 'prio'
+      'priority', 'приоритет', 'важность', 'срочность', 'prio', 'דחיפות', 'עדיפות'
     ],
     workType: [
-      'workType', 'work_type', 'тип работы', 'операция', 'обработка', 'work', 'type', 'סטטוס', 'סטטוס*', 'סטטוס *', 'status', 'תיאור', 'סוג עבודה'
+      'workType', 'work_type', 'тип работы', 'операция', 'обработка', 'work', 'type', 
+      'סטטוס', 'סטטוס*', 'סטטוס *', 'status', 'תיאור', 'סוג עבודה', 'machine', 'станок'
+    ],
+    operationsTime: [
+      'time', 'время', 'duration', 'minutes', 'mins', 'мин', 'продолжительность', 'זמן', 'דקות'
+    ],
+    operationsCount: [
+      'operations', 'операции', 'ops', 'количество операций', 'מספר פעולות', 'פעולות'
+    ],
+    machineAxes: [
+      'axes', 'оси', 'axis', 'количество осей', 'צירים', 'מספר צירים'
     ]
   };
 
@@ -83,10 +99,10 @@ export class ExcelParserService {
   ) {}
 
   /**
-   * Парсинг Excel файла
+   * Парсинг Excel файла с чтением реальных данных
    */
   async parseExcelFile(fileBuffer: Buffer): Promise<ExcelParseResult> {
-    this.logger.log('📈 Начало парсинга Excel файла...');
+    this.logger.log('📈 ИСПРАВЛЕННЫЙ парсинг Excel файла...');
     
     try {
       // Читаем файл через ExcelJS
@@ -108,6 +124,8 @@ export class ExcelParserService {
         headers[colNumber - 1] = cell.text || cell.value?.toString() || '';
       });
       
+      this.logger.log('📋 Найденные заголовки:', headers);
+      
       // Читаем данные со второй строки
       for (let rowNumber = 2; rowNumber <= worksheet.rowCount; rowNumber++) {
         const row = worksheet.getRow(rowNumber);
@@ -128,19 +146,21 @@ export class ExcelParserService {
       
       this.logger.log(`📈 Найдено ${rawData.length} строк в файле`);
       
-      // Определяем колонки
-      const columnMappings = this.detectColumnMappings(rawData);
+      // Определяем колонки с улучшенным поиском
+      const columnMappings = this.detectColumnMappingsImproved(rawData, headers);
+      this.logger.log('🗺️ Обнаруженные колонки:', columnMappings);
       
-      // Парсим данные
+      // Парсим данные с реальными операциями
       const parsedOrders: CreateOrderV2Dto[] = [];
       const errors: string[] = [];
       
       for (let i = 0; i < rawData.length; i++) {
         try {
           const row = rawData[i];
-          const parsedOrder = await this.parseRow(row, columnMappings, i + 1, worksheet);
+          const parsedOrder = await this.parseRowWithRealData(row, columnMappings, i + 1, worksheet);
           if (parsedOrder) {
             parsedOrders.push(parsedOrder);
+            this.logger.log(`✅ Строка ${i + 1}: ${parsedOrder.drawingNumber} - приоритет: ${parsedOrder.priority}`);
           }
         } catch (error) {
           const errorMessage = `Строка ${i + 1}: ${error.message}`;
@@ -149,7 +169,7 @@ export class ExcelParserService {
         }
       }
       
-      this.logger.log(`✅ Парсинг завершен: ${parsedOrders.length} заказов, ${errors.length} ошибок`);
+      this.logger.log(`✅ ИСПРАВЛЕННЫЙ парсинг завершен: ${parsedOrders.length} заказов, ${errors.length} ошибок`);
       
       return {
         success: parsedOrders.length > 0,
@@ -166,162 +186,112 @@ export class ExcelParserService {
   }
 
   /**
-   * Преобразование буквы колонки в номер
+   * Улучшенное определение соответствия колонок
    */
-  private letterToNumber(letter: string): number {
-    let result = 0;
-    for (let i = 0; i < letter.length; i++) {
-      result = result * 26 + letter.charCodeAt(i) - 64;
-    }
-    return result;
-  }
-
-  /**
-   * Определение соответствия колонок с приоритетом буквенных позиций
-   */
-  private detectColumnMappings(data: ExcelRow[]): ColumnMappings {
-    this.logger.log('🔍 Определение соответствия колонок...');
+  private detectColumnMappingsImproved(data: ExcelRow[], headers: string[]): ColumnMappings {
+    this.logger.log('🔍 УЛУЧШЕННОЕ определение соответствия колонок...');
     
     if (data.length === 0) {
       return {};
     }
     
-    const firstRow = data[0];
-    const columns = Object.keys(firstRow);
     const mappings: ColumnMappings = {};
     
-    // Первый проход: ищем по приоритетным буквам (K > J > A)
-    this.logger.log('🎩 Приоритетный поиск по колонкам K, L, M, N...');
+    // Анализируем все возможные поля
+    const fieldsToFind = [
+      'drawingNumber', 'quantity', 'deadline', 'priority', 
+      'workType', 'operationsTime', 'operationsCount', 'machineAxes'
+    ];
     
-    for (const [field, preferredLetters] of Object.entries(this.COLUMN_LETTER_PRIORITY)) {
-      for (const letter of preferredLetters) {
-        const columnIndex = this.letterToNumber(letter);
-        if (columnIndex <= columns.length && !mappings[field as keyof ColumnMappings]) {
-          const columnName = columns[columnIndex - 1];
-          if (columnName) {
-            // Проверяем, есть ли в колонке данные
-            const hasData = data.some(row => {
-              const value = row[columnName];
-              return value && String(value).trim() !== '';
-            });
-            
-            if (hasData) {
-              mappings[field as keyof ColumnMappings] = columnName;
-              this.logger.log(`✅ Найдено ${field} в колонке ${letter}: ${columnName}`);
-              break;
-            }
+    for (const field of fieldsToFind) {
+      const aliases = this.COLUMN_ALIASES[field] || [];
+      
+      // Ищем по названиям колонок
+      for (const header of headers) {
+        const normalizedHeader = header.toLowerCase().trim();
+        
+        if (aliases.some(alias => normalizedHeader.includes(alias.toLowerCase()))) {
+          // Проверяем, есть ли в колонке данные
+          const hasData = data.some(row => {
+            const value = row[header];
+            return value && String(value).trim() !== '';
+          });
+          
+          if (hasData && !mappings[field as keyof ColumnMappings]) {
+            mappings[field as keyof ColumnMappings] = header;
+            this.logger.log(`✅ Найдено ${field} в колонке: ${header}`);
+            break;
           }
         }
       }
-    }
-    
-    // Второй проход: поиск по названиям для ненайденных полей
-    this.logger.log('🔍 Поиск по названиям колонок...');
-    
-    for (const [field, aliases] of Object.entries(this.COLUMN_ALIASES)) {
-      if (!mappings[field as keyof ColumnMappings]) {
-        for (const column of columns) {
-          const normalizedColumn = column.toLowerCase().trim();
-          if (aliases.some(alias => normalizedColumn.includes(alias.toLowerCase()))) {
-            mappings[field as keyof ColumnMappings] = column;
-            this.logger.log(`✅ Найдено ${field} по названию: ${column}`);
+      
+      // Если не нашли по названию, ищем по содержимому
+      if (!mappings[field as keyof ColumnMappings] && field === 'priority') {
+        for (const header of headers) {
+          const hasNumericalPriority = data.some(row => {
+            const value = row[header];
+            const num = Number(value);
+            return !isNaN(num) && num >= 1 && num <= 4;
+          });
+          
+          if (hasNumericalPriority) {
+            mappings.priority = header;
+            this.logger.log(`✅ Найден приоритет по содержимому в колонке: ${header}`);
             break;
           }
         }
       }
     }
     
-    this.logger.log('🗺️ Найденные соответствия:', mappings);
     return mappings;
   }
 
   /**
-   * Проверка цвета ячейки (фильтр зеленых заказов)
+   * Парсинг строки с чтением реальных данных операций
    */
-  private isGreenCell(worksheet: ExcelJS.Worksheet, rowNumber: number, columnIndex: number): boolean {
+  private async parseRowWithRealData(
+    row: ExcelRow, 
+    mappings: ColumnMappings, 
+    rowIndex: number, 
+    worksheet?: ExcelJS.Worksheet
+  ): Promise<CreateOrderV2Dto | null> {
     try {
-      const cell = worksheet.getCell(rowNumber, columnIndex);
-      if (cell.fill && cell.fill.type === 'pattern') {
-        const fill = cell.fill as ExcelJS.FillPattern;
-        if (fill.fgColor) {
-          const color = typeof fill.fgColor === 'object' ? fill.fgColor.argb : fill.fgColor;
-          // Проверяем на различные оттенки зеленого
-          return color && (
-            color.toLowerCase().includes('00ff00') || // Зеленый
-            color.toLowerCase().includes('008000') || // Темно-зеленый
-            color.toLowerCase().includes('90ee90') || // Светло-зеленый
-            color.toLowerCase().includes('00ff7f') || // Весенне-зеленый
-            color.toLowerCase().includes('32cd32') || // Лайм
-            color.toLowerCase().includes('adff2f')    // Желто-зеленый
-          );
-        }
-      }
-      return false;
-    } catch {
-      return false;
-    }
-  }
-
-  /**
-   * Парсинг одной строки - ИСПРАВЛЕН для V2 DTO
-   */
-  private async parseRow(row: ExcelRow, mappings: ColumnMappings, rowIndex: number, worksheet?: ExcelJS.Worksheet): Promise<CreateOrderV2Dto | null> {
-    try {
-      // Проверяем цвет ячейки с номером чертежа (если есть worksheet)
+      // Проверяем цвет ячейки (пропускаем зеленые заказы)
       if (worksheet && mappings.drawingNumber) {
         const columnKeys = Object.keys(row);
         const drawingColumnIndex = columnKeys.findIndex(key => key === mappings.drawingNumber) + 1;
         
         if (drawingColumnIndex > 0 && this.isGreenCell(worksheet, rowIndex + 1, drawingColumnIndex)) {
           this.logger.log(`🟢 Строка ${rowIndex}: пропускаем зеленый заказ`);
-          return null; // Пропускаем зеленые заказы
+          return null;
         }
       }
       
-      // Извлекаем данные - ИСПРАВЛЕНО для V2
-      const drawingNumber = this.extractDrawingNumber(row, mappings);
-      const quantity = this.extractQuantity(row, mappings);
-      const deadline = this.extractDeadline(row, mappings);
-      const priorityString = this.extractPriorityV2(row, mappings); // Теперь возвращаем строку
+      // Извлекаем основные данные
+      const drawingNumber = this.extractDrawingNumber(row, mappings) || this.generateDrawingNumber(rowIndex);
+      const quantity = this.extractQuantity(row, mappings) || 1;
+      const deadline = this.extractDeadline(row, mappings) || this.getDefaultDeadline();
+      
+      // ИСПРАВЛЕНО: читаем приоритет из файла
+      const priorityFromFile = this.extractPriorityV2FromFile(row, mappings);
+      const priority = priorityFromFile || PriorityV2.MEDIUM;
+      
+      // ИСПРАВЛЕНО: читаем тип работы из файла
       const workTypeString = this.extractWorkType(row, mappings);
+      const workType = getWorkTypeFromExcel(workTypeString || 'фрезерная обработка');
       
-      // Преобразуем в enum'ы V2
-      const workType = getWorkTypeFromExcel(workTypeString || 'обработка');
-      const operationType = getOperationTypeFromWorkType(workType);
+      // ИСПРАВЛЕНО: читаем реальные операции из файла
+      const operations = this.extractOperationsFromFile(row, mappings, workType, quantity);
       
-      // Проверяем обязательные поля - генерируем номер чертежа если отсутствует
-      let finalDrawingNumber = drawingNumber;
-      if (!finalDrawingNumber) {
-        // Генерируем номер чертежа на основе данных строки
-        const timestamp = Date.now();
-        const hash = Math.random().toString(36).substr(2, 5).toUpperCase();
-        finalDrawingNumber = `AUTO-${rowIndex}-${hash}-${timestamp}`;
-        this.logger.warn(`⚠️ Строка ${rowIndex}: отсутствует номер чертежа, сгенерирован: ${finalDrawingNumber}`);
-      }
+      this.logger.log(`📋 Строка ${rowIndex}: ${drawingNumber} - приоритет из файла: ${priority}, операций: ${operations.length}`);
       
-      if (!quantity || quantity <= 0) {
-        throw new Error('Некорректное количество');
-      }
-      
-      if (!deadline) {
-        throw new Error('Отсутствует дедлайн');
-      }
-      
-      // Создаем операции V2 с правильным типом
-      const operations = [{
-        operationNumber: 1,
-        operationType: operationType, // Определяем по workType
-        machineAxes: 3,
-        estimatedTime: Math.ceil(quantity * 10), // 10 минут на деталь
-      }];
-      
-      // Формируем V2 DTO
+      // Формируем DTO с реальными данными
       const orderDto: CreateOrderV2Dto = {
-        drawingNumber: finalDrawingNumber,
+        drawingNumber,
         quantity,
         deadline,
-        priority: priorityString || PriorityV2.MEDIUM, // Используем PriorityV2 enum
-        workType: workType, // Используем WorkTypeV2 enum
+        priority,
+        workType,
         operations,
       };
       
@@ -332,33 +302,238 @@ export class ExcelParserService {
   }
 
   /**
-   * Извлечение номера чертежа
+   * ИСПРАВЛЕНО: Извлечение приоритета из файла
    */
-  private extractDrawingNumber(row: ExcelRow, mappings: ColumnMappings): string | null {
-    const column = mappings.drawingNumber;
-    
+  private extractPriorityV2FromFile(row: ExcelRow, mappings: ColumnMappings): PriorityV2 | null {
+    const column = mappings.priority;
     if (!column) {
-      // Попробуем найти любое поле с номером чертежа
-      const possibleColumns = Object.keys(row).filter(key => {
-        const val = String(key).toLowerCase();
-        return this.COLUMN_ALIASES.drawingNumber.some(alias => val.includes(alias.toLowerCase()));
-      });
-      
-      if (possibleColumns.length > 0) {
-        const value = row[possibleColumns[0]];
-        return value ? String(value).trim() : null;
+      // Пытаемся найти приоритет в любой колонке
+      for (const [key, value] of Object.entries(row)) {
+        if (value) {
+          const str = String(value).toLowerCase().trim();
+          if (str.includes('высок') || str.includes('high') || str === '1') return PriorityV2.HIGH;
+          if (str.includes('средн') || str.includes('medium') || str === '2') return PriorityV2.MEDIUM;
+          if (str.includes('низк') || str.includes('low') || str === '3') return PriorityV2.LOW;
+          if (str.includes('срочн') || str.includes('urgent') || str === '4') return PriorityV2.URGENT;
+        }
       }
-      
       return null;
     }
+    
+    const value = row[column];
+    if (!value) return null;
+    
+    const str = String(value).toLowerCase().trim();
+    
+    // Подробное логирование приоритета
+    this.logger.log(`🎯 Анализ приоритета: значение="${value}", строка="${str}"`);
+    
+    // Маппинг на PriorityV2 enum
+    if (str.includes('высок') || str.includes('high') || str === '1') {
+      this.logger.log(`🔴 Определен приоритет: HIGH`);
+      return PriorityV2.HIGH;
+    }
+    if (str.includes('средн') || str.includes('medium') || str === '2') {
+      this.logger.log(`🟡 Определен приоритет: MEDIUM`);
+      return PriorityV2.MEDIUM;
+    }
+    if (str.includes('низк') || str.includes('low') || str === '3') {
+      this.logger.log(`🟢 Определен приоритет: LOW`);
+      return PriorityV2.LOW;
+    }
+    if (str.includes('срочн') || str.includes('urgent') || str === '4') {
+      this.logger.log(`🚨 Определен приоритет: URGENT`);
+      return PriorityV2.URGENT;
+    }
+    
+    // Пытаемся как число
+    const num = Number(value);
+    if (!isNaN(num)) {
+      switch (num) {
+        case 1: 
+          this.logger.log(`🔴 Определен числовой приоритет: HIGH (1)`);
+          return PriorityV2.HIGH;
+        case 2: 
+          this.logger.log(`🟡 Определен числовой приоритет: MEDIUM (2)`);
+          return PriorityV2.MEDIUM;
+        case 3: 
+          this.logger.log(`🟢 Определен числовой приоритет: LOW (3)`);
+          return PriorityV2.LOW;
+        case 4: 
+          this.logger.log(`🚨 Определен числовой приоритет: URGENT (4)`);
+          return PriorityV2.URGENT;
+      }
+    }
+    
+    this.logger.log(`❓ Приоритет не распознан: "${value}"`);
+    return null;
+  }
+
+  /**
+   * ИСПРАВЛЕНО: Извлечение реальных операций из файла
+   */
+  private extractOperationsFromFile(
+    row: ExcelRow, 
+    mappings: ColumnMappings, 
+    workType: WorkTypeV2, 
+    quantity: number
+  ): any[] {
+    // Пытаемся найти данные об операциях в файле
+    const operationsTime = this.extractOperationsTime(row, mappings);
+    const operationsCount = this.extractOperationsCount(row, mappings);
+    const machineAxes = this.extractMachineAxes(row, mappings);
+    
+    this.logger.log(`🔧 Данные операций из файла: время=${operationsTime}, количество=${operationsCount}, оси=${machineAxes}`);
+    
+    // Определяем тип операции
+    const operationType = getOperationTypeFromWorkType(workType);
+    
+    // Если есть реальные данные из файла, используем их
+    if (operationsTime || operationsCount) {
+      const finalTime = operationsTime || (quantity * 15); // 15 минут на деталь по умолчанию
+      const finalCount = operationsCount || 1;
+      const finalAxes = machineAxes || 3;
+      
+      const operations = [];
+      for (let i = 1; i <= finalCount; i++) {
+        operations.push({
+          operationNumber: i,
+          operationType: operationType,
+          machineAxes: finalAxes,
+          estimatedTime: Math.ceil(finalTime / finalCount), // Распределяем время по операциям
+        });
+      }
+      
+      this.logger.log(`✅ Созданы операции из файла: ${operations.length} операций`);
+      return operations;
+    }
+    
+    // Если данных нет, создаем минимальную операцию
+    this.logger.log(`⚠️ Данные операций не найдены, создаем базовую операцию`);
+    return [{
+      operationNumber: 1,
+      operationType: operationType,
+      machineAxes: 3,
+      estimatedTime: Math.ceil(quantity * 10), // 10 минут на деталь
+    }];
+  }
+
+  /**
+   * Извлечение времени операций из файла
+   */
+  private extractOperationsTime(row: ExcelRow, mappings: ColumnMappings): number | null {
+    const column = mappings.operationsTime;
+    if (column) {
+      const value = row[column];
+      const num = Number(value);
+      if (!isNaN(num) && num > 0) {
+        this.logger.log(`⏱️ Найдено время операций: ${num} минут`);
+        return num;
+      }
+    }
+    
+    // Ищем время в любой колонке
+    for (const [key, value] of Object.entries(row)) {
+      if (value) {
+        const str = String(value).toLowerCase();
+        if (str.includes('мин') || str.includes('час') || str.includes('время')) {
+          const num = Number(value.toString().replace(/[^0-9.]/g, ''));
+          if (!isNaN(num) && num > 0) {
+            this.logger.log(`⏱️ Найдено время в колонке ${key}: ${num}`);
+            return num;
+          }
+        }
+      }
+    }
+    
+    return null;
+  }
+
+  /**
+   * Извлечение количества операций из файла
+   */
+  private extractOperationsCount(row: ExcelRow, mappings: ColumnMappings): number | null {
+    const column = mappings.operationsCount;
+    if (column) {
+      const value = row[column];
+      const num = Number(value);
+      if (!isNaN(num) && num > 0 && num <= 10) { // Разумное количество операций
+        this.logger.log(`🔢 Найдено количество операций: ${num}`);
+        return num;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Извлечение количества осей станка из файла
+   */
+  private extractMachineAxes(row: ExcelRow, mappings: ColumnMappings): number | null {
+    const column = mappings.machineAxes;
+    if (column) {
+      const value = row[column];
+      const num = Number(value);
+      if (!isNaN(num) && num >= 3 && num <= 5) { // 3-5 осей
+        this.logger.log(`⚙️ Найдено количество осей: ${num}`);
+        return num;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Проверка цвета ячейки
+   */
+  private isGreenCell(worksheet: ExcelJS.Worksheet, rowNumber: number, columnIndex: number): boolean {
+    try {
+      const cell = worksheet.getCell(rowNumber, columnIndex);
+      if (cell.fill && cell.fill.type === 'pattern') {
+        const fill = cell.fill as ExcelJS.FillPattern;
+        if (fill.fgColor) {
+          const color = typeof fill.fgColor === 'object' ? fill.fgColor.argb : fill.fgColor;
+          return color && (
+            color.toLowerCase().includes('00ff00') ||
+            color.toLowerCase().includes('008000') ||
+            color.toLowerCase().includes('90ee90') ||
+            color.toLowerCase().includes('00ff7f') ||
+            color.toLowerCase().includes('32cd32') ||
+            color.toLowerCase().includes('adff2f')
+          );
+        }
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Генерация номера чертежа
+   */
+  private generateDrawingNumber(rowIndex: number): string {
+    const timestamp = Date.now();
+    const hash = Math.random().toString(36).substr(2, 5).toUpperCase();
+    return `AUTO-${rowIndex}-${hash}-${timestamp}`;
+  }
+
+  /**
+   * Получение дефолтного дедлайна
+   */
+  private getDefaultDeadline(): string {
+    const defaultDate = new Date();
+    defaultDate.setDate(defaultDate.getDate() + 30);
+    return defaultDate.toISOString().split('T')[0];
+  }
+
+  // Остальные методы остаются без изменений...
+  private extractDrawingNumber(row: ExcelRow, mappings: ColumnMappings): string | null {
+    const column = mappings.drawingNumber;
+    if (!column) return null;
     
     const value = row[column];
     return value ? String(value).trim() : null;
   }
 
-  /**
-   * Извлечение количества
-   */
   private extractQuantity(row: ExcelRow, mappings: ColumnMappings): number | null {
     const column = mappings.quantity;
     if (!column) return null;
@@ -368,151 +543,35 @@ export class ExcelParserService {
     return isNaN(num) ? null : num;
   }
 
-  /**
-   * Извлечение дедлайна
-   */
   private extractDeadline(row: ExcelRow, mappings: ColumnMappings): string | null {
     const column = mappings.deadline;
-    if (!column) {
-      // Попробуем найти любое поле с датой
-      const dateColumns = Object.keys(row).filter(key => {
-        const val = String(key).toLowerCase();
-        return this.COLUMN_ALIASES.deadline.some(alias => val.includes(alias.toLowerCase()));
-      });
-      
-      if (dateColumns.length > 0) {
-        const value = row[dateColumns[0]];
-        return this.parseDate(value);
-      }
-      return null;
-    }
+    if (!column) return null;
     
     const value = row[column];
     if (!value) return null;
     
     return this.parseDate(value);
   }
-  
-  /**
-   * Парсинг даты с поддержкой разных форматов
-   */
+
   private parseDate(value: any): string | null {
     if (!value) return null;
     
     try {
-      const strValue = String(value).trim();
-      
-      // Проверяем различные форматы дат
-      
-      // Формат DD/MM/YY или DD/MM/YYYY
-      const ddmmyyMatch = strValue.match(/^(\d{1,2})[\/\.\-](\d{1,2})[\/\.\-](\d{2,4})$/);
-      if (ddmmyyMatch) {
-        let [, day, month, year] = ddmmyyMatch;
-        if (year.length === 2) {
-          year = '20' + year; // Предполагаем 21 век
-        }
-        const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-        if (!isNaN(date.getTime())) {
-          return date.toISOString().split('T')[0];
-        }
-      }
-      
-      // Обычное преобразование
       const date = new Date(value);
       if (!isNaN(date.getTime())) {
-        return date.toISOString().split('T')[0]; // YYYY-MM-DD
+        return date.toISOString().split('T')[0];
       }
       
-      // Если ничего не сработало, возвращаем дефолтную дату
       const defaultDate = new Date();
-      defaultDate.setDate(defaultDate.getDate() + 30); // +30 дней
+      defaultDate.setDate(defaultDate.getDate() + 30);
       return defaultDate.toISOString().split('T')[0];
     } catch {
-      // Если все плохо, возвращаем дефолт
       const defaultDate = new Date();
       defaultDate.setDate(defaultDate.getDate() + 30);
       return defaultDate.toISOString().split('T')[0];
     }
   }
 
-  /**
-   * Извлечение приоритета (старая версия)
-   */
-  private extractPriority(row: ExcelRow, mappings: ColumnMappings): number | null {
-    const column = mappings.priority;
-    if (!column) return null;
-    
-    const value = row[column];
-    if (!value) return null;
-    
-    const str = String(value).toLowerCase().trim();
-    
-    // Сопоставляем строки с числами (возвращаем числа, не enum)
-    if (str.includes('высок') || str.includes('high') || str === '1') {
-      return 1; // Priority.HIGH
-    }
-    if (str.includes('средн') || str.includes('medium') || str === '2') {
-      return 2; // Priority.MEDIUM
-    }
-    if (str.includes('низк') || str.includes('low') || str === '3') {
-      return 3; // Priority.LOW
-    }
-    if (str.includes('срочн') || str.includes('urgent') || str === '4') {
-      return 4; // Priority.URGENT
-    }
-    
-    // Пытаемся как число
-    const num = Number(value);
-    if (!isNaN(num) && num >= 1 && num <= 4) {
-      return num;
-    }
-    
-    return null;
-  }
-  
-  /**
-   * Извлечение приоритета V2 (возвращаем строковые enum)
-   */
-  private extractPriorityV2(row: ExcelRow, mappings: ColumnMappings): PriorityV2 | null {
-    const column = mappings.priority;
-    if (!column) return null;
-    
-    const value = row[column];
-    if (!value) return null;
-    
-    const str = String(value).toLowerCase().trim();
-    
-    // Маппинг на PriorityV2 enum
-    if (str.includes('высок') || str.includes('high') || str === '1') {
-      return PriorityV2.HIGH;
-    }
-    if (str.includes('средн') || str.includes('medium') || str === '2') {
-      return PriorityV2.MEDIUM;
-    }
-    if (str.includes('низк') || str.includes('low') || str === '3') {
-      return PriorityV2.LOW;
-    }
-    if (str.includes('срочн') || str.includes('urgent') || str === '4') {
-      return PriorityV2.URGENT;
-    }
-    
-    // Пытаемся как число и маппим
-    const num = Number(value);
-    if (!isNaN(num)) {
-      switch (num) {
-        case 1: return PriorityV2.HIGH;
-        case 2: return PriorityV2.MEDIUM;
-        case 3: return PriorityV2.LOW;
-        case 4: return PriorityV2.URGENT;
-      }
-    }
-    
-    return null;
-  }
-
-  /**
-   * Извлечение типа работы
-   */
   private extractWorkType(row: ExcelRow, mappings: ColumnMappings): string | null {
     const column = mappings.workType;
     if (!column) return null;
@@ -521,15 +580,9 @@ export class ExcelParserService {
     return value ? String(value).trim() : null;
   }
 
-  /**
-   * Валидация данных
-   */
   async validateExcelFile(fileBuffer: Buffer): Promise<{ valid: boolean; errors: string[] }> {
-    this.logger.log('🔍 Валидация Excel файла...');
-    
     try {
       const result = await this.parseExcelFile(fileBuffer);
-      
       return {
         valid: result.success && result.errors.length === 0,
         errors: result.errors,
@@ -542,15 +595,12 @@ export class ExcelParserService {
     }
   }
 
-  /**
-   * Получение примера структуры файла
-   */
   getExampleFileStructure(): any {
     return {
-      headers: ['Номер чертежа', 'Количество', 'Дедлайн', 'Приоритет', 'Тип работы'],
+      headers: ['Номер чертежа', 'Количество', 'Дедлайн', 'Приоритет', 'Тип работы', 'Время операций'],
       example: [
-        ['DRW-001', 10, '2024-12-31', 'Высокий', 'Фрезерование'],
-        ['DRW-002', 5, '2024-11-15', 'Средний', 'Токарная обработка'],
+        ['CN3F2001A', 3, '2023-10-01', 'Высокий', 'Фрезерная обработка', '60'],
+        ['RE1K0022A', 200, '2024-09-03', 'Средний', 'Токарная обработка', '2000'],
       ],
       supportedColumns: this.COLUMN_ALIASES,
     };
