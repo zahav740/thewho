@@ -319,44 +319,46 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
       });
       
       const ordersToCreate = selectedOrders.map(order => {
-        // Определяем WorkTypeV2 на основе данных из Excel
-        const workType = getWorkTypeFromExcel(order.workType || 'обработка');
-        const operationType = getOperationTypeFromWorkType(workType);
-        
-        // Определяем PriorityV2 на основе расчетного приоритета
-        const priority = getPriorityV2FromString(order.calculatedPriority);
-        
-        console.log(`📋 Обработка заказа ${order.drawingNumber}:`, {
-          workType: `'${order.workType}' -> ${workType}`,
-          operationType: operationType,
-          priority: `'${order.calculatedPriority}' -> ${priority}`
-        });
+        console.log(`📋 Подготовка заказа ${order.drawingNumber} БЕЗ операций (для технолога)`);
         
         return {
           drawingNumber: order.drawingNumber,
           quantity: order.quantity,
           deadline: order.deadline,
-          priority: priority,
-          workType: workType, // Используем WorkTypeV2 enum
-          operations: [{
-            operationNumber: 1,
-            operationType: operationType, // Определяем на основе workType
-            machineAxes: 3,
-            estimatedTime: Math.max(30, order.quantity * 5)
-          }],
+          priority: getPriorityV2FromString(order.calculatedPriority),
+          // НЕ УКАЗЫВАЕМ workType и operations - технолог заполнит вручную
         };
       });
       
       let created = 0;
       let errors = 0;
+      let duplicates = 0;
+      const errorDetails = [];
       
       for (let i = 0; i < ordersToCreate.length; i++) {
         try {
+          // 🔍 Проверяем на дубликаты по номеру чертежа
+          const existingOrder = await ordersApi.checkDuplicate(ordersToCreate[i].drawingNumber);
+          
+          if (existingOrder) {
+            console.log(`⚠️ Дубликат найден: ${ordersToCreate[i].drawingNumber}`);
+            duplicates++;
+            errorDetails.push({
+              drawingNumber: ordersToCreate[i].drawingNumber,
+              error: 'Заказ с таким номером чертежа уже существует'
+            });
+            continue; // Пропускаем дубликат
+          }
+          
           await ordersApi.createV2(ordersToCreate[i]);
           created++;
-        } catch (error) {
+        } catch (error: any) {
           errors++;
           console.error(`Ошибка создания заказа ${ordersToCreate[i].drawingNumber}:`, error);
+          errorDetails.push({
+            drawingNumber: ordersToCreate[i].drawingNumber,
+            error: error.response?.data?.message || error.message || 'Неизвестная ошибка'
+          });
         }
         
         const progress = Math.round((i + 1) / ordersToCreate.length * 100);
@@ -365,23 +367,40 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
         await new Promise(resolve => setTimeout(resolve, 100));
       }
       
-      if (created > 0) {
+      if (created > 0 || duplicates > 0) {
         const result = {
           created,
           updated: 0,
           errors,
+          duplicates,
+          errorDetails,
           prioritized: true,
           stats: importStats,
         };
         
         setCurrentStep(4);
         
+        // Показываем детальное сообщение
+        let messageText = `Создано: ${created} заказов`;
+        if (duplicates > 0) {
+          messageText += `, Пропущено дубликатов: ${duplicates}`;
+        }
+        if (errors > 0) {
+          messageText += `, Ошибок: ${errors}`;
+        }
+        
+        if (duplicates > 0 || errors > 0) {
+          message.warning(messageText);
+        } else {
+          message.success(messageText);
+        }
+        
         setTimeout(() => {
           onSuccess(result);
           handleClose();
         }, 2000);
       } else {
-        message.error('Не удалось создать ни одного заказа');
+        message.error('Не удалось создать ни одного заказа. Проверьте данные.');
         setCurrentStep(2);
       }
       
@@ -471,15 +490,6 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
         </Space>
       ),
     },
-    {
-      title: 'Тип работы',
-      dataIndex: 'workType',
-      key: 'workType',
-      ellipsis: true,
-      render: (workType: string) => (
-        <Text type="secondary">{workType}</Text>
-      ),
-    },
   ];
 
   const renderStepContent = () => {
@@ -493,7 +503,7 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
                 description={
                   <div>
                     <Paragraph>
-                      Загрузите Excel файл с колонками:
+                      📊 Загрузите Excel файл с колонками:
                     </Paragraph>
                     <ul style={{ textAlign: 'left', marginLeft: '40px' }}>
                       <li><strong>Колонка C:</strong> Номер чертежа</li>
@@ -501,8 +511,15 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
                       <li><strong>Колонка I:</strong> Дедлайн (дата)</li>
                       <li><strong>Колонка K:</strong> Приоритет (необязательно)</li>
                     </ul>
+                    <Alert
+                      message="Важно!"
+                      description="Тип работы и операции будут заполнены технологом вручную после загрузки."
+                      type="warning"
+                      showIcon
+                      style={{ marginTop: 16, marginBottom: 16 }}
+                    />
                     <Paragraph>
-                      Система автоматически распределит приоритеты по дедлайнам и сложности работы.
+                      Система автоматически распределит приоритеты по дедлайнам.
                     </Paragraph>
                   </div>
                 }

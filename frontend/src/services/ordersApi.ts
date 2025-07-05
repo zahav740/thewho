@@ -1,3 +1,21 @@
+  // Проверить дубликат по номеру чертежа
+  checkDuplicate: async (drawingNumber: string): Promise<Order | null> => {
+    try {
+      console.log('🔍 Проверяем дубликат для чертежа:', drawingNumber);
+      const response = await api.get(`/orders/check-duplicate/${encodeURIComponent(drawingNumber)}`);
+      console.log('✅ Результат проверки дубликата:', response.data ? 'Найден' : 'Не найден');
+      return response.data;
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        // Если заказ не найден, это хорошо - дубликата нет
+        console.log('✅ Дубликат не найден для:', drawingNumber);
+        return null;
+      }
+      console.error('❌ Ошибка проверки дубликата:', error);
+      throw error;
+    }
+  },
+
 /**
  * @file: ordersApi.ts
  * @description: API для работы с заказами
@@ -148,6 +166,24 @@ export const ordersApi = {
     console.log('🗑️ API: Удаляем заказ с ID:', id);
     const response = await api.delete(`/orders/${id}`);
     console.log('✅ API: Заказ успешно удалён:', response.status);
+  },
+
+  // Проверить дубликат по номеру чертежа
+  checkDuplicate: async (drawingNumber: string): Promise<Order | null> => {
+    try {
+      console.log('🔍 Проверяем дубликат для чертежа:', drawingNumber);
+      const response = await api.get(`/orders/check-duplicate/${encodeURIComponent(drawingNumber)}`);
+      console.log('✅ Результат проверки дубликата:', response.data ? 'Найден' : 'Не найден');
+      return response.data;
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        // Если заказ не найден, это хорошо - дубликата нет
+        console.log('✅ Дубликат не найден для:', drawingNumber);
+        return null;
+      }
+      console.error('❌ Ошибка проверки дубликата:', error);
+      throw error;
+    }
   },
 
   // Удалить выбранные заказы

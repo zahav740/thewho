@@ -42,16 +42,18 @@ deployment-beget/
 # ========================================
 # 🚫 ENVIRONMENT & CONFIG FILES
 # ========================================
-.env*
+.env
 !.env.example
 .env.local
 .env.development
 .env.production
-.env.beget*
+.env.beget
 .env.security
 .env.sqlite
-.env.supabase*
+.env.supabase
 .env.prod
+.env.beget.supabase
+.env.supabase.production
 
 # ========================================
 # 🚫 EXCEL & OFFICE FILES

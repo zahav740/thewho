@@ -113,25 +113,31 @@ export class OrdersController {
 
   @Get('check-duplicate/:drawingNumber')
   @ApiOperation({ summary: 'Проверить дубликат заказа по номеру чертежа' })
-  @ApiResponse({ status: 200, description: 'Результат проверки дубликата' })
+  @ApiResponse({ status: 200, description: 'Заказ найден' })
+  @ApiResponse({ status: 404, description: 'Заказ не найден' })
   async checkOrderDuplicate(@Param('drawingNumber') drawingNumber: string) {
     try {
       const existingOrder = await this.ordersService.findByDrawingNumber(drawingNumber);
       this.logger.log(`Checked duplicate for drawingNumber: ${drawingNumber}, exists: ${!!existingOrder}`);
-      return {
-        isDuplicate: !!existingOrder,
-        existingOrder: existingOrder
-          ? {
-              id: existingOrder.id,
-              drawingNumber: existingOrder.drawingNumber,
-              quantity: existingOrder.quantity,
-              deadline: existingOrder.deadline,
-              createdAt: existingOrder.createdAt,
-              operations: existingOrder.operations?.length || 0,
-            }
-          : null,
-      };
+      
+      if (existingOrder) {
+        // Если заказ найден, возвращаем его
+        return {
+          id: existingOrder.id,
+          drawingNumber: existingOrder.drawingNumber,
+          quantity: existingOrder.quantity,
+          deadline: existingOrder.deadline,
+          createdAt: existingOrder.createdAt,
+          operations: existingOrder.operations?.length || 0,
+        };
+      } else {
+        // Если заказ не найден, возвращаем 404
+        throw new NotFoundException('Заказ не найден');
+      }
     } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
       this.logger.error(`Error checking duplicate for drawingNumber ${drawingNumber}: ${error.message}`, error.stack);
       throw new BadRequestException('Ошибка проверки дубликата заказа');
     }
