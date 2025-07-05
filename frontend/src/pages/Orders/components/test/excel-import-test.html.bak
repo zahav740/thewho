@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест функциональности импорта Excel</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            margin: 40px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .feature {
+            background: #f8f9fa;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            border-left: 4px solid #52c41a;
+        }
+        .feature.demo {
+            border-left-color: #1890ff;
+        }
+        .feature.warning {
+            border-left-color: #faad14;
+            background: #fffbe6;
+        }
+        .feature h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        .checklist {
+            list-style: none;
+            padding: 0;
+        }
+        .checklist li {
+            padding: 8px 0;
+        }
+        .checklist li:before {
+            content: "✅ ";
+            margin-right: 10px;
+        }
+        .checklist li.disabled:before {
+            content: "❌ ";
+        }
+        .button {
+            background: #1890ff;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            margin: 10px 0;
+        }
+        .button:hover {
+            background: #40a9ff;
+        }
+        .code {
+            background: #f6f8fa;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            margin: 10px 0;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 Тест функциональности импорта Excel</h1>
+        
+        <div class="feature">
+            <h3>✅ Выполненные задачи</h3>
+            <ul class="checklist">
+                <li>Кнопка для сохранения только выбранных заказов</li>
+                <li>Фильтр "Зеленые не загружать" (исключить низкий приоритет)</li>
+                <li>Выбор отдельных записей в таблице с checkboxes</li>
+                <li>Кнопка "Выбрать все" с учетом фильтров</li>
+                <li>Счетчик выбранных заказов в реальном времени</li>
+                <li>Цветовое выделение строк по приоритету</li>
+                <li>Расширенная статистика с количеством выбранных</li>
+            </ul>
+        </div>
+
+        <div class="feature demo">
+            <h3>🚀 Текущий статус: Демо режим</h3>
+            <p><strong>Используются мок-данные</strong> для демонстрации функциональности:</p>
+            <ul>
+                <li>5 тестовых заказов с разными приоритетами</li>
+                <li>Различные дедлайны (просроченные, срочные, долгосрочные)</li>
+                <li>Разные типы работ (фрезерование, токарная, сверление)</li>
+                <li>Автоматический расчет приоритетов по дедлайнам</li>
+            </ul>
+        </div>
+
+        <div class="feature warning">
+            <h3>⚠️ Временно отключено</h3>
+            <ul class="checklist">
+                <li class="disabled">Реальный парсинг Excel файлов (API ошибка 400)</li>
+                <li class="disabled">Сохранение в базу данных (только имитация)</li>
+            </ul>
+            <p><strong>Причина:</strong> Серверный API эндпоинт `/api/v2/orders/parse-excel` возвращает ошибку 400.</p>
+        </div>
+
+        <div class="feature">
+            <h3>🧪 Что можно протестировать прямо сейчас</h3>
+            <ol>
+                <li><strong>Загрузите любой Excel файл</strong> - отобразятся демо-данные</li>
+                <li><strong>Переключите фильтр</strong> "Исключить зеленые" - увидите, как меняется выбор</li>
+                <li><strong>Выберите/отмените</strong> отдельные записи в таблице</li>
+                <li><strong>Используйте "Выбрать все"</strong> - работает с учетом фильтра</li>
+                <li><strong>Наблюдайте за счетчиками</strong> - статистика обновляется в реальном времени</li>
+                <li><strong>Увидьте цветовое выделение</strong> - зеленые, желтые, красные строки</li>
+                <li><strong>Нажмите "Сохранить"</strong> - сохранятся только выбранные заказы</li>
+            </ol>
+        </div>
+
+        <div class="feature">
+            <h3>🔧 Для включения реального API</h3>
+            <p>Когда серверная часть заработает, нужно:</p>
+            <div class="code">
+// В ExcelImportModal.tsx, строки 209-250
+// Убрать мок-данные и восстановить:
+
+const formData = new FormData();
+formData.append('file', file);
+
+const response = await fetch('/api/v2/orders/parse-excel', {
+  method: 'POST',
+  body: formData,
+});
+
+if (!response.ok) {
+  throw new Error(`Ошибка парсинга: ${response.status}`);
+}
+
+const result = await response.json();
+            </div>
+        </div>
+
+        <div class="feature">
+            <h3>📋 Мок-данные для тестирования</h3>
+            <p>Содержат следующие записи:</p>
+            <ul>
+                <li><strong>DRW-001</strong> - 5 шт, дедлайн 2025-07-15, Фрезерование (Высокий приоритет)</li>
+                <li><strong>DRW-002</strong> - 10 шт, дедлайн 2025-07-20, Токарная обработка (Средний приоритет)</li>
+                <li><strong>DRW-003</strong> - 15 шт, дедлайн 2025-08-01, Сверление (Низкий приоритет - зеленый)</li>
+                <li><strong>DRW-004</strong> - 3 шт, дедлайн 2025-07-08, Шлифование (Высокий приоритет)</li>
+                <li><strong>DRW-005</strong> - 25 шт, дедлайн 2025-08-15, Обработка (Низкий приоритет - зеленый)</li>
+            </ul>
+        </div>
+
+        <a href="#" onclick="window.location.href='http://localhost:3000'" class="button">
+            🚀 Перейти к тестированию в приложении
+        </a>
+    </div>
+
+    <script>
+        // Простая проверка доступности приложения
+        fetch('http://localhost:3000')
+            .then(response => {
+                if (response.ok) {
+                    console.log('✅ Приложение доступно на localhost:3000');
+                } else {
+                    console.log('⚠️ Приложение может быть недоступно');
+                }
+            })
+            .catch(error => {
+                console.log('❌ Приложение недоступно на localhost:3000');
+            });
+    </script>
+</body>
+</html>

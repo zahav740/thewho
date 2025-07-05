@@ -1,5 +1,5 @@
 import { Injectable, NestMiddleware, Logger } from '@nestjs/common';
-import { Request, Response, NextFunction } from 'express';
+import { Request as ExpressRequest, Response as ExpressResponse, NextFunction } from 'express';
 
 @Injectable()
 export class SecurityMiddleware implements NestMiddleware {
@@ -62,10 +62,10 @@ export class SecurityMiddleware implements NestMiddleware {
     '/swagger', '/docs', '/metrics', '/health-detailed'
   ];
 
-  use(req: Request, res: Response, next: NextFunction) {
+  use(req: ExpressRequest, res: ExpressResponse, next: NextFunction) {
     const startTime = Date.now();
     const clientIp = this.getClientIp(req);
-    const userAgent = req.get('User-Agent') || 'Unknown';
+    const userAgent = req.headers['user-agent'] || 'Unknown';
     const requestId = this.generateRequestId();
 
     // Добавляем request ID для трейсинга
@@ -121,7 +121,7 @@ export class SecurityMiddleware implements NestMiddleware {
       }
 
       // 5. Проверка размера запроса
-      const contentLength = parseInt(req.get('Content-Length') || '0');
+      const contentLength = parseInt(req.headers['content-length'] || '0');
       if (contentLength > 50 * 1024 * 1024) { // 50MB
         this.logSecurityEvent('LARGE_REQUEST', {
           ip: clientIp,
@@ -175,13 +175,13 @@ export class SecurityMiddleware implements NestMiddleware {
     }
   }
 
-  private getClientIp(req: Request): string {
+  private getClientIp(req: ExpressRequest): string {
     return (
-      req.get('CF-Connecting-IP') ||
-      req.get('X-Forwarded-For')?.split(',')[0] ||
-      req.get('X-Real-IP') ||
-      req.connection.remoteAddress ||
-      req.socket.remoteAddress ||
+      req.headers['cf-connecting-ip'] as string ||
+      (req.headers['x-forwarded-for'] as string)?.split(',')[0] ||
+      req.headers['x-real-ip'] as string ||
+      (req as any).connection?.remoteAddress ||
+      (req as any).socket?.remoteAddress ||
       'unknown'
     );
   }
@@ -213,7 +213,7 @@ export class SecurityMiddleware implements NestMiddleware {
     return this.xssPatterns.some(pattern => pattern.test(input));
   }
 
-  private hasSuspiciousHeaders(req: Request): boolean {
+  private hasSuspiciousHeaders(req: ExpressRequest): boolean {
     const headers = req.headers;
     
     // Проверка на отсутствие User-Agent (боты часто не отправляют)
@@ -230,7 +230,7 @@ export class SecurityMiddleware implements NestMiddleware {
     return suspiciousHeaders.some(header => headers[header]);
   }
 
-  private addSecurityHeaders(res: Response): void {
+  private addSecurityHeaders(res: ExpressResponse): void {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('X-Frame-Options', 'DENY');
     res.setHeader('X-XSS-Protection', '1; mode=block');
@@ -243,7 +243,7 @@ export class SecurityMiddleware implements NestMiddleware {
     res.removeHeader('Server');
   }
 
-  private blockRequest(res: Response, reason: string): void {
+  private blockRequest(res: ExpressResponse, reason: string): void {
     res.status(444).json({
       error: 'Access Denied',
       message: 'Your request has been blocked by security policies',

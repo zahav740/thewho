@@ -162,12 +162,22 @@ export const ordersApi = {
 
   // Удалить все заказы
   deleteAll: async (): Promise<{ deleted: number }> => {
-    console.log('API: Удаление всех заказов');
-    const response = await api.delete('/orders/all/confirm', {
-      data: { confirm: true }
-    });
-    console.log('API: Результат удаления всех:', response.data);
-    return response.data;
+    console.log('🗑️ API Client: Отправляем запрос на удаление всех заказов');
+    try {
+      const response = await api.delete('/orders/all/confirm', {
+        data: { confirm: true }
+      });
+      console.log('✅ API Client: Ответ от сервера:', response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ API Client: Ошибка удаления всех заказов:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        message: error.message
+      });
+      throw error;
+    }
   },
 
   // Получить все ID заказов
@@ -270,6 +280,180 @@ export const ordersApi = {
   deletePdf: async (orderId: number): Promise<Order> => {
     const response = await api.delete(`/orders/${orderId}/pdf`);
     return response.data;
+  },
+
+  // ===== НОВЫЕ МЕТОДЫ ДЛЯ ВЕРСИИ 2 =====
+
+  // Получить все заказы V2 с улучшенной фильтрацией
+  getAllV2: async (filter?: import('../types/order-v2.types').OrdersV2Filter): Promise<import('../types/order-v2.types').OrdersV2Response> => {
+    console.log('📋 API V2: Получение заказов с фильтрами:', filter);
+    const response = await api.get('/v2/orders', { params: filter });
+    console.log('✅ API V2: Получено заказов:', response.data.data?.length || 0);
+    return response.data;
+  },
+
+  // Получить заказ по ID V2
+  getByIdV2: async (id: number): Promise<import('../types/order-v2.types').OrderV2> => {
+    console.log('📋 API V2: Получение заказа по ID:', id);
+    const response = await api.get(`/v2/orders/${id}`);
+    console.log('✅ API V2: Заказ получен:', response.data.drawingNumber);
+    return response.data;
+  },
+
+  // Создать новый заказ V2
+  createV2: async (data: import('../types/order-v2.types').CreateOrderV2Dto): Promise<import('../types/order-v2.types').OrderV2> => {
+    console.log('📝 API V2: Создание заказа:', data);
+    
+    try {
+      // Приоритет уже является строкой (PriorityV2), не преобразуем
+      const preparedData = {
+        ...data,
+        priority: data.priority, // Оставляем как есть (строка)
+        operations: data.operations.map(op => ({
+          ...op,
+          operationNumber: Number(op.operationNumber),
+          machineAxes: Number(op.machineAxes),
+          estimatedTime: Number(op.estimatedTime)
+        }))
+      };
+      
+      console.log('📝 API V2: Отформатированные данные:', preparedData);
+        
+        // Дополнительная отладка для поиска ошибок 400
+        console.log('🔍 Отладка данных перед отправкой:', {
+          drawingNumber: preparedData.drawingNumber,
+          quantity: preparedData.quantity,
+          deadline: preparedData.deadline,
+          priority: `'${preparedData.priority}' (${typeof preparedData.priority})`,
+          workType: `'${preparedData.workType}' (${typeof preparedData.workType})`,
+          operationsCount: preparedData.operations?.length,
+          firstOperation: preparedData.operations?.[0]
+        });
+      
+      const response = await api.post('/v2/orders', preparedData);
+      console.log('✅ API V2: Заказ создан:', response.data.drawingNumber);
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ API V2: Ошибка создания заказа:', error.response?.data || error.message);
+      
+      // Детальная отладка ошибок 400
+      if (error.response?.status === 400 && error.response?.data?.message) {
+        console.error('🔍 Детали ошибки 400:', {
+          statusCode: error.response.data.statusCode,
+          error: error.response.data.error,
+          message: error.response.data.message,
+          ПОЛНОЕ_СООБЩЕНИЕ: error.response.data
+        });
+        
+        if (Array.isArray(error.response.data.message)) {
+          console.error('🐛 Ошибки валидации:', error.response.data.message);
+          error.response.data.message.forEach((msg: string, index: number) => {
+            console.error(`   ${index + 1}. ${msg}`);
+          });
+        }
+      }
+      
+      throw error;
+    }
+  },
+
+  // Обновить заказ V2
+  updateV2: async (id: number, data: import('../types/order-v2.types').UpdateOrderV2Dto): Promise<import('../types/order-v2.types').OrderV2> => {
+    console.log(`📝 API V2: Обновление заказа ${id}:`, data);
+    
+    try {
+      // Приоритет уже является строкой (PriorityV2), не преобразуем
+      const preparedData = {
+        ...data,
+        priority: data.priority, // Оставляем как есть (строка или undefined)
+        operations: data.operations ? data.operations.map(op => ({
+          ...op,
+          operationNumber: Number(op.operationNumber),
+          machineAxes: Number(op.machineAxes),
+          estimatedTime: Number(op.estimatedTime)
+        })) : undefined
+      };
+      
+      console.log('📝 API V2: Отформатированные данные:', preparedData);
+      
+      const response = await api.put(`/v2/orders/${id}`, preparedData);
+      console.log('✅ API V2: Заказ обновлен:', response.data.drawingNumber);
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ API V2: Ошибка обновления заказа:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  // Удалить заказ V2
+  deleteV2: async (id: number): Promise<void> => {
+    console.log('🗑️ API V2: Удаляем заказ с ID:', id);
+    const response = await api.delete(`/v2/orders/${id}`);
+    console.log('✅ API V2: Заказ успешно удалён:', response.status);
+  },
+
+  // Парсинг Excel файла V2
+  parseExcelV2: async (file: File): Promise<any> => {
+    console.log('📊 API V2: Парсинг Excel файла:', file.name);
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    try {
+      const response = await api.post('/v2/orders/parse-excel', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      
+      console.log('✅ API V2: Excel файл спарсен:', response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ API V2: Ошибка парсинга Excel:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  // Массовое создание заказов V2
+  createBatchV2: async (orders: import('../types/order-v2.types').CreateOrderV2Dto[]): Promise<import('../types/order-v2.types').ExcelImportV2Result> => {
+    console.log('📝 API V2: Массовое создание заказов:', orders.length);
+    
+    try {
+      const response = await api.post('/v2/orders/batch', { orders });
+      console.log('✅ API V2: Заказы созданы:', response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ API V2: Ошибка массового создания:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  // Получить статистику заказов V2
+  getStatsV2: async (): Promise<import('../types/order-v2.types').OrdersV2Stats> => {
+    console.log('📊 API V2: Получение статистики заказов');
+    
+    try {
+      const response = await api.get('/v2/orders/stats');
+      console.log('✅ API V2: Статистика получена:', response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ API V2: Ошибка получения статистики:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  // Пересчитать приоритеты заказов V2
+  recalculatePrioritiesV2: async (): Promise<any> => {
+    console.log('🔄 API V2: Пересчет приоритетов заказов');
+    
+    try {
+      const response = await api.post('/v2/orders/recalculate-priorities');
+      console.log('✅ API V2: Приоритеты пересчитаны:', response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ API V2: Ошибка пересчета приоритетов:', error.response?.data || error.message);
+      throw error;
+    }
   },
 };
 

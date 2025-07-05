@@ -3,7 +3,7 @@
  * @description: Адаптивная страница базы данных заказов с поддержкой i18n
  * @dependencies: OrdersList, OrderForm, CSVImportModal, ResponsiveGrid
  * @created: 2025-01-28
- * @updated: 2025-06-18 - Добавлена полная адаптивность для всех устройств
+ * @updated: 2025-06-30 - Добавлен новый Excel Import Manager с БД
  */
 import React, { useState } from 'react';
 import { Button, Row, Col, message, Space, Tooltip, Modal } from 'antd';
@@ -22,6 +22,7 @@ import { OrdersList } from './components/OrdersList';
 import { OrderForm } from './components/OrderForm.SIMPLE';
 import { CSVImportModal } from './components/CSVImportModal';
 import AdvancedExcelUploader from '../../components/ExcelUploader/AdvancedExcelUploader';
+import { ExcelImportManagerAntd, FilterManagerAntd, InteractiveColumnMapper, ExcelImportsList } from '../../components/ExcelUploader';
 // import { EnhancedExcelImporter } from '../../components/ExcelUploader/EnhancedExcelImporter'; // Заменено на AdvancedExcelUploader
 import { useTranslation } from '../../i18n';
 import { 
@@ -38,6 +39,10 @@ export const DatabasePage: React.FC = () => {
   const [showOrderForm, setShowOrderForm] = useState(false);
   const [showCSVImport, setShowCSVImport] = useState(false);
   const [showAdvancedExcelImport, setShowAdvancedExcelImport] = useState(false);
+  const [showExcelImportManager, setShowExcelImportManager] = useState(false);
+  const [showFilterManager, setShowFilterManager] = useState(false);
+  const [showInteractiveMapper, setShowInteractiveMapper] = useState(false);
+  const [showExcelImportsList, setShowExcelImportsList] = useState(false);
   // const [showEnhancedExcelImport, setShowEnhancedExcelImport] = useState(false); // Заменено
   const [editingOrderId, setEditingOrderId] = useState<number | undefined>();
   const [filter, setFilter] = useState<OrdersFilter>({ page: 1, limit: 10 });
@@ -47,6 +52,20 @@ export const DatabasePage: React.FC = () => {
     queryKey: ['orders', filter],
     queryFn: () => ordersApi.getAll(filter),
   });
+
+  // Глобальный callback для обновления списка заказов
+  React.useEffect(() => {
+    window.refreshOrdersList = async () => {
+      console.log('🔄 Обновляем список заказов через React Query...');
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      await refetch();
+      message.success('✅ Список заказов обновлён!');
+    };
+    
+    return () => {
+      delete window.refreshOrdersList;
+    };
+  }, [queryClient, refetch]);
 
   const componentSize = responsiveUtils.getComponentSize(screenInfo);
   const cardSize: 'default' | 'small' = screenInfo.isMobile ? 'small' : 'default';
@@ -272,6 +291,90 @@ export const DatabasePage: React.FC = () => {
               </Button>
             </Tooltip>
             
+            {/* Список импортов Excel */}
+            <Tooltip title="История импорта Excel файлов">
+              <Button
+                type="default"
+                icon={<FileExcelOutlined />}
+                onClick={() => setShowExcelImportsList(true)}
+                size={componentSize}
+                style={{ 
+                  width: screenInfo.isMobile ? '100%' : 'auto',
+                  height: screenInfo.isMobile ? 44 : 'auto',
+                  marginBottom: screenInfo.isMobile ? 8 : 0
+                }}
+              >
+                {screenInfo.isMobile ? '📋 История' : '📋 История импорта'}
+              </Button>
+            </Tooltip>
+            
+            {/* Менеджер фильтров */}
+      <Modal
+        title="⚙️ Менеджер фильтров импорта"
+        open={showFilterManager}
+        onCancel={() => setShowFilterManager(false)}
+        width={1200}
+        footer={null}
+        destroyOnClose
+        style={{ top: 20 }}
+      >
+        <FilterManagerAntd />
+      </Modal>
+
+      {/* Новый интерактивный маппер колонок Excel */}
+      <Tooltip title="Интерактивный маппинг колонок Excel к БД">
+      <Button
+      type="primary"
+      icon={<FileExcelOutlined />}
+      onClick={() => setShowInteractiveMapper(true)}
+      size={componentSize}
+      style={{ 
+      background: 'linear-gradient(45deg, #1890ff, #722ed1)',
+      border: 'none',
+      width: screenInfo.isMobile ? '100%' : 'auto',
+      height: screenInfo.isMobile ? 44 : 'auto',
+      marginBottom: screenInfo.isMobile ? 8 : 0
+      }}
+      >
+      {screenInfo.isMobile ? '🎯 Excel Маппер' : '🎯 Excel Маппер'}
+      <CheckCircleOutlined style={{ marginLeft: 4, color: 'white' }} />
+      </Button>
+      </Tooltip>
+            
+            {/* Новый менеджер импорта Excel с БД */}
+            <Tooltip title="Полный менеджер импорта Excel с сохранением в базу данных">
+              <Button
+                type="default"
+                icon={<FileExcelOutlined />}
+                onClick={() => setShowExcelImportManager(true)}
+                size={componentSize}
+                style={{ 
+                  width: screenInfo.isMobile ? '100%' : 'auto',
+                  height: screenInfo.isMobile ? 44 : 'auto',
+                  marginBottom: screenInfo.isMobile ? 8 : 0
+                }}
+              >
+                {screenInfo.isMobile ? '🗄️ Менеджер' : '🗼 Менеджер'}
+              </Button>
+            </Tooltip>
+            
+            {/* Менеджер фильтров */}
+            <Tooltip title="Настройка фильтров импорта">
+              <Button
+                type="default"
+                icon={<ImportOutlined />}
+                onClick={() => setShowFilterManager(true)}
+                size={componentSize}
+                style={{ 
+                  width: screenInfo.isMobile ? '100%' : 'auto',
+                  height: screenInfo.isMobile ? 44 : 'auto',
+                  marginBottom: screenInfo.isMobile ? 8 : 0
+                }}
+              >
+                {screenInfo.isMobile ? '⚙️ Фильтры' : '⚙️ Фильтры'}
+              </Button>
+            </Tooltip>
+            
             {/* Новый Excel импорт с выбором колонок */}
             <Tooltip title="Новый импорт Excel с возможностью выбора любых колонок">
               <Button
@@ -362,6 +465,45 @@ export const DatabasePage: React.FC = () => {
         onClose={() => setShowCSVImport(false)}
         onSuccess={handleCSVImportSuccess}
       />
+
+      {/* Список импортов Excel */}
+      <Modal
+        title="📋 История импорта Excel файлов"
+        open={showExcelImportsList}
+        onCancel={() => setShowExcelImportsList(false)}
+        width={1400}
+        footer={null}
+        destroyOnClose
+        style={{ top: 20 }}
+      >
+        <ExcelImportsList />
+      </Modal>
+      
+      {/* Новый интерактивный маппер Excel */}
+      <Modal
+        title="🎯 Интерактивный маппинг Excel колонок"
+        open={showInteractiveMapper}
+        onCancel={() => setShowInteractiveMapper(false)}
+        width={1400}
+        footer={null}
+        destroyOnClose
+        style={{ top: 20 }}
+      >
+        <InteractiveColumnMapper />
+      </Modal>
+      
+      {/* Новый менеджер импорта Excel с БД */}
+      <Modal
+        title="🗄️ Менеджер импорта Excel с базой данных"
+        open={showExcelImportManager}
+        onCancel={() => setShowExcelImportManager(false)}
+        width={1400}
+        footer={null}
+        destroyOnClose
+        style={{ top: 20 }}
+      >
+        <ExcelImportManagerAntd />
+      </Modal>
 
       {/* Новый Excel импорт с выбором колонок */}
       <Modal

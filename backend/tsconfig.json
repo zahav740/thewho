@@ -16,8 +16,14 @@
     "noImplicitAny": false,
     "strictBindCallApply": false,
     "forceConsistentCasingInFileNames": false,
-    "noFallthroughCasesInSwitch": false
+    "noFallthroughCasesInSwitch": false,
+    "typeRoots": ["./node_modules/@types", "./src/types"],
+    "types": ["node"]
   },
+  "include": [
+    "src/**/*",
+    "src/types/**/*"
+  ],
   "exclude": [
     "src/main.security.ts",
     "src/main.beget.ts",

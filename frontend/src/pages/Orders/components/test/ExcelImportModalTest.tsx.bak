@@ -1,0 +1,55 @@
+/**
+ * @file: ExcelImportModalTest.tsx
+ * @description: Тестовый компонент для проверки функциональности импорта Excel
+ */
+import React, { useState } from 'react';
+import { Button, Space } from 'antd';
+import { FileExcelOutlined } from '@ant-design/icons';
+import { ExcelImportModal } from '../ExcelImportModal';
+
+export const ExcelImportModalTest: React.FC = () => {
+  const [modalVisible, setModalVisible] = useState(false);
+
+  const handleSuccess = (result: any) => {
+    console.log('✅ Импорт завершен успешно:', result);
+    console.log(`- Создано заказов: ${result.created}`);
+    console.log(`- Ошибок: ${result.errors}`);
+    console.log(`- Статистика:`, result.stats);
+  };
+
+  return (
+    <div style={{ padding: '20px' }}>
+      <Space direction="vertical" size="large">
+        <h2>Тест модуля импорта Excel с фильтрами</h2>
+        
+        <div>
+          <h3>Новая функциональность:</h3>
+          <ul>
+            <li>✅ <strong>Фильтр "Зеленые не загружать"</strong> - автоматически исключает заказы с низким приоритетом</li>
+            <li>✅ <strong>Кнопка выбора заказов</strong> - позволяет выбирать конкретные заказы для импорта</li>
+            <li>✅ <strong>Цветовое выделение</strong> - строки выделяются цветом по приоритету</li>
+            <li>✅ <strong>Счетчик выбранных</strong> - показывает количество выбранных заказов</li>
+            <li>✅ <strong>Статистика</strong> - расширенная статистика с учетом фильтров</li>
+          </ul>
+        </div>
+
+        <Button 
+          type="primary" 
+          icon={<FileExcelOutlined />}
+          onClick={() => setModalVisible(true)}
+          size="large"
+        >
+          Открыть импорт Excel с фильтрами
+        </Button>
+      </Space>
+
+      <ExcelImportModal
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+        onSuccess={handleSuccess}
+      />
+    </div>
+  );
+};
+
+export default ExcelImportModalTest;

@@ -22,6 +22,7 @@ import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 // --- Основные модули приложения ---
 import { MachinesModule } from './modules/machines/machines.module';
 import { OrdersModule } from './modules/orders/orders.module';
+import { OrdersV2Module } from './modules/orders/v2/orders-v2.module';
 import { OperationsModule } from './modules/operations/operations.module';
 import { OperatorsModule } from './modules/operators/operators.module';
 import { ShiftsModule } from './modules/shifts/shifts.module';
@@ -34,6 +35,7 @@ import { TranslationsModule } from './modules/translations/translations.module';
 import { OperationAnalyticsModule } from './modules/operation-analytics/operation-analytics.module';
 import { SynchronizationModule } from './modules/synchronization/synchronization.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { AnalyticsModule } from './modules/analytics/analytics.module';
 
 @Module({
   imports: [
@@ -58,6 +60,7 @@ import { AuthModule } from './modules/auth/auth.module';
     // Подключение всех модулей вашего приложения
     MachinesModule,
     OrdersModule,
+    OrdersV2Module,
     OperationsModule,
     OperatorsModule,
     ShiftsModule,
@@ -70,6 +73,7 @@ import { AuthModule } from './modules/auth/auth.module';
     OperationAnalyticsModule,
     SynchronizationModule,
     AuthModule,
+    AnalyticsModule,
   ],
   providers: [
     // В данный момент глобальный JWT Guard закомментирован.

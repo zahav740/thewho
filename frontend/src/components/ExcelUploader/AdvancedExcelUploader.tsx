@@ -19,7 +19,7 @@ import {
   Divider,
   Modal,
   Table,
-  message,
+  App,
   Spin,
   Steps,
   Statistic
@@ -38,6 +38,31 @@ import {
 } from '@ant-design/icons';
 import { UploadProps } from 'antd/es/upload/interface';
 import ExcelColumnMapper from './ExcelColumnMapper';
+
+// Добавляем CSS анимацию для кнопки "Готово"
+const pulseButtonStyle = `
+  @keyframes pulse {
+    0% {
+      transform: scale(1);
+      box-shadow: 0 0 0 0 rgba(82, 196, 26, 0.7);
+    }
+    70% {
+      transform: scale(1.05);
+      box-shadow: 0 0 0 10px rgba(82, 196, 26, 0);
+    }
+    100% {
+      transform: scale(1);
+      box-shadow: 0 0 0 0 rgba(82, 196, 26, 0);
+    }
+  }
+`;
+
+// Добавляем стили в head
+if (typeof document !== 'undefined') {
+  const styleElement = document.createElement('style');
+  styleElement.textContent = pulseButtonStyle;
+  document.head.appendChild(styleElement);
+}
 
 const { Dragger } = Upload;
 const { Title, Text, Paragraph } = Typography;
@@ -82,6 +107,7 @@ const AdvancedExcelUploader: React.FC<AdvancedExcelUploaderProps> = ({
   title = 'Загрузка Excel файлов с выбором колонок',
   description = 'Перетащите файл сюда или нажмите для выбора. Настройте соответствие колонок перед импортом.',
 }) => {
+  const { message } = App.useApp();
   const [files, setFiles] = useState<ExcelFile[]>([]);
   const [previewModalVisible, setPreviewModalVisible] = useState(false);
   const [columnMapperVisible, setColumnMapperVisible] = useState(false);
@@ -200,7 +226,14 @@ const AdvancedExcelUploader: React.FC<AdvancedExcelUploaderProps> = ({
         } : f
       ));
 
-      message.success(`Файл "${currentFileForMapping.name}" успешно импортирован с пользовательскими настройками`);
+      message.success(`Файл "${currentFileForMapping.name}" успешно импортирован в список заказов (📋 Данные сохранены!)`);
+
+      // Обновляем список заказов через глобальный callback
+      if (window.refreshOrdersList) {
+        setTimeout(() => {
+          window.refreshOrdersList?.();
+        }, 500);
+      }
     } catch (error: any) {
       console.error('❌ Ошибка импорта с маппингом:', error);
       setFiles(prev => prev.map((f, i) => 
@@ -260,6 +293,52 @@ const AdvancedExcelUploader: React.FC<AdvancedExcelUploaderProps> = ({
     handleFileUpload(file.file);
   };
 
+  // Новая функция для сохранения в список заказов
+  const handleSaveToList = async (index: number) => {
+    const file = files[index];
+    
+    if (!file.importResult) {
+      message.warning('Нет данных для сохранения');
+      return;
+    }
+
+    try {
+      console.log('📋 Сохраняем данные в список заказов:', file.importResult);
+      
+      // Показываем сообщение о том что данные уже сохранены
+      message.success({
+        content: (
+          <div>
+            <div>🎉 <strong>Данные уже сохранены в списке заказов!</strong></div>
+            <div style={{ fontSize: '12px', marginTop: '4px' }}>
+              Создано: {file.importResult.data.created || 0}, 
+              Обновлено: {file.importResult.data.updated || 0}
+            </div>
+            <div style={{ fontSize: '11px', color: '#666', marginTop: '2px' }}>
+              📋 Обновляем список заказов...
+            </div>
+          </div>
+        ),
+        duration: 3
+      });
+
+      // Закрываем модальное окно импорта и обновляем страницу
+      setTimeout(() => {
+        // Если есть callback для обновления списка - используем его
+        if (window.refreshOrdersList) {
+          window.refreshOrdersList();
+        } else {
+          // Иначе перезагружаем страницу
+          window.location.reload();
+        }
+      }, 1000);
+      
+    } catch (error: any) {
+      console.error('❌ Ошибка при сохранении:', error);
+      message.error('Ошибка при сохранении в список заказов');
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'done': return 'success';
@@ -290,7 +369,7 @@ const AdvancedExcelUploader: React.FC<AdvancedExcelUploaderProps> = ({
       case 'analyzing': return 'Анализ';
       case 'configuring': return 'Настройка';
       case 'importing': return 'Импорт';
-      case 'done': return 'Готов';
+      case 'done': return 'Данные в списке заказов';
       case 'error': return 'Ошибка';
       default: return 'Неизвестно';
     }
@@ -355,7 +434,7 @@ const AdvancedExcelUploader: React.FC<AdvancedExcelUploaderProps> = ({
           <Step title="Загрузка" description="Выберите файл" icon={<InboxOutlined />} />
           <Step title="Настройка" description="Выберите колонки" icon={<SettingOutlined />} />
           <Step title="Импорт" description="Импорт данных" icon={<CloudUploadOutlined />} />
-          <Step title="Завершено" description="Готово" icon={<CheckCircleOutlined />} />
+          <Step title="Готово" description="📋 Нажмите кнопку 'Готово'" icon={<CheckCircleOutlined />} />
         </Steps>
 
         <Dragger {...uploadProps} style={{ marginBottom: 24 }}>
@@ -400,23 +479,41 @@ const AdvancedExcelUploader: React.FC<AdvancedExcelUploaderProps> = ({
                     <Col>
                       <Space>
                         {file.status === 'configuring' && (
-                          <Button 
-                            type="primary"
-                            size="small" 
-                            icon={<SettingOutlined />}
-                            onClick={() => handleConfigureColumns(index)}
-                          >
-                            Настроить колонки
-                          </Button>
+                        <Button 
+                        type="primary"
+                        size="small" 
+                        icon={<SettingOutlined />}
+                        onClick={() => handleConfigureColumns(index)}
+                        >
+                        🆕 Настроить колонки
+                        </Button>
                         )}
-                        {file.status === 'done' && showPreview && (
-                          <Button 
-                            size="small" 
-                            icon={<BarChartOutlined />}
-                            onClick={() => handlePreview(index)}
-                          >
-                            Результаты
-                          </Button>
+                        {file.status === 'done' && (
+                          <>
+                            <Button 
+                              type="primary"
+                              size="small" 
+                              icon={<CheckCircleOutlined />}
+                              onClick={() => handleSaveToList(index)}
+                              style={{ 
+                                backgroundColor: '#52c41a', 
+                                borderColor: '#52c41a',
+                                animation: 'pulse 2s infinite',
+                                boxShadow: '0 0 0 0 rgba(82, 196, 26, 0.7)'
+                              }}
+                            >
+                              📋 Готово - Данные в списке заказов
+                            </Button>
+                            {showPreview && (
+                              <Button 
+                                size="small" 
+                                icon={<BarChartOutlined />}
+                                onClick={() => handlePreview(index)}
+                              >
+                                Результаты
+                              </Button>
+                            )}
+                          </>
                         )}
                         {file.status === 'error' && (
                           <Button 

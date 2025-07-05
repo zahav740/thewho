@@ -11,7 +11,7 @@ import * as ExcelJS from 'exceljs';
 import { Order, Priority } from '../../database/entities/order.entity';
 import { Operation, OperationType } from '../../database/entities/operation.entity';
 import { OrdersService } from './orders.service';
-import type { Express } from 'express';
+import { MulterFile } from '../../types/express';
 
 export interface ImportResult {
   created: number;
@@ -44,7 +44,7 @@ export class ExcelImportService {
   ) {}
 
   async importOrders(
-    file: Express.Multer.File,
+    file: MulterFile,
     colorFilters: string[] = [],
   ): Promise<ImportResult> {
     console.log('🔍 EXCEL IMPORT SERVICE: Начало импорта реального файла:', {

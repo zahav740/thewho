@@ -32,38 +32,20 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from '../../i18n';
 import { 
-  calculateCorrectedMetrics, 
-  calculateKirillExample, 
-  compareCalculationMethods,
-  getMetricColor,
-  getImprovementRecommendations
-} from '../../utils/CorrectedEfficiencyCalculations';
+  calculateOEEAndKPI, 
+  calculateUserExample, 
+  OEEKPIResult,
+  ProductionShiftData
+} from '../../utils/OEECalculations';
+import { analyticsApi, OperatorPerformance as APIOperatorPerformance, MachinePerformance as APIMachinePerformance } from '../../services/analyticsApi';
 import dayjs, { Dayjs } from 'dayjs';
 
 const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
 const { TabPane } = Tabs;
 
-interface OperatorPerformance {
-  operatorName: string;
-  oee: number;
-  kpi: number;
-  totalShifts: number;
-  avgProduction: number;
-  qualityRate: number;
-  recommendations: string[];
-}
-
-interface MachinePerformance {
-  machineId: string;
-  machineName: string;
-  oee: number;
-  utilization: number;
-  setupTimePercent: number;
-  productionTimePercent: number;
-  downTimePercent: number;
-  status: 'excellent' | 'good' | 'needs_attention';
-}
+interface OperatorPerformance extends APIOperatorPerformance {}
+interface MachinePerformance extends APIMachinePerformance {}
 
 export const KPIAnalyticsPage: React.FC = () => {
   const { t } = useTranslation();
@@ -74,72 +56,74 @@ export const KPIAnalyticsPage: React.FC = () => {
   const [selectedOperator, setSelectedOperator] = useState<string>('all');
   const [selectedMachine, setSelectedMachine] = useState<string>('all');
 
-  // Тестовые данные для демонстрации
-  const [operatorData] = useState<OperatorPerformance[]>([
-    {
-      operatorName: 'Kirill',
-      oee: 87.5, // (120+300)/480*100
-      kpi: 89.2, // Высокий KPI без штрафа за наладку
-      totalShifts: 12,
-      avgProduction: 11.5,
-      qualityRate: 91.7,
-      recommendations: ['Отличная работа', 'Поддерживать уровень']
+  // Загрузка данных операторов из API
+  const { data: operatorData, isLoading: operatorLoading, error: operatorError } = useQuery<OperatorPerformance[]>({
+    queryKey: ['operator-performance', selectedPeriod],
+    queryFn: () => {
+      if (!selectedPeriod || !selectedPeriod[0] || !selectedPeriod[1]) {
+        return analyticsApi.getOperatorPerformance();
+      }
+      return analyticsApi.getOperatorPerformance({
+        startDate: selectedPeriod[0].format('YYYY-MM-DD'),
+        endDate: selectedPeriod[1].format('YYYY-MM-DD')
+      });
     },
-    {
-      operatorName: 'Arkady',
-      oee: 91.2,
-      kpi: 94.1,
-      totalShifts: 15,
-      avgProduction: 18.2,
-      qualityRate: 98.1,
-      recommendations: ['Превосходный результат', 'Может обучать других']
-    },
-    {
-      operatorName: 'Denis',
-      oee: 73.5,
-      kpi: 76.8,
-      totalShifts: 8,
-      avgProduction: 8.3,
-      qualityRate: 87.4,
-      recommendations: ['Нуждается в обучении', 'Анализ простоев']
-    }
-  ]);
+    staleTime: 5 * 60 * 1000,
+  });
 
-  const [machineData] = useState<MachinePerformance[]>([
-    {
-      machineId: 'CNC-01',
-      machineName: 'Doosan Yashana',
-      oee: 87.5,
-      utilization: 87.5,
-      setupTimePercent: 25.0,
-      productionTimePercent: 62.5,
-      downTimePercent: 12.5,
-      status: 'good'
+  const { data: machineData, isLoading: machineLoading, error: machineError } = useQuery<MachinePerformance[]>({
+    queryKey: ['machine-performance', selectedPeriod],
+    queryFn: () => {
+      if (!selectedPeriod || !selectedPeriod[0] || !selectedPeriod[1]) {
+        return analyticsApi.getMachinePerformance();
+      }
+      return analyticsApi.getMachinePerformance({
+        startDate: selectedPeriod[0].format('YYYY-MM-DD'),
+        endDate: selectedPeriod[1].format('YYYY-MM-DD')
+      });
     },
-    {
-      machineId: 'CNC-02', 
-      machineName: 'Doosan Hadasha',
-      oee: 91.2,
-      utilization: 91.2,
-      setupTimePercent: 20.0,
-      productionTimePercent: 71.2,
-      downTimePercent: 8.8,
-      status: 'excellent'
-    },
-    {
-      machineId: 'CNC-03',
-      machineName: 'Mitsubishi',
-      oee: 68.3,
-      utilization: 68.3,
-      setupTimePercent: 30.0,
-      productionTimePercent: 38.3,
-      downTimePercent: 31.7,
-      status: 'needs_attention'
-    }
-  ]);
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Общие метрики на основе реальных данных
+  const averageOEE = machineData && machineData.length > 0 
+    ? Math.round(machineData.reduce((sum: number, machine: MachinePerformance) => sum + machine.oee, 0) / machineData.length)
+    : 0;
+    
+  const averageKPI = operatorData && operatorData.length > 0 
+    ? Math.round(operatorData.reduce((sum: number, operator: OperatorPerformance) => sum + operator.kpi, 0) / operatorData.length)
+    : 0;
+    
+  const bestResult = Math.max(averageOEE, averageKPI);
+  const needsAttentionCount = machineData ? machineData.filter((m: MachinePerformance) => m.status === 'needs_attention').length : 0;
 
   // Демонстрация исправленных расчетов
-  const exampleCalculation = calculateKirillExample();
+  const exampleCalculation = calculateUserExample();
+  
+  // Helper functions
+  const getMetricColor = (value: number, type: 'oee' | 'kpi') => {
+    const threshold = type === 'oee' ? 85 : 80;
+    return value >= threshold + 10 ? '#52c41a' : value >= threshold ? '#faad14' : '#f5222d';
+  };
+  
+  const compareCalculationMethods = (data: any) => {
+    const newResult = calculateOEEAndKPI(data);
+    return {
+      old: {
+        oee: 62.5, // Пример старого неправильного расчета
+        logic: 'Считал наладку простоем'
+      },
+      new: {
+        oee: newResult.machineOEE,
+        operatorKPI: newResult.operatorKPI
+      },
+      difference: {
+        oeeDiff: newResult.machineOEE - 62.5,
+        explanation: 'Наладка теперь не простой'
+      }
+    };
+  };
+  
   const comparisonResult = compareCalculationMethods({
     shiftTime: 480,
     setupTime: 120,
@@ -148,7 +132,10 @@ export const KPIAnalyticsPage: React.FC = () => {
     plannedParts: 15,
     actualParts: 12,
     defectParts: 1,
-    standardTimePerPart: 25
+    operatorName: 'Test',
+    machineName: 'Test Machine',
+    shift: 1,
+    date: '2025-06-30'
   });
 
   const getStatusColor = (status: string) => {
@@ -404,29 +391,35 @@ export const KPIAnalyticsPage: React.FC = () => {
           <Card>
             <Statistic
               title="Средний OEE станков"
-              value={82.3}
+              value={averageOEE}
               suffix="%"
-              valueStyle={{ color: getMetricColor(82.3, 'oee') }}
+              valueStyle={{ color: getMetricColor(averageOEE, 'oee') }}
               prefix={<ToolOutlined />}
             />
+            <Text type="secondary" style={{ fontSize: '12px' }}>
+              {machineData?.length || 0} станков
+            </Text>
           </Card>
         </Col>
         <Col span={6}>
           <Card>
             <Statistic
               title="Средний KPI операторов"
-              value={86.7}
+              value={averageKPI}
               suffix="%"
-              valueStyle={{ color: getMetricColor(86.7, 'kpi') }}
+              valueStyle={{ color: getMetricColor(averageKPI, 'kpi') }}
               prefix={<UserOutlined />}
             />
+            <Text type="secondary" style={{ fontSize: '12px' }}>
+              {operatorData?.length || 0} операторов
+            </Text>
           </Card>
         </Col>
         <Col span={6}>
           <Card>
             <Statistic
               title="Лучший результат"
-              value={94.1}
+              value={bestResult}
               suffix="%"
               valueStyle={{ color: '#52c41a' }}
               prefix={<TrophyOutlined />}
@@ -437,7 +430,7 @@ export const KPIAnalyticsPage: React.FC = () => {
           <Card>
             <Statistic
               title="Требуют внимания"
-              value={1}
+              value={needsAttentionCount}
               suffix="станок"
               valueStyle={{ color: '#f5222d' }}
               prefix={<WarningOutlined />}
@@ -451,11 +444,17 @@ export const KPIAnalyticsPage: React.FC = () => {
         <TabPane tab="👥 KPI Операторов" key="operators">
           <Card title="Рейтинг операторов по KPI">
             <Table
-              dataSource={operatorData}
+              dataSource={operatorData || []}
               columns={operatorColumns}
               rowKey="operatorName"
               pagination={false}
               size="middle"
+              loading={operatorLoading}
+              locale={{
+                emptyText: operatorError 
+                  ? 'Ошибка загрузки данных операторов'
+                  : 'Нет данных о производстве за выбранный период'
+              }}
             />
           </Card>
         </TabPane>
@@ -463,11 +462,17 @@ export const KPIAnalyticsPage: React.FC = () => {
         <TabPane tab="🏭 OEE Станков" key="machines">
           <Card title="Эффективность станков">
             <Table
-              dataSource={machineData}
+              dataSource={machineData || []}
               columns={machineColumns}
               rowKey="machineId"
               pagination={false}
               size="middle"
+              loading={machineLoading}
+              locale={{
+                emptyText: machineError 
+                  ? 'Ошибка загрузки данных станков'
+                  : 'Нет данных о станках за выбранный период'
+              }}
             />
           </Card>
         </TabPane>
@@ -490,8 +495,8 @@ export const KPIAnalyticsPage: React.FC = () => {
                   <Space direction="vertical" style={{ width: '100%' }}>
                     <div>
                       <Text strong>OEE станка: </Text>
-                      <Tag color={getMetricColor(exampleCalculation.oee, 'oee')}>
-                        {exampleCalculation.oee}%
+                      <Tag color={getMetricColor(exampleCalculation.machineOEE, 'oee')}>
+                        {exampleCalculation.machineOEE}%
                       </Tag>
                       <Text type="secondary">
                         = (120+300)/480*100
@@ -509,7 +514,7 @@ export const KPIAnalyticsPage: React.FC = () => {
                     </div>
                     <div>
                       <Text strong>Эффективность: </Text>
-                      <Text>{exampleCalculation.productionEfficiency}%</Text>
+                      <Text>{exampleCalculation.operatorEfficiency}%</Text>
                     </div>
                   </Space>
                 </Card>
@@ -519,8 +524,9 @@ export const KPIAnalyticsPage: React.FC = () => {
         </TabPane>
 
         <TabPane tab="📊 Разбивка времени" key="breakdown">
-          <Row gutter={16}>
-            {machineData.map(machine => (
+          {machineData && machineData.length > 0 ? (
+            <Row gutter={16}>
+              {((machineData as MachinePerformance[]) || []).map((machine: MachinePerformance) => (
               <Col span={8} key={machine.machineId}>
                 <Card 
                   title={machine.machineName}
@@ -563,7 +569,17 @@ export const KPIAnalyticsPage: React.FC = () => {
                 </Card>
               </Col>
             ))}
-          </Row>
+            </Row>
+          ) : (
+            <Card>
+              <div style={{ textAlign: 'center', padding: '40px' }}>
+                <ToolOutlined style={{ fontSize: '48px', color: '#d9d9d9', marginBottom: '16px' }} />
+                <Text type="secondary">
+                  Данные о станках будут загружены после интеграции с API
+                </Text>
+              </div>
+            </Card>
+          )}
         </TabPane>
       </Tabs>
     </div>

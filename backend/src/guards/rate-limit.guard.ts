@@ -1,6 +1,6 @@
 import { Injectable, CanActivate, ExecutionContext, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { Request } from 'express';
+import { Request as ExpressRequest } from 'express';
 
 interface RateLimitInfo {
   count: number;
@@ -50,7 +50,7 @@ export class RateLimitGuard implements CanActivate {
   }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const request = context.switchToHttp().getRequest<Request>();
+    const request = context.switchToHttp().getRequest<ExpressRequest>();
     const clientIp = this.getClientIp(request);
     const endpoint = `${request.method} ${request.route?.path || request.path}`;
     
@@ -184,7 +184,7 @@ export class RateLimitGuard implements CanActivate {
     return true;
   }
 
-  private getLimitType(request: Request): keyof typeof RateLimitGuard.prototype.defaultLimits {
+  private getLimitType(request: ExpressRequest): keyof typeof RateLimitGuard.prototype.defaultLimits {
     const path = request.path.toLowerCase();
     const method = request.method.toLowerCase();
 
@@ -213,13 +213,13 @@ export class RateLimitGuard implements CanActivate {
     return 'general';
   }
 
-  private getClientIp(request: Request): string {
+  private getClientIp(request: ExpressRequest): string {
     return (
-      request.get('CF-Connecting-IP') ||
-      request.get('X-Forwarded-For')?.split(',')[0]?.trim() ||
-      request.get('X-Real-IP') ||
-      request.connection.remoteAddress ||
-      request.socket.remoteAddress ||
+      request.headers['cf-connecting-ip'] as string ||
+      (request.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
+      request.headers['x-real-ip'] as string ||
+      (request as any).connection?.remoteAddress ||
+      (request as any).socket?.remoteAddress ||
       'unknown'
     );
   }

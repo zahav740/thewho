@@ -418,15 +418,68 @@ export class OrdersService {
   }
 
   async removeAll(): Promise<number> {
-    this.logger.log('Removing all orders');
+    this.logger.log('🗑️ SERVICE: Starting removeAll operation');
 
     try {
-      const result = await this.orderRepository.delete({});
-      this.logger.log(`Deleted ${result.affected} orders`);
-      return result.affected || 0;
+      // Сначала узнаем сколько заказов есть
+      const countBefore = await this.orderRepository.count();
+      this.logger.log(`📊 SERVICE: Found ${countBefore} orders before deletion`);
+      
+      if (countBefore === 0) {
+        this.logger.log('ℹ️ SERVICE: No orders to delete');
+        return 0;
+      }
+
+      // Получаем все ID заказов
+      const orders = await this.orderRepository.find({ select: ['id'] });
+      const orderIds = orders.map(order => order.id);
+      
+      if (orderIds.length === 0) {
+        this.logger.log('ℹ️ SERVICE: No order IDs found - database may be empty');
+        return 0;
+      }
+      
+      this.logger.log(`📋 SERVICE: Order IDs to delete: ${orderIds.join(', ')}`);
+
+      // Удаляем все операции сначала (из-за FK ограничений)
+      if (orderIds.length > 0) {
+        const operationsResult = await this.operationRepository
+          .createQueryBuilder()
+          .delete()
+          .from(Operation)
+          .where('orderId IN (:...orderIds)', { orderIds })
+          .execute();
+        
+        this.logger.log(`🔧 SERVICE: Deleted ${operationsResult.affected || 0} operations`);
+        
+        // Теперь удаляем все заказы
+        const ordersResult = await this.orderRepository
+          .createQueryBuilder()
+          .delete()
+          .from(Order)
+          .where('id IN (:...orderIds)', { orderIds })
+          .execute();
+        
+        const deletedCount = ordersResult.affected || 0;
+        
+        this.logger.log(`✅ SERVICE: Successfully deleted ${deletedCount} orders`);
+        
+        // Проверяем что действительно удалили все
+        const countAfter = await this.orderRepository.count();
+        this.logger.log(`📊 SERVICE: Orders remaining after deletion: ${countAfter}`);
+        
+        return deletedCount;
+      } else {
+        this.logger.log('ℹ️ SERVICE: No orders to delete (empty result)');
+        return 0;
+      }
     } catch (error) {
-      this.logger.error(`Error removing all orders: ${error.message}`, error.stack);
-      throw new InternalServerErrorException('Ошибка удаления всех заказов');
+      this.logger.error(`❌ SERVICE: Error removing all orders:`, error);
+      this.logger.error(`❌ SERVICE: Error details: ${error.message}`);
+      if (error.stack) {
+        this.logger.error(`❌ SERVICE: Error stack: ${error.stack}`);
+      }
+      throw new InternalServerErrorException(`Ошибка удаления всех заказов: ${error.message}`);
     }
   }
 

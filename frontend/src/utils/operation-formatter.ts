@@ -104,10 +104,8 @@ export const formatOrderData = (data: any): any => {
     result.operations = formatOperations(result.operations);
   }
   
-  // Преобразуем приоритет в число
-  if (result.priority !== undefined) {
-    result.priority = Number(result.priority);
-  }
+  // Приоритет оставляем как есть (строка для V2, число для V1)
+  // Не преобразуем priority, чтобы не поломать V2 API
   
   return result;
 };

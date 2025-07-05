@@ -83,20 +83,24 @@ export const checkCurrentConnection = async (): Promise<boolean> => {
 
 // Инициализация API URL при загрузке модуля
 let initPromise: Promise<string> | null = null;
+let isInitialized = false;
 
 export const initializeApi = (): Promise<string> => {
-  if (!initPromise) {
-    initPromise = getApiUrl();
+  if (!initPromise && !isInitialized) {
+    initPromise = getApiUrl().then(url => {
+      isInitialized = true;
+      return url;
+    });
   }
-  return initPromise;
+  return initPromise || Promise.resolve(cachedApiUrl || 'http://localhost:5100/api');
 };
 
-// Автоматическая инициализация
-initializeApi().then(url => {
-  console.log(`🚀 API инициализирован: ${url}`);
-}).catch(error => {
-  console.error('❌ Ошибка инициализации API:', error);
-});
+// Убираем автоматическую инициализацию для предотвращения двойных вызовов
+// initializeApi().then(url => {
+//   console.log(`🚀 API инициализирован: ${url}`);
+// }).catch(error => {
+//   console.error('❌ Ошибка инициализации API:', error);
+// });
 
 // Экспорт устаревших функций для совместимости
 export const getBackendUrl = getApiUrl;

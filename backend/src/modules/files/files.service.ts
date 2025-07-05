@@ -10,7 +10,8 @@ import { promises as fs } from 'fs';
 import { join } from 'path';
 import * as ExcelJS from 'exceljs';
 import { PDFDocument } from 'pdf-lib';
-import type { Express } from 'express';
+import type { MulterFile } from '../../types/express';
+
 
 @Injectable()
 export class FilesService {
@@ -33,7 +34,7 @@ export class FilesService {
     }
   }
 
-  async uploadFile(file: Express.Multer.File, folder: string = ''): Promise<string> {
+  async uploadFile(file: MulterFile, folder: string = ''): Promise<string> {
     const targetPath = folder ? join(this.uploadsPath, folder) : this.uploadsPath;
     await fs.mkdir(targetPath, { recursive: true });
     
@@ -69,7 +70,7 @@ export class FilesService {
     }
   }
 
-  async parseExcel(file: Express.Multer.File): Promise<{
+  async parseExcel(file: MulterFile): Promise<{
     headers: string[];
     rows: any[];
     sheetsCount: number;

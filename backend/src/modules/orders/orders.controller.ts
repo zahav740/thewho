@@ -25,8 +25,8 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiConsumes, ApiResponse } from '@nestjs/swagger';
+import { MulterFile, createExcelFile } from '../../types/express';
 import { Response } from 'express';
-import type { Express } from 'express';
 import { OrdersService, EnrichedOrder } from './orders.service';
 import { ExcelImportService, ImportResult } from './excel-import.service';
 import { ExcelColumnMapperService, ExcelFileAnalysis, ExcelImportSettings } from './excel-column-mapper.service';
@@ -87,6 +87,7 @@ export class OrdersController {
       this.logger.log(`Created upload directory: ${this.uploadDir}`);
     }
   }
+
 
   @Get()
   @ApiOperation({ summary: 'Получить все заказы с фильтрацией и пагинацией' })
@@ -275,17 +276,44 @@ export class OrdersController {
   @Delete('all/confirm')
   @ApiOperation({ summary: 'Удалить все заказы (с подтверждением)' })
   @ApiResponse({ status: 200, description: 'Количество удаленных заказов' })
-  async removeAll(@Body() body?: { confirm?: boolean }): Promise<{ deleted: number }> {
+  async removeAll(@Body() body: { confirm?: boolean } = {}): Promise<{ deleted: number }> {
     try {
-      // Убираем обязательное подтверждение для совместимости с фронтендом
       this.logger.log('Received request to delete all orders');
+      this.logger.log('Request body:', JSON.stringify(body));
+      
+      // Для DELETE запроса с телом разрешаем любое подтверждение или его отсутствие
+      const isConfirmed = body.confirm === true || 
+                         String(body.confirm) === 'true' || 
+                         Number(body.confirm) === 1 || 
+                         String(body.confirm) === '1' ||
+                         body.confirm === undefined || // Разрешаем отсутствие параметра
+                         Object.keys(body).length === 0; // Пустое тело тоже разрешаем
+      
+      this.logger.log(`Confirmation status: ${isConfirmed}`);
+      
+      if (!isConfirmed) {
+        this.logger.warn('Delete all orders request rejected - invalid confirmation');
+        throw new BadRequestException('Требуется подтверждение для удаления всех заказов');
+      }
+      
       const deleted = await this.ordersService.removeAll();
-      this.logger.log(`Deleted all orders: ${deleted}`);
+      this.logger.log(`Successfully deleted all orders: ${deleted}`);
       return { deleted };
     } catch (error) {
-      this.logger.error(`Error deleting all orders: ${error.message}`, error.stack);
+      this.logger.error(`Error deleting all orders:`, error);
+      this.logger.error(`Error message: ${error.message}`);
+      this.logger.error(`Error stack: ${error.stack}`);
       throw error;
     }
+  }
+
+  // Дополнительный маршрут для совместимости
+  @Post('all/delete')
+  @ApiOperation({ summary: 'Удалить все заказы (POST альтернатива)' })
+  @ApiResponse({ status: 200, description: 'Количество удаленных заказов' })
+  async removeAllPost(@Body() body: { confirm?: boolean } = {}): Promise<{ deleted: number }> {
+    this.logger.log('POST alternative route called for delete all orders');
+    return this.removeAll(body);
   }
 
   private async generateUniqueDrawingNumber(originalNumber: string): Promise<string> {
@@ -321,7 +349,7 @@ export class OrdersController {
       limits: { fileSize: 50 * 1024 * 1024 },
     }),
   )
-  async uploadExcel(@UploadedFile() file: Express.Multer.File, @Body() body: any) {
+  async uploadExcel(@UploadedFile() file: MulterFile, @Body() body: any) {
     try {
       this.logger.log(`Received Excel file: ${file.originalname}, size: ${file.size}`);
       if (!file || !file.buffer) {
@@ -384,13 +412,13 @@ export class OrdersController {
       limits: { fileSize: 50 * 1024 * 1024 },
     }),
   )
-  async analyzeExcel(@UploadedFile() file: Express.Multer.File): Promise<ExcelFileAnalysis> {
+  async analyzeExcel(@UploadedFile() file: MulterFile): Promise<ExcelFileAnalysis> {
     try {
       this.logger.log(`Analyzing Excel structure: ${file.originalname}`);
       if (!file || !file.buffer) {
         throw new BadRequestException('Файл отсутствует или некорректен');
       }
-      return await this.excelColumnMapperService.analyzeExcelStructure(file);
+      return await this.excelColumnMapperService.analyzeExcelStructure(createExcelFile(file));
     } catch (error) {
       this.logger.error(`Error analyzing Excel: ${error.message}`, error.stack);
       throw new BadRequestException(`Ошибка анализа Excel файла: ${error.message}`);
@@ -420,7 +448,7 @@ export class OrdersController {
     }),
   )
   async importExcelWithMapping(
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFile() file: MulterFile,
     @Body('settings') settingsJson: string
   ) {
     try {
@@ -437,7 +465,7 @@ export class OrdersController {
       }
 
       // Импортируем данные с пользовательским маппингом
-      const parsedOrders = await this.excelColumnMapperService.importWithMapping(file, settings);
+      const parsedOrders = await this.excelColumnMapperService.importWithMapping(createExcelFile(file), settings);
       
       // Создаем заказы в базе данных
       let created = 0;
@@ -495,7 +523,7 @@ export class OrdersController {
   @ApiResponse({ status: 200, description: 'Результат импорта Excel' })
   @UseInterceptors(FileInterceptor('file'))
   @UsePipes(new ValidationPipe())
-  async importExcel(@UploadedFile() file: Express.Multer.File, @Body() importDto: ImportExcelDto): Promise<ImportResult> {
+  async importExcel(@UploadedFile() file: MulterFile, @Body() importDto: ImportExcelDto): Promise<ImportResult> {
     try {
       this.logger.log(`Legacy Excel import: ${file.originalname}`);
       return await this.excelImportService.importOrders(file, importDto.colorFilters);
@@ -532,7 +560,7 @@ export class OrdersController {
   )
   async uploadPdf(
     @Param('id') id: string,
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFile() file: MulterFile,
     @Res() res: Response,
     @Query('action') action?: 'replace' | 'new_order' | 'revision' | 'force',
     @Query('force') force?: string,
@@ -601,7 +629,7 @@ export class OrdersController {
 
   private async handleFileUpload(
     order: Order,
-    file: Express.Multer.File,
+    file: MulterFile,
     fileHash: string,
     action: string,
     duplicateInfo: DuplicateInfo,
@@ -710,7 +738,7 @@ export class OrdersController {
   @Get(':id/pdf')
   @ApiOperation({ summary: 'Получить PDF файл заказа' })
   @ApiResponse({ status: 200, description: 'PDF файл' })
-  async getPdf(@Param('id') id: string, @Res() res: Response): Promise<void> {
+  async getPdf(@Param('id') id: string, @Res() res: Response): Promise<Response> {
     try {
       const order = await this.ordersService.findOne(id);
       if (!order.pdfPath) {
@@ -732,7 +760,7 @@ export class OrdersController {
   @Get('pdf/:filename')
   @ApiOperation({ summary: 'Получить PDF файл по имени файла' })
   @ApiResponse({ status: 200, description: 'PDF файл' })
-  async getPdfByFilename(@Param('filename') filename: string, @Res() res: Response): Promise<void> {
+  async getPdfByFilename(@Param('filename') filename: string, @Res() res: Response): Promise<Response> {
     try {
       const filePath = join(this.uploadDir, filename);
       if (!fs.existsSync(filePath)) {
@@ -740,14 +768,13 @@ export class OrdersController {
         return;
       }
       const stats = fs.statSync(filePath);
-      res.set({
-        'Content-Type': 'application/pdf',
-        'Content-Disposition': `inline; filename="${filename}"`,
-        'Content-Length': stats.size.toString(),
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0',
-      });
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+      res.setHeader('Content-Length', stats.size.toString());
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+
       res.sendFile(filePath);
     } catch (error) {
       this.logger.error(`Error fetching PDF ${filename}: ${error.message}`, error.stack);
@@ -827,12 +854,10 @@ export class OrdersController {
       }
       const filePath = join(this.uploadDir, revision.filename);
       const stats = fs.statSync(filePath);
-      res.set({
-        'Content-Type': 'application/pdf',
-        'Content-Disposition': `inline; filename="${revision.filename}"`,
-        'Content-Length': stats.size.toString(),
-      });
-      res.sendFile(filePath);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="${revision.filename}"`);
+      res.setHeader('Content-Length', stats.size.toString());
+      return res.sendFile(filePath);
     } catch (error) {
       this.logger.error(`Error fetching PDF revision ${revisionNumber} for order ${id}: ${error.message}`, error.stack);
       throw new BadRequestException('Ошибка получения ревизии PDF');

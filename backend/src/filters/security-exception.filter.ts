@@ -6,7 +6,8 @@ import {
   HttpStatus,
   Logger,
 } from '@nestjs/common';
-import { Request, Response } from 'express';
+import { Request as ExpressRequest, Response as ExpressResponse } from 'express';
+import * as express from 'express';
 
 @Catch()
 export class SecurityExceptionFilter implements ExceptionFilter {
@@ -14,11 +15,11 @@ export class SecurityExceptionFilter implements ExceptionFilter {
 
   catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
-    const response = ctx.getResponse<Response>();
-    const request = ctx.getRequest<Request>();
+    const response = ctx.getResponse<ExpressResponse>();
+    const request = ctx.getRequest<ExpressRequest>();
     
     const clientIp = this.getClientIp(request);
-    const userAgent = request.get('User-Agent') || 'Unknown';
+    const userAgent = request.headers['user-agent'] || 'Unknown';
     const requestId = request['requestId'] || 'unknown';
     
     let status: number;
@@ -93,13 +94,13 @@ export class SecurityExceptionFilter implements ExceptionFilter {
     response.status(status).json(responseBody);
   }
 
-  private getClientIp(request: Request): string {
+  private getClientIp(request: ExpressRequest): string {
     return (
-      request.get('CF-Connecting-IP') ||
-      request.get('X-Forwarded-For')?.split(',')[0]?.trim() ||
-      request.get('X-Real-IP') ||
-      request.connection.remoteAddress ||
-      request.socket.remoteAddress ||
+      request.headers['cf-connecting-ip'] as string ||
+      (request.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
+      request.headers['x-real-ip'] as string ||
+      (request as any).connection?.remoteAddress ||
+      (request as any).socket?.remoteAddress ||
       'unknown'
     );
   }
@@ -212,7 +213,7 @@ export class SecurityExceptionFilter implements ExceptionFilter {
     }
   }
 
-  private addSecurityHeaders(response: Response, status: number): void {
+  private addSecurityHeaders(response: ExpressResponse, status: number): void {
     // Стандартные заголовки безопасности
     response.setHeader('X-Content-Type-Options', 'nosniff');
     response.setHeader('X-Frame-Options', 'DENY');

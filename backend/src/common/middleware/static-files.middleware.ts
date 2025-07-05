@@ -4,13 +4,12 @@
  * @created: 2025-06-21
  */
 import { Injectable, NestMiddleware } from '@nestjs/common';
-import { Request, Response, NextFunction } from 'express';
 import * as path from 'path';
 import * as fs from 'fs';
 
 @Injectable()
 export class StaticFilesMiddleware implements NestMiddleware {
-  use(req: Request, res: Response, next: NextFunction) {
+  use(req: any, res: any, next: any) {
     // Обрабатываем только запросы к PDF файлам
     if (req.path.startsWith('/api/orders/pdf/')) {
       const filename = req.path.split('/').pop();

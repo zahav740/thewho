@@ -14,7 +14,7 @@ import {
   Button,
   Space,
   Table,
-  message,
+  App,
   Spin,
   Tabs,
   Divider,
@@ -48,6 +48,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
   onSuccess,
 }) => {
   const { t, tWithParams } = useTranslation();
+  const { message } = App.useApp();
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('1');
   const [currentPdfPath, setCurrentPdfPath] = useState<string | undefined>();

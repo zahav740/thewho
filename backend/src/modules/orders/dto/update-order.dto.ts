@@ -21,35 +21,35 @@ import {
 import { Type } from 'class-transformer';
 import { OperationType } from '../../../database/entities/operation.entity';
 
-// UpdateOperationDto: поля для создания/обновления операции сделаны обязательными
+// UpdateOperationDto: поля для создания/обновления операции сделаны опциональными
 export class UpdateOperationDto {
-  @ApiProperty({ example: 1, description: 'Номер операции' })
-  @IsNotEmpty()
+  @ApiPropertyOptional({ example: 1, description: 'Номер операции' })
+  @IsOptional()
   @IsNumber()
   @Min(1)
-  operationNumber: number;
+  operationNumber?: number;
 
-  @ApiProperty({ enum: OperationType, description: 'Тип операции' })
-  @IsNotEmpty()
+  @ApiPropertyOptional({ enum: OperationType, description: 'Тип операции' })
+  @IsOptional()
   @IsEnum(OperationType)
-  operationType: OperationType;
+  operationType?: OperationType;
 
-  @ApiProperty({ example: 3, description: 'Количество осей станка' })
-  @IsNotEmpty()
+  @ApiPropertyOptional({ example: 3, description: 'Количество осей станка' })
+  @IsOptional()
   @IsNumber()
   @Min(3)
-  machineAxes: number;
+  machineAxes?: number;
 
-  @ApiProperty({ example: 120, description: 'Время выполнения в минутах' })
-  @IsNotEmpty()
+  @ApiPropertyOptional({ example: 120, description: 'Время выполнения в минутах' })
+  @IsOptional()
   @IsNumber()
   @Min(1)
-  estimatedTime: number;
+  estimatedTime?: number;
 
-  @ApiPropertyOptional({ description: 'ID существующей операции (UUID, если у вас ID операций - uuid)' })
+  @ApiPropertyOptional({ description: 'ID существующей операции' })
   @IsOptional()
-  @IsString() // Если ID операции UUID
-  id?: string;
+  @IsNumber() // Исправлено с string на number
+  id?: number;
 
   @ApiPropertyOptional({ example: 'in_progress', description: 'Статус операции' })
   @IsOptional()

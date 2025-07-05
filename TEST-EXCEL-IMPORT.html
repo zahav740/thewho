@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест Excel Импорта</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .test-section h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        button {
+            background: #1890ff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #40a9ff;
+        }
+        .success {
+            color: #52c41a;
+            font-weight: bold;
+        }
+        .error {
+            color: #ff4d4f;
+            font-weight: bold;
+        }
+        .info {
+            color: #1890ff;
+        }
+        .log {
+            background: #f6f6f6;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        input[type="file"] {
+            margin: 10px 0;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 100%;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .status.success {
+            background: #f6ffed;
+            border: 1px solid #b7eb8f;
+        }
+        .status.error {
+            background: #fff2f0;
+            border: 1px solid #ffccc7;
+        }
+        .status.info {
+            background: #e6f7ff;
+            border: 1px solid #91d5ff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Диагностика Excel Импорта</h1>
+        
+        <div class="test-section">
+            <h3>📡 1. Проверка API доступности</h3>
+            <button onclick="testApiConnection()">Проверить API</button>
+            <div id="api-status"></div>
+            <div id="api-log" class="log"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>📊 2. Тест парсинга Excel</h3>
+            <input type="file" id="excel-file" accept=".xlsx,.xls" />
+            <button onclick="testExcelUpload()">Загрузить Excel</button>
+            <div id="upload-status"></div>
+            <div id="upload-log" class="log"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🎯 3. Создание тестового Excel</h3>
+            <button onclick="createTestExcel()">Создать тестовый файл</button>
+            <div id="test-excel-status"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🔍 4. Инструкции по колонкам</h3>
+            <div style="background: #e6f7ff; padding: 15px; border-radius: 4px;">
+                <strong>Правильный формат Excel файла:</strong>
+                <ul>
+                    <li><strong>Колонка C:</strong> Номер чертежа (например: DWG-001)</li>
+                    <li><strong>Колонка E:</strong> Количество (например: 10)</li>
+                    <li><strong>Колонка H:</strong> Дедлайн (например: 2025-02-15)</li>
+                    <li><strong>Колонка K:</strong> Приоритет (HIGH/MEDIUM/LOW) - ✅ <span class="success">ОБНОВЛЕНО с J на K</span></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:5100/api';
+        
+        function log(elementId, message, type = 'info') {
+            const logElement = document.getElementById(elementId);
+            const timestamp = new Date().toLocaleTimeString();
+            const prefix = type === 'error' ? '❌' : type === 'success' ? '✅' : '📝';
+            logElement.textContent += `[${timestamp}] ${prefix} ${message}\n`;
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+
+        function setStatus(elementId, message, type = 'info') {
+            const statusElement = document.getElementById(elementId);
+            statusElement.innerHTML = `<div class="status ${type}">${message}</div>`;
+        }
+
+        async function testApiConnection() {
+            log('api-log', 'Проверяем подключение к API...');
+            setStatus('api-status', '🔄 Проверка соединения...', 'info');
+            
+            try {
+                // Проверяем основной endpoint
+                const response = await fetch(`${API_BASE}/health`);
+                
+                if (response.ok) {
+                    const data = await response.text();
+                    log('api-log', `Основной API доступен: ${response.status}`, 'success');
+                    
+                    // Проверяем конкретно Excel endpoint
+                    const excelResponse = await fetch(`${API_BASE}/v2/orders`);
+                    
+                    if (excelResponse.ok) {
+                        log('api-log', 'Excel API endpoint доступен', 'success');
+                        setStatus('api-status', '✅ API работает корректно', 'success');
+                    } else {
+                        log('api-log', `Excel endpoint недоступен: ${excelResponse.status}`, 'error');
+                        setStatus('api-status', '⚠️ API частично работает', 'error');
+                    }
+                } else {
+                    log('api-log', `API недоступен: ${response.status}`, 'error');
+                    setStatus('api-status', '❌ API недоступен', 'error');
+                }
+            } catch (error) {
+                log('api-log', `Ошибка соединения: ${error.message}`, 'error');
+                setStatus('api-status', '❌ Нет соединения с API', 'error');
+            }
+        }
+
+        async function testExcelUpload() {
+            const fileInput = document.getElementById('excel-file');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                setStatus('upload-status', '❌ Выберите Excel файл', 'error');
+                return;
+            }
+            
+            log('upload-log', `Загружаем файл: ${file.name} (${file.size} байт)`);
+            setStatus('upload-status', '🔄 Загрузка файла...', 'info');
+            
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+                
+                log('upload-log', 'Отправляем файл на /v2/orders/parse-excel');
+                
+                const response = await fetch(`${API_BASE}/v2/orders/parse-excel`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const responseText = await response.text();
+                
+                if (response.ok) {
+                    let result;
+                    try {
+                        result = JSON.parse(responseText);
+                        log('upload-log', `Файл успешно обработан: ${result.parsedRows || 0} строк`, 'success');
+                        log('upload-log', `Данные: ${JSON.stringify(result, null, 2)}`);
+                        setStatus('upload-status', '✅ Файл успешно обработан', 'success');
+                    } catch (e) {
+                        log('upload-log', `Ответ сервера: ${responseText}`, 'success');
+                        setStatus('upload-status', '✅ Файл загружен (текстовый ответ)', 'success');
+                    }
+                } else {
+                    log('upload-log', `Ошибка: ${response.status} - ${responseText}`, 'error');
+                    setStatus('upload-status', `❌ Ошибка: ${response.status}`, 'error');
+                }
+            } catch (error) {
+                log('upload-log', `Ошибка загрузки: ${error.message}`, 'error');
+                setStatus('upload-status', '❌ Ошибка загрузки', 'error');
+            }
+        }
+
+        function createTestExcel() {
+            log('test-excel-status', 'Создаем тестовый Excel файл...');
+            
+            // Создаем простой CSV с правильной структурой
+            const csvContent = [
+                // Заголовки в правильных колонках
+                'A,B,Номер чертежа,D,Количество,F,G,Дедлайн,I,J,Приоритет',
+                // Данные
+                ',,,DWG-001,10,,,2025-02-15,,,HIGH',
+                ',,,DWG-002,5,,,2025-02-20,,,MEDIUM', 
+                ',,,DWG-003,15,,,2025-02-25,,,LOW'
+            ].join('\\n');
+            
+            // Создаем и скачиваем файл
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'test-orders.csv';
+            link.click();
+            
+            setStatus('test-excel-status', '✅ Тестовый файл создан и загружен', 'success');
+        }
+
+        // Автоматически проверяем API при загрузке
+        window.onload = function() {
+            setTimeout(testApiConnection, 500);
+        };
+    </script>
+</body>
+</html>

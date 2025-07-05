@@ -5,11 +5,10 @@
  * @created: 2025-01-28
  */
 import { Injectable, NestMiddleware, HttpException, HttpStatus } from '@nestjs/common';
-import { Request, Response, NextFunction } from 'express';
 
 @Injectable()
 export class HeaderSizeMiddleware implements NestMiddleware {
-  use(req: Request, res: Response, next: NextFunction) {
+  use(req: any, res: any, next: any) {
     // Проверяем размер заголовков
     const headersSize = JSON.stringify(req.headers).length;
     const maxHeaderSize = 8192; // 8KB максимальный размер заголовков

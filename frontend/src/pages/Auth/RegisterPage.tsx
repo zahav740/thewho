@@ -340,7 +340,6 @@ export const RegisterPage: React.FC = () => {
                 style={{ height: '48px', fontSize: '16px' }}
               >
                 <Option value="user">User</Option>
-                <Option value="admin">Admin</Option>
               </Select>
             </Form.Item>
 
