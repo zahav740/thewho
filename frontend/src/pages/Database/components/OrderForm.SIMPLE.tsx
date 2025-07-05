@@ -84,7 +84,8 @@ export const OrderForm: React.FC<OrderFormProps> = ({
   // Загрузка данных в форму
   useEffect(() => {
     if (orderData && visible && isEdit) {
-      console.log('📥 Loading data into form:', orderData);
+      console.log('📥 Loading REAL data into form:', orderData);
+      console.log('🔍 Order operations from API:', orderData.operations);
       
       reset({
         drawingNumber: orderData.drawingNumber || '',
@@ -92,14 +93,16 @@ export const OrderForm: React.FC<OrderFormProps> = ({
         deadline: orderData.deadline || dayjs().format('YYYY-MM-DD'),
         priority: orderData.priority || Priority.MEDIUM,
         workType: orderData.workType || '',
-        operations: orderData.operations && orderData.operations.length > 0 
-          ? orderData.operations.map((op: any) => ({
-              operationNumber: Number(op.operationNumber) || 1,
-              operationType: op.operationType || OperationType.MILLING,
-              machineAxes: Number(op.machineAxes) || 3,
-              estimatedTime: Number(op.estimatedTime) || 60,
-            }))
-          : [],
+        // ✅ ИСПРАВЛЕНО: Загружаем ТОЛЬКО реальные операции из API, без моковых значений
+        operations: orderData.operations ? orderData.operations.map((op: any, index: number) => {
+          console.log(`📋 Loading operation ${index + 1}:`, op);
+          return {
+            operationNumber: op.operationNumber,
+            operationType: op.operationType,
+            machineAxes: op.machineAxes,
+            estimatedTime: op.estimatedTime,
+          };
+        }) : [], // Если нет операций - оставляем пустой массив
       });
 
       // Загружаем информацию о PDF
@@ -219,7 +222,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
       machineAxes: 3,
       estimatedTime: 60,
     };
-    console.log('➕ Adding operation:', newOp);
+    console.log('➕ Adding NEW operation (not from database):', newOp);
     append(newOp);
   };
 

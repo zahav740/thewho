@@ -16,7 +16,7 @@ import {
   GlobalOutlined,
   MenuOutlined,
   BarChartOutlined,
-  ShoppingCartOutlined,
+  // ShoppingCartOutlined, // Скрыта секция Заказы
 } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
 import { useTranslation } from '../../i18n';
@@ -58,12 +58,12 @@ export const Layout: React.FC = () => {
   }, [location.pathname, isMobile]);
 
   const menuItems: MenuProps['items'] = [
-    {
-      key: '/orders',
-      icon: <ShoppingCartOutlined />,
-      label: '📊 Заказы',
-      onClick: () => navigate('/orders'),
-    },
+    // {
+    //   key: '/orders',
+    //   icon: <ShoppingCartOutlined />,
+    //   label: '📊 Заказы',
+    //   onClick: () => navigate('/orders'),
+    // },
     {
       key: '/database',
       icon: <DatabaseOutlined />,
@@ -293,8 +293,8 @@ export const Layout: React.FC = () => {
 
 function getPageTitle(pathname: string, t: (key: string) => string): string {
   switch (pathname) {
-    case '/orders':
-      return '📊 Заказы - Улучшенная версия';
+    // case '/orders':
+    //   return '📊 Заказы - Улучшенная версия';
     case '/database':
       return t('page.database.title');
     case '/production':
