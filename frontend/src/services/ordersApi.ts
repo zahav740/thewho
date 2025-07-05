@@ -1,21 +1,3 @@
-  // Проверить дубликат по номеру чертежа
-  checkDuplicate: async (drawingNumber: string): Promise<Order | null> => {
-    try {
-      console.log('🔍 Проверяем дубликат для чертежа:', drawingNumber);
-      const response = await api.get(`/orders/check-duplicate/${encodeURIComponent(drawingNumber)}`);
-      console.log('✅ Результат проверки дубликата:', response.data ? 'Найден' : 'Не найден');
-      return response.data;
-    } catch (error: any) {
-      if (error.response?.status === 404) {
-        // Если заказ не найден, это хорошо - дубликата нет
-        console.log('✅ Дубликат не найден для:', drawingNumber);
-        return null;
-      }
-      console.error('❌ Ошибка проверки дубликата:', error);
-      throw error;
-    }
-  },
-
 /**
  * @file: ordersApi.ts
  * @description: API для работы с заказами
@@ -441,11 +423,36 @@ export const ordersApi = {
   // Удалить все заказы V2
   deleteAllV2: async (): Promise<any> => {
     console.log('🗑️ API V2: Удаление всех заказов');
-    const response = await api.delete('/v2/orders/all', {
-      data: {} // Отправляем пустое тело, чтобы избежать проблем с ValidationPipe
-    });
-    console.log('✅ API V2: Все заказы удалены:', response.data);
-    return response.data;
+    try {
+      const response = await api.delete('/v2/orders/all', {
+        data: { confirm: true } // Добавляем подтверждение для безопасности
+      });
+      console.log('✅ API V2: Все заказы удалены:', response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ API V2: Ошибка удаления всех заказов:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        message: error.message
+      });
+      
+      // Пробуем альтернативный метод
+      if (error.response?.status === 400) {
+        console.log('⚠️ Пробуем альтернативный метод удаления...');
+        try {
+          const alternativeResponse = await api.post('/v2/orders/delete-all', {
+            confirm: true
+          });
+          console.log('✅ API V2: Все заказы удалены альтернативным методом:', alternativeResponse.data);
+          return alternativeResponse.data;
+        } catch (altError: any) {
+          console.error('❌ API V2: Альтернативный метод также не сработал:', altError.response?.data);
+        }
+      }
+      
+      throw error;
+    }
   },
 
   // Парсинг Excel файла V2

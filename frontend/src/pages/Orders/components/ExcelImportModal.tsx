@@ -319,15 +319,21 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
       });
       
       const ordersToCreate = selectedOrders.map(order => {
-        console.log(`📋 Подготовка заказа ${order.drawingNumber} БЕЗ операций (для технолога)`);
+        console.log(`📋 Подготовка заказа ${order.drawingNumber} с базовыми параметрами`);
         
         return {
           drawingNumber: order.drawingNumber,
           quantity: order.quantity,
           deadline: order.deadline,
           priority: getPriorityV2FromString(order.calculatedPriority),
-          // НЕ УКАЗЫВАЕМ workType и operations - технолог заполнит вручную
-        };
+          workType: 'MILLING' as WorkTypeV2, // ✅ ИСПРАВЛЕНО: используем MILLING вместо MACHINING
+          operations: [{
+            operationNumber: 1,
+            operationType: 'MILLING' as OperationTypeV2,
+            machineAxes: 3,
+            estimatedTime: 60 // 1 час по умолчанию
+          }] // Базовая операция фрезерования, технолог может изменить
+        } as CreateOrderV2Dto;
       });
       
       let created = 0;
@@ -513,8 +519,8 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
                     </ul>
                     <Alert
                       message="Важно!"
-                      description="Тип работы и операции будут заполнены технологом вручную после загрузки."
-                      type="warning"
+                      description="Тип работы будет установлен 'Фрезерование' по умолчанию. Технолог может изменить тип работы на 'Токарная обработка' или операции после загрузки."
+                      type="info"
                       showIcon
                       style={{ marginTop: 16, marginBottom: 16 }}
                     />
