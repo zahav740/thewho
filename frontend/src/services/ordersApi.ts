@@ -392,6 +392,26 @@ export const ordersApi = {
     console.log('✅ API V2: Заказ успешно удалён:', response.status);
   },
 
+  // Массовое удаление выбранных заказов V2
+  deleteSelectedV2: async (ids: number[]): Promise<any> => {
+    console.log('🗑️ API V2: Массовое удаление заказов:', ids);
+    const response = await api.delete('/v2/orders/batch/selected', {
+      data: { ids }
+    });
+    console.log('✅ API V2: Заказы успешно удалены:', response.data);
+    return response.data;
+  },
+
+  // Удалить все заказы V2
+  deleteAllV2: async (): Promise<any> => {
+    console.log('🗑️ API V2: Удаление всех заказов');
+    const response = await api.delete('/v2/orders/all', {
+      data: {} // Отправляем пустое тело, чтобы избежать проблем с ValidationPipe
+    });
+    console.log('✅ API V2: Все заказы удалены:', response.data);
+    return response.data;
+  },
+
   // Парсинг Excel файла V2
   parseExcelV2: async (file: File): Promise<any> => {
     console.log('📊 API V2: Парсинг Excel файла:', file.name);

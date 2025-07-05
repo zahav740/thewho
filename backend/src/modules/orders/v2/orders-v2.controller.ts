@@ -37,6 +37,7 @@ import { Order } from '../../../database/entities/order.entity';
 import { OrdersV2Service } from './orders-v2.service';
 import { ExcelParserService, ExcelParseResult } from './excel-parser.service';
 import { PriorityCalculatorService } from './priority-calculator.service';
+import { NoValidationPipe } from '../../../common/pipes/no-validation.pipe'; // 🔧 НОВОЕ: импорт NoValidationPipe
 import * as multer from 'multer';
 import * as path from 'path';
 
@@ -223,6 +224,47 @@ export class OrdersV2Controller {
       
       throw new HttpException(
         'Ошибка удаления заказа',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Delete('batch/selected')
+  @ApiOperation({ summary: 'Массовое удаление выбранных заказов V2' })
+  @ApiResponse({ status: 200, description: 'Заказы удалены успешно' })
+  async deleteSelectedOrders(@Body() data: { ids: number[] }) {
+    this.logger.log(`🗑️ V2: Массовое удаление ${data.ids.length} выбранных заказов`);
+    this.logger.log('📋 V2: Данные запроса:', data); // Отладка
+    
+    try {
+      const result = await this.ordersV2Service.deleteBatch(data.ids);
+      
+      this.logger.log(`✅ V2: Массовое удаление завершено: удалено ${result.deleted}, ошибок ${result.errors}`);
+      return result;
+    } catch (error) {
+      this.logger.error('❌ V2: Ошибка массового удаления заказов:', error);
+      throw new HttpException(
+        'Ошибка массового удаления заказов',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Delete('all')
+  @ApiOperation({ summary: 'Удалить все заказы V2' })
+  @ApiResponse({ status: 200, description: 'Все заказы удалены успешно' })
+  async deleteAllOrders() { // 🔧 ИСПРАВЛЕНО: убрали @Body параметр
+    this.logger.log('🗑️ V2: Удаление всех заказов');
+    
+    try {
+      const result = await this.ordersV2Service.deleteAll();
+      
+      this.logger.log(`✅ V2: Все заказы удалены: удалено ${result.deleted}`);
+      return result;
+    } catch (error) {
+      this.logger.error('❌ V2: Ошибка удаления всех заказов:', error);
+      throw new HttpException(
+        'Ошибка удаления всех заказов',
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }

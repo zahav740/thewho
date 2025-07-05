@@ -23,6 +23,7 @@ import { OrdersV2Filter } from '../../types/order-v2.types';
 import { OrdersList } from './components/OrdersList';
 import { OrderForm } from './components/OrderForm';
 import { ExcelImportModal } from './components/ExcelImportModal';
+import { DeleteMenuButton } from './components/DeleteMenuButton';
 import { useTranslation } from '../../i18n';
 import { 
   ResponsiveContainer, 
@@ -40,6 +41,10 @@ export const OrdersPage: React.FC = () => {
   const [showOrderForm, setShowOrderForm] = useState(false);
   const [showExcelImport, setShowExcelImport] = useState(false);
   const [editingOrderId, setEditingOrderId] = useState<number | undefined>();
+  const [selectedOrderIds, setSelectedOrderIds] = useState<React.Key[]>([]); // НОВОЕ: правильный тип
+  const handleSelectionChange = useCallback((keys: React.Key[]) => {
+    setSelectedOrderIds(keys);
+  }, []);
   const [filter, setFilter] = useState<OrdersV2Filter>({ page: 1, limit: 10 });
   const queryClient = useQueryClient();
 
@@ -76,20 +81,33 @@ window.refreshOrdersListV2 = async () => {
     setShowOrderForm(true);
   }, []);
 
+  const handleDeleteSuccess = useCallback(async () => {
+    console.log('✅ Успешное удаление - обновляем список');
+    setSelectedOrderIds([]); // Очищаем выбор
+    
+    // 🔧 АГРЕССИВНОЕ ОБНОВЛЕНИЕ КЭША
+    queryClient.clear(); // Очищаем весь кэш
+    queryClient.invalidateQueries({ queryKey: ['orders-v2'] });
+    
+    // Принудительное обновление с первой страницы
+    setFilter({ page: 1, limit: 10 });
+    await refetch();
+    
+    console.log('📋 Кэш очищен, список обновлен');
+  }, [queryClient, refetch, setFilter]);
+
   const handleDeleteOrder = useCallback(async (orderId: number) => {
     try {
       console.log('🗑️ Удаляем заказ с ID:', orderId);
       await ordersApi.deleteV2(orderId);
       message.success(t('message.success.deleted'));
-      // Принудительно обновляем список заказов
-      queryClient.invalidateQueries({ queryKey: ['orders-v2'] });
-      await refetch();
+      await handleDeleteSuccess();
       console.log('✅ Заказ успешно удалён и список обновлён');
     } catch (error) {
       console.error('❌ Ошибка при удалении заказа:', error);
       message.error(t('message.error.delete'));
     }
-  }, [queryClient, refetch, t]);
+  }, [handleDeleteSuccess, t]);
 
   const handleFormClose = useCallback(() => {
     setShowOrderForm(false);
@@ -134,10 +152,11 @@ window.refreshOrdersListV2 = async () => {
     if (!data?.data) return { total: 0, highPriority: 0, overdue: 0, pending: 0 };
     
     const orders = data.data;
+    const totalOrders = data.total || 0; // 🔧 ИСПРАВЛЕНО: используем общее количество
     const now = new Date();
     
     return {
-      total: orders.length,
+      total: totalOrders, // 🔧 Общее количество из API, а не на странице
       highPriority: orders.filter(o => String(o.priority) === 'HIGH').length,
       overdue: orders.filter(o => new Date(o.deadline) < now).length,
       pending: orders.filter(o => (o as any).status === 'pending').length
@@ -252,6 +271,13 @@ window.refreshOrdersListV2 = async () => {
           >
             {t('database.refresh')}
           </Button>
+          
+          {/* НОВОЕ: Кнопка с контекстным меню для удаления */}
+          <DeleteMenuButton
+            selectedIds={selectedOrderIds}
+            onDeleteSuccess={handleDeleteSuccess}
+            disabled={isLoading}
+          />
         </div>
       </ResponsiveActions>
 
@@ -266,6 +292,8 @@ window.refreshOrdersListV2 = async () => {
           onEdit={handleEditOrder}
           onDelete={handleDeleteOrder}
           onRefresh={handleRefresh}
+          selectedRowKeys={selectedOrderIds} // НОВОЕ
+          onSelectionChange={handleSelectionChange} // Используем правильный коллбэк
         />
       </ResponsiveTableWrapper>
 

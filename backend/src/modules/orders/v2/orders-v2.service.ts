@@ -266,19 +266,120 @@ export class OrdersV2Service {
         throw new NotFoundException(`Заказ с ID ${id} не найден`);
       }
       
-      // Удаляем заказ (операции удалятся каскадно)
+      this.logger.log(`📋 V2: Найден заказ ${order.drawingNumber} с ${order.operations?.length || 0} операциями`);
+      
+      // Сначала удаляем операции вручную
+      if (order.operations && order.operations.length > 0) {
+        this.logger.log(`🔧 V2: Удаляем ${order.operations.length} операций`);
+        await this.operationRepository.delete({ order: { id } });
+        this.logger.log(`✅ V2: Операции удалены`);
+      }
+      
+      // Затем удаляем заказ
+      this.logger.log(`🗑️ V2: Удаляем заказ ${id}`);
       await this.orderRepository.delete(id);
       
-      this.logger.log(`✅ V2: Заказ ${id} удален с очисткой`);
+      this.logger.log(`✅ V2: Заказ ${id} (${order.drawingNumber}) удален с очисткой`);
     } catch (error) {
       this.logger.error(`❌ V2: Ошибка удаления заказа ${id}:`, error);
+      
+      // Более детальная информация об ошибке
+      if (error.code) {
+        this.logger.error(`🔍 V2: Код ошибки базы данных: ${error.code}`);
+      }
+      if (error.detail) {
+        this.logger.error(`🔍 V2: Детали ошибки: ${error.detail}`);
+      }
+      
       throw error;
     }
   }
 
   /**
-   * Массовое создание заказов с умными приоритетами
+   * Массовое удаление заказов
    */
+  async deleteBatch(ids: number[]) {
+    this.logger.log(`🗑️ V2: Массовое удаление ${ids.length} заказов`);
+    
+    let deleted = 0;
+    let errors = 0;
+    const errorDetails = [];
+    
+    try {
+      for (const id of ids) {
+        try {
+          await this.deleteWithCleanup(id);
+          deleted++;
+        } catch (error) {
+          errors++;
+          errorDetails.push({
+            id,
+            error: error.message,
+          });
+          this.logger.warn(`⚠️ V2: Ошибка удаления заказа ${id}:`, error.message);
+        }
+      }
+      
+      this.logger.log(`✅ V2: Массовое удаление завершено: удалено ${deleted}, ошибок ${errors}`);
+      
+      return {
+        deleted,
+        errors,
+        total: ids.length,
+        errorDetails,
+        success: deleted > 0,
+      };
+    } catch (error) {
+      this.logger.error('❌ V2: Ошибка массового удаления заказов:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Удалить все заказы
+   */
+  async deleteAll() {
+    this.logger.log('🗑️ V2: Удаление всех заказов');
+    
+    try {
+      // Получаем все ID заказов
+      const orders = await this.orderRepository.find({
+        select: ['id'],
+      });
+      
+      if (orders.length === 0) {
+        this.logger.log('📋 V2: Нет заказов для удаления');
+        return {
+          deleted: 0,
+          total: 0,
+          success: true,
+        };
+      }
+      
+      const ids = orders.map(order => order.id);
+      this.logger.log(`📋 V2: Найдено ${ids.length} заказов для удаления`);
+      
+      // Удаляем все операции сначала
+      this.logger.log('🔧 V2: Удаляем все операции');
+      await this.operationRepository.delete({});
+      this.logger.log('✅ V2: Все операции удалены');
+      
+      // Затем удаляем все заказы
+      this.logger.log('🗑️ V2: Удаляем все заказы');
+      await this.orderRepository.delete({});
+      
+      this.logger.log(`✅ V2: Все ${ids.length} заказов удалены`);
+      
+      return {
+        deleted: ids.length,
+        total: ids.length,
+        success: true,
+      };
+    } catch (error) {
+      this.logger.error('❌ V2: Ошибка удаления всех заказов:', error);
+      throw error;
+    }
+  }
   async createBatchWithSmartPriorities(orders: CreateOrderDto[]) {
     this.logger.log(`📝 V2: Массовое создание ${orders.length} заказов с умными приоритетами`);
     

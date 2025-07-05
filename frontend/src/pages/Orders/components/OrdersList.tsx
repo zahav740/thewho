@@ -4,12 +4,13 @@
  * @dependencies: antd, order.types, useTranslation
  * @created: 2025-07-03
  */
-import React, { useState, useMemo } from 'react';
-import { Table, Tag, Button, Space, Popconfirm, Input, Select, Alert, message, Tooltip } from 'antd';
-import { EditOutlined, DeleteOutlined, FilePdfOutlined, SearchOutlined, ClockCircleOutlined, FlagOutlined } from '@ant-design/icons';
+import React, { useMemo } from 'react';
+import { Table, Tag, Button, Space, Input, Select, Alert, Tooltip } from 'antd';
+import { EditOutlined, FilePdfOutlined, SearchOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { OrderV2, OrdersV2Filter, OrdersV2Response, PriorityV2 } from '../../../types/order-v2.types';
 import { useTranslation } from '../../../i18n';
+import { DeleteMenuButton } from './DeleteMenuButton';
 import dayjs from 'dayjs';
 
 const { Search } = Input;
@@ -24,6 +25,8 @@ interface OrdersListProps {
   onEdit: (orderId: number) => void;
   onDelete: (orderId: number) => void;
   onRefresh?: () => void;
+  selectedRowKeys?: React.Key[];
+  onSelectionChange?: (selectedRowKeys: React.Key[]) => void;
 }
 
 export const OrdersList: React.FC<OrdersListProps> = ({
@@ -35,9 +38,10 @@ export const OrdersList: React.FC<OrdersListProps> = ({
   onEdit,
   onDelete,
   onRefresh,
+  selectedRowKeys = [],
+  onSelectionChange,
 }) => {
   const { t, tWithParams } = useTranslation();
-  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
 
   const getPriorityConfig = (priority: PriorityV2) => {
     const configs = {
@@ -273,22 +277,14 @@ export const OrdersList: React.FC<OrdersListProps> = ({
               className="action-button edit-button"
             />
           </Tooltip>
-          <Popconfirm
-            title="Удалить заказ"
-            description="Вы уверены, что хотите удалить этот заказ?"
-            onConfirm={() => onDelete(record.id)}
-            okText="Удалить"
-            cancelText="Отмена"
-          >
-            <Tooltip title="Удалить заказ">
-              <Button 
-                type="text"
-                icon={<DeleteOutlined />} 
-                size="small"
-                className="action-button delete-button"
-              />
-            </Tooltip>
-          </Popconfirm>
+          <DeleteMenuButton
+            orderId={record.id}
+            selectedIds={selectedRowKeys as number[]}
+            onDeleteSuccess={() => {
+              onRefresh?.();
+              onSelectionChange?.([]);
+            }}
+          />
         </div>
       ),
     },
@@ -313,7 +309,7 @@ export const OrdersList: React.FC<OrdersListProps> = ({
   const rowSelection = {
     selectedRowKeys,
     onChange: (keys: React.Key[]) => {
-      setSelectedRowKeys(keys);
+      onSelectionChange?.(keys);
     },
   };
 
@@ -369,7 +365,7 @@ export const OrdersList: React.FC<OrdersListProps> = ({
             type="info"
             showIcon
             closable
-            onClose={() => setSelectedRowKeys([])}
+            onClose={() => onSelectionChange?.([])}
           />
         )}
       </div>

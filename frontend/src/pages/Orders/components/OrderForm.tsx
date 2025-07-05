@@ -15,12 +15,9 @@ import {
   Button,
   Space,
   Table,
-  message,
   Spin,
-  Divider,
   Card,
   Tag,
-  Tooltip,
   Alert,
 } from 'antd';
 import { PlusOutlined, DeleteOutlined, CalendarOutlined, FlagOutlined, SettingOutlined, InfoCircleOutlined } from '@ant-design/icons';
@@ -34,7 +31,7 @@ import {
   WorkTypeV2,
   OrderFormOperationV2Dto,
   OperationTypeV2,
-  getWorkTypeEnumFromString
+  OperationV2,
 } from '../../../types/order-v2.types';
 import { useTranslation } from '../../../hooks/useTranslation';
 
@@ -47,13 +44,13 @@ interface OrderFormProps {
   onSuccess: () => void;
 }
 
-// Функция для получения текста для WorkTypeV2 - ТОЛЬКО РЕАЛЬНЫЕ ТИПЫ
+// Функция для получения текста для WorkTypeV2
 const getWorkTypeText = (workType: WorkTypeV2): string => {
   const mapping = {
     [WorkTypeV2.MILLING]: '🔧 Фрезерная обработка',
     [WorkTypeV2.TURNING]: '⚙️ Токарная обработка',
   };
-  return mapping[workType] || '🔧 Фрезерная обработка'; // По умолчанию
+  return mapping[workType] || '🔧 Фрезерная обработка';
 };
 
 export const OrderForm: React.FC<OrderFormProps> = ({
@@ -70,13 +67,13 @@ export const OrderForm: React.FC<OrderFormProps> = ({
   const isEdit = !!orderId;
   const dataLoadedRef = useRef(false);
 
-  const { control, handleSubmit, reset, watch, formState: { errors } } = useForm<CreateOrderV2Dto>({
+  const { control, handleSubmit, reset, watch, formState: { errors }, setValue } = useForm<CreateOrderV2Dto>({
     defaultValues: {
       drawingNumber: '',
       quantity: 1,
       deadline: dayjs().add(7, 'days').format('YYYY-MM-DD'),
       priority: PriorityV2.MEDIUM,
-      workType: WorkTypeV2.MILLING, // По умолчанию фрезерная (реальный тип)
+      workType: WorkTypeV2.MILLING,
       operations: [],
     },
   });
@@ -96,192 +93,114 @@ export const OrderForm: React.FC<OrderFormProps> = ({
       const now = dayjs();
       const daysLeft = deadline.diff(now, 'day');
       
-      // Расчет сложности операций
       const totalTime = watchedOperations.reduce((sum, op) => sum + (op.estimatedTime || 0), 0);
-      const has4Axis = watchedOperations.some(op => op.machineAxes === 4);
       const hasComplexOps = watchedOperations.some(op => op.operationType === OperationTypeV2.TURNING || op.estimatedTime > 120);
       
-      let priority = PriorityV2.MEDIUM;
+      let newPriority = PriorityV2.MEDIUM;
       let reason = '';
       
-      if (daysLeft <= 3) {
-        priority = PriorityV2.HIGH;
-        reason = `Критический дедлайн: ${daysLeft} дней`;
-      } else if (daysLeft <= 7 && (has4Axis || hasComplexOps || totalTime > 300)) {
-        priority = PriorityV2.HIGH;
-        reason = `Срочный дедлайн + сложные операции`;
-      } else if (daysLeft <= 7) {
-        priority = PriorityV2.MEDIUM;
-        reason = `Средний дедлайн: ${daysLeft} дней`;
-      } else if (has4Axis || hasComplexOps || totalTime > 480) {
-        priority = PriorityV2.MEDIUM;
-        reason = `Сложные операции: ${watchedOperations.length} оп., ${totalTime} мин`;
+      if (daysLeft <= 1) {
+        newPriority = PriorityV2.URGENT;
+        reason = 'Срочный дедлайн (менее 1 дня)';
+      } else if (daysLeft <= 3 && (hasComplexOps || totalTime > 300)) {
+        newPriority = PriorityV2.HIGH;
+        reason = 'Близкий дедлайн + сложные операции';
+      } else if (daysLeft <= 7 && hasComplexOps) {
+        newPriority = PriorityV2.HIGH;
+        reason = 'Сложные операции';
+      } else if (daysLeft <= 3) {
+        newPriority = PriorityV2.HIGH;
+        reason = 'Близкий дедлайн';
+      } else if (totalTime > 180) {
+        newPriority = PriorityV2.MEDIUM;
+        reason = 'Средняя сложность операций';
       } else {
-        priority = PriorityV2.LOW;
-        reason = `Стандартный заказ: ${daysLeft} дней`;
+        newPriority = PriorityV2.LOW;
+        reason = 'Стандартный заказ';
       }
       
-      setCalculatedPriority(priority);
+      setCalculatedPriority(newPriority);
       setPriorityReason(reason);
     }
   }, [watchedDeadline, watchedOperations]);
 
-  // Загрузка данных при редактировании
+  // Загрузка данных заказа для редактирования
   const { data: orderData } = useQuery({
-    queryKey: ['order-v2', orderId],
+    queryKey: ['order', orderId],
     queryFn: () => ordersApi.getByIdV2(orderId!),
-    enabled: isEdit,
+    enabled: isEdit && visible,
+    staleTime: 0,
   });
 
+  // Заполнение формы при загрузке данных
   useEffect(() => {
     if (orderData && !dataLoadedRef.current) {
-      const parseAxisValue = (value: any): number => {
-        if (typeof value === 'number') return value;
-        if (typeof value === 'string') {
-          const match = value.match(/^(\d+)/);
-          const parsedValue = match ? parseInt(match[1], 10) : 3;
-          return (parsedValue === 3 || parsedValue === 4) ? parsedValue : 3;
-        }
-        return 3;
-      };
-      
-      console.log('Загружаем данные заказа:', orderData);
-      
       reset({
         drawingNumber: orderData.drawingNumber,
         quantity: orderData.quantity,
         deadline: orderData.deadline,
         priority: orderData.priority,
-        workType: getWorkTypeEnumFromString(orderData.workType || ''), // Конвертируем строку в enum
-        operations: orderData.operations?.map((op): OrderFormOperationV2Dto => ({
+        workType: orderData.workType as WorkTypeV2,
+        operations: orderData.operations?.map((op: OperationV2): OrderFormOperationV2Dto => ({
           operationNumber: op.operationNumber,
           operationType: op.operationType || OperationTypeV2.MILLING,
-          machineAxes: parseAxisValue(op.machineAxes),
-          estimatedTime: op.estimatedTime,
+          machineAxes: op.machineAxes || 3,
+          estimatedTime: op.estimatedTime || 0,
         })) || [],
       });
-      
       dataLoadedRef.current = true;
     }
   }, [orderData, reset]);
 
-  // Сброс данных при закрытии формы
-  useEffect(() => {
-    if (!visible) {
-      dataLoadedRef.current = false;
-      setCalculatedPriority(null);
-      setPriorityReason('');
-    }
-  }, [visible]);
-
-  // Мутации для создания и обновления заказа
+  // Создание/обновление заказа
   const createMutation = useMutation({
-    mutationFn: ordersApi.createV2,
-    onSuccess: (createdOrder) => {
-      message.success('Заказ успешно создан');
-      dataLoadedRef.current = false;
+    mutationFn: (data: CreateOrderV2Dto) => 
+      isEdit ? ordersApi.updateV2(orderId!, data) : ordersApi.createV2(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
       onSuccess();
-    },
-    onError: (error: any) => {
-      console.error('Ошибка при создании заказа:', error);
-      message.error('Ошибка при создании заказа: ' + (error.response?.data?.message || error.message));
-    },
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: any }) =>
-      ordersApi.updateV2(id, data),
-    onSuccess: (updatedOrder) => {
-      message.success('Заказ успешно обновлен');
-      dataLoadedRef.current = false;
-      onSuccess();
-    },
-    onError: (error: any) => {
-      console.error('Ошибка при обновлении заказа:', error);
-      message.error('Ошибка при обновлении заказа: ' + (error.response?.data?.message || error.message));
+      onClose();
     },
   });
 
   const onSubmit = async (data: CreateOrderV2Dto) => {
     setLoading(true);
-    
     try {
-      const formattedData = { ...data };
-      
-      // Применяем рассчитанный приоритет если он есть
-      if (calculatedPriority && !isEdit) {
-        formattedData.priority = calculatedPriority;
-      }
-      
-      if (formattedData.operations && formattedData.operations.length > 0) {
-        formattedData.operations = formattedData.operations.map(op => ({
-          ...op,
-          operationNumber: Number(op.operationNumber),
-          machineAxes: Number(op.machineAxes),
-          estimatedTime: Number(op.estimatedTime)
-        }));
-      }
-      
-      if (isEdit && orderId) {
-        await updateMutation.mutateAsync({ id: orderId, data: formattedData });
-      } else {
-        await createMutation.mutateAsync(formattedData);
-      }
-    } catch (error) {
-      console.error('Ошибка при отправке данных формы:', error);
+      await createMutation.mutateAsync(data);
     } finally {
       setLoading(false);
     }
   };
 
   const handleAddOperation = () => {
-    const lastOperation = fields[fields.length - 1];
-    const newOperation: OrderFormOperationV2Dto = {
-      operationNumber: lastOperation ? lastOperation.operationNumber + 1 : 1,
+    append({
+      operationNumber: fields.length + 1,
       operationType: OperationTypeV2.MILLING,
       machineAxes: 3,
       estimatedTime: 60,
-    };
-    append(newOperation);
-  };
-
-  const handleRemoveOperation = (index: number) => {
-    remove(index);
-  };
-
-  const handleUseSuggestedPriority = () => {
-    if (calculatedPriority) {
-      message.success(`Приоритет установлен: ${calculatedPriority}`);
-    }
+    });
   };
 
   const operationColumns = [
     {
       title: '№',
       dataIndex: 'operationNumber',
-      width: 60,
-      render: (_: any, __: any, index: number) => (
-        <Controller
-          name={`operations.${index}.operationNumber`}
-          control={control}
-          render={({ field }) => (
-            <InputNumber {...field} min={1} style={{ width: '100%' }} />
-          )}
-        />
-      ),
+      width: 50,
+      render: (_: any, __: any, index: number) => index + 1,
     },
     {
       title: 'Тип операции',
       dataIndex: 'operationType',
-      width: 150,
       render: (_: any, __: any, index: number) => (
         <Controller
-          name={`operations.${index}.operationType`}
           control={control}
+          name={`operations.${index}.operationType`}
           render={({ field }) => (
             <Select {...field} style={{ width: '100%' }}>
-              <Option value={OperationTypeV2.MILLING}>🔧 Фрезерная</Option>
+              <Option value={OperationTypeV2.MILLING}>🔧 Фрезерование</Option>
               <Option value={OperationTypeV2.TURNING}>⚙️ Токарная</Option>
+              <Option value={OperationTypeV2.DRILLING}>🔩 Сверление</Option>
+              <Option value={OperationTypeV2.GRINDING}>🟨 Шлифование</Option>
             </Select>
           )}
         />
@@ -293,12 +212,13 @@ export const OrderForm: React.FC<OrderFormProps> = ({
       width: 80,
       render: (_: any, __: any, index: number) => (
         <Controller
-          name={`operations.${index}.machineAxes`}
           control={control}
+          name={`operations.${index}.machineAxes`}
           render={({ field }) => (
             <Select {...field} style={{ width: '100%' }}>
               <Option value={3}>3 оси</Option>
               <Option value={4}>4 оси</Option>
+              <Option value={5}>5 осей</Option>
             </Select>
           )}
         />
@@ -310,44 +230,43 @@ export const OrderForm: React.FC<OrderFormProps> = ({
       width: 100,
       render: (_: any, __: any, index: number) => (
         <Controller
-          name={`operations.${index}.estimatedTime`}
           control={control}
+          name={`operations.${index}.estimatedTime`}
           render={({ field }) => (
-            <InputNumber {...field} min={1} style={{ width: '100%' }} />
+            <InputNumber {...field} min={1} max={999} style={{ width: '100%' }} />
           )}
         />
       ),
     },
     {
-      title: '',
-      width: 50,
+      title: 'Действия',
+      width: 80,
       render: (_: any, __: any, index: number) => (
         <Button
           type="text"
           danger
           icon={<DeleteOutlined />}
-          onClick={() => handleRemoveOperation(index)}
-          title={`Удалить операцию ${index + 1}`}
+          onClick={() => remove(index)}
+          size="small"
         />
       ),
     },
   ];
 
-  const totalOperationTime = watchedOperations?.reduce((sum, op) => sum + (op.estimatedTime || 0), 0) || 0;
+  const handleClose = () => {
+    reset();
+    dataLoadedRef.current = false;
+    onClose();
+  };
 
   return (
     <Modal
-      title={
-        <Space>
-          <SettingOutlined />
-          {isEdit ? 'Редактирование заказа' : 'Создание заказа'}
-        </Space>
-      }
+      title={isEdit ? 'Редактировать заказ' : 'Создать новый заказ'}
       open={visible}
-      onCancel={onClose}
-      width={1000}
+      onCancel={handleClose}
+      width={800}
       footer={[
-        <Button key="cancel" onClick={onClose}>
+        <Button key="cancel" onClick={handleClose}>
           Отмена
         </Button>,
         <Button
@@ -359,178 +278,147 @@ export const OrderForm: React.FC<OrderFormProps> = ({
           {isEdit ? 'Сохранить' : 'Создать'}
         </Button>,
       ]}
-      style={{ top: 20 }}
-      bodyStyle={{ maxHeight: '80vh', overflowY: 'auto' }}
     >
       <Spin spinning={loading}>
         <Form layout="vertical">
-          <Card title="Основная информация" size="small" style={{ marginBottom: 16 }}>
-            <Form.Item
-              label="Номер чертежа"
-              required
-              validateStatus={errors.drawingNumber ? 'error' : ''}
-              help={errors.drawingNumber?.message}
-            >
-              <Controller
-                name="drawingNumber"
-                control={control}
-                rules={{ required: 'Это поле обязательно' }}
-                render={({ field }) => (
-                  <Input {...field} placeholder="Введите номер чертежа" />
-                )}
-              />
-            </Form.Item>
-
-            <div style={{ display: 'flex', gap: 16 }}>
-              <Form.Item
-                label="Количество"
-                required
-                validateStatus={errors.quantity ? 'error' : ''}
-                style={{ flex: 1 }}
-              >
+          <Space direction="vertical" style={{ width: '100%' }} size="large">
+            {/* Основная информация */}
+            <Card title={<><InfoCircleOutlined /> Основная информация</>} size="small">
+              <Space direction="vertical" style={{ width: '100%' }}>
                 <Controller
-                  name="quantity"
                   control={control}
-                  rules={{ required: 'Это поле обязательно', min: 1 }}
+                  name="drawingNumber"
+                  rules={{ required: 'Номер чертежа обязателен' }}
                   render={({ field }) => (
-                    <InputNumber {...field} min={1} style={{ width: '100%' }} />
+                    <Form.Item
+                      label="Номер чертежа"
+                      validateStatus={errors.drawingNumber ? 'error' : ''}
+                      help={errors.drawingNumber?.message}
+                    >
+                      <Input {...field} placeholder="Введите номер чертежа" />
+                    </Form.Item>
                   )}
                 />
-              </Form.Item>
 
-              <Form.Item
-                label="Дедлайн"
-                required
-                validateStatus={errors.deadline ? 'error' : ''}
-                style={{ flex: 1 }}
-              >
-                <Controller
-                  name="deadline"
-                  control={control}
-                  rules={{ required: 'Это поле обязательно' }}
-                  render={({ field }) => (
-                    <DatePicker
-                      {...field}
-                      format="DD.MM.YYYY"
-                      value={field.value ? dayjs(field.value) : null}
-                      onChange={(date) => field.onChange(date?.format('YYYY-MM-DD'))}
-                      style={{ width: '100%' }}
-                      prefix={<CalendarOutlined />}
-                    />
-                  )}
-                />
-              </Form.Item>
-
-              <Form.Item
-                label="Приоритет"
-                required
-                validateStatus={errors.priority ? 'error' : ''}
-                style={{ flex: 1 }}
-              >
-                <Controller
-                  name="priority"
-                  control={control}
-                  rules={{ required: 'Это поле обязательно' }}
-                  render={({ field }) => (
-                    <Select {...field} style={{ width: '100%' }}>
-                      <Option value={PriorityV2.HIGH}>🔥 Высокий</Option>
-                      <Option value={PriorityV2.MEDIUM}>⚡ Средний</Option>
-                      <Option value={PriorityV2.LOW}>📋 Низкий</Option>
-                    </Select>
-                  )}
-                />
-              </Form.Item>
-            </div>
-
-            <Form.Item label="Тип работы" required>
-              <Controller
-                name="workType"
-                control={control}
-                rules={{ required: 'Это поле обязательно' }}
-                render={({ field }) => (
-                  <Select {...field} style={{ width: '100%' }}>
-                    {Object.values(WorkTypeV2).map(wt => (
-                      <Option key={wt} value={wt}>
-                        {getWorkTypeText(wt)}
-                      </Option>
-                    ))}
-                  </Select>
-                )}
-              />
-            </Form.Item>
-          </Card>
-
-          {/* Умный помощник по приоритету */}
-          {calculatedPriority && (
-            <Card 
-              title={
                 <Space>
-                  <InfoCircleOutlined />
-                  Рекомендуемый приоритет
-                </Space>
-              } 
-              size="small" 
-              style={{ marginBottom: 16 }}
-            >
-              <Alert
-                message={
-                  <Space>
-                    <FlagOutlined />
-                    Рекомендуемый приоритет: 
-                    <Tag color={calculatedPriority === PriorityV2.HIGH ? 'red' : calculatedPriority === PriorityV2.MEDIUM ? 'orange' : 'green'}>
-                      {calculatedPriority === PriorityV2.HIGH ? '🔥 Высокий' : calculatedPriority === PriorityV2.MEDIUM ? '⚡ Средний' : '📋 Низкий'}
-                    </Tag>
-                  </Space>
-                }
-                description={priorityReason}
-                type="info"
-                showIcon
-                action={
-                  <Button size="small" onClick={handleUseSuggestedPriority}>
-                    Применить
-                  </Button>
-                }
-              />
-            </Card>
-          )}
+                  <Controller
+                    control={control}
+                    name="quantity"
+                    rules={{ required: 'Количество обязательно', min: { value: 1, message: 'Минимум 1' } }}
+                    render={({ field }) => (
+                      <Form.Item
+                        label="Количество"
+                        validateStatus={errors.quantity ? 'error' : ''}
+                        help={errors.quantity?.message}
+                      >
+                        <InputNumber {...field} min={1} max={9999} style={{ width: 120 }} />
+                      </Form.Item>
+                    )}
+                  />
 
-          <Card 
-            title={
-              <Space>
-                <SettingOutlined />
-                Операции
-                {totalOperationTime > 0 && (
-                  <Tag color="blue">
-                    Общее время: {totalOperationTime} мин
-                  </Tag>
-                )}
+                  <Controller
+                    control={control}
+                    name="workType"
+                    render={({ field }) => (
+                      <Form.Item label="Тип работы">
+                        <Select {...field} style={{ width: 200 }}>
+                          <Option value={WorkTypeV2.MILLING}>🔧 Фрезерная</Option>
+                          <Option value={WorkTypeV2.TURNING}>⚙️ Токарная</Option>
+                        </Select>
+                      </Form.Item>
+                    )}
+                  />
+                </Space>
               </Space>
-            } 
-            size="small"
-          >
-            <Table
-              dataSource={fields}
-              columns={operationColumns}
-              rowKey="id"
-              pagination={false}
-              size="small"
-              footer={() => (
-                <Button
-                  type="dashed"
-                  onClick={handleAddOperation}
-                  icon={<PlusOutlined />}
-                  block
-                >
-                  Добавить операцию
-                </Button>
+            </Card>
+
+            {/* Планирование */}
+            <Card title={<><CalendarOutlined /> Планирование</>} size="small">
+              <Space>
+                <Controller
+                  control={control}
+                  name="deadline"
+                  rules={{ required: 'Дедлайн обязателен' }}
+                  render={({ field }) => (
+                    <Form.Item
+                      label="Дедлайн"
+                      validateStatus={errors.deadline ? 'error' : ''}
+                      help={errors.deadline?.message}
+                    >
+                      <DatePicker 
+                        {...field} 
+                        value={field.value ? dayjs(field.value) : null}
+                        onChange={(date) => field.onChange(date?.format('YYYY-MM-DD'))}
+                        style={{ width: 160 }}
+                      />
+                    </Form.Item>
+                  )}
+                />
+
+                <Controller
+                  control={control}
+                  name="priority"
+                  render={({ field }) => (
+                    <Form.Item label="Приоритет">
+                      <Select {...field} style={{ width: 160 }}>
+                        <Option value={PriorityV2.LOW}>📋 Низкий</Option>
+                        <Option value={PriorityV2.MEDIUM}>⚡ Средний</Option>
+                        <Option value={PriorityV2.HIGH}>🔥 Высокий</Option>
+                        <Option value={PriorityV2.URGENT}>⚠️ Срочный</Option>
+                      </Select>
+                    </Form.Item>
+                  )}
+                />
+              </Space>
+
+              {calculatedPriority && (
+                <Alert
+                  message={`Рекомендуемый приоритет: ${calculatedPriority}`}
+                  description={priorityReason}
+                  type="info"
+                  showIcon
+                  style={{ marginTop: 8 }}
+                  action={
+                    <Button
+                      size="small"
+                      onClick={() => setValue('priority', calculatedPriority)}
+                    >
+                      Применить
+                    </Button>
+                  }
+                />
               )}
-            />
-            {fields.length > 0 && (
-              <div style={{ marginTop: 8, color: '#666', fontSize: '12px' }}>
-                Всего операций: {fields.length}
-              </div>
-            )}
-          </Card>
+            </Card>
+
+            {/* Операции */}
+            <Card
+              title={<><SettingOutlined /> Операции ({fields.length})</>}
+              size="small"
+            >
+              <Table
+                dataSource={fields}
+                columns={operationColumns}
+                rowKey="id"
+                pagination={false}
+                size="small"
+                footer={() => (
+                  <Button
+                    type="dashed"
+                    onClick={handleAddOperation}
+                    icon={<PlusOutlined />}
+                    block
+                  >
+                    Добавить операцию
+                  </Button>
+                )}
+              />
+              {fields.length > 0 && (
+                <div style={{ marginTop: 8, color: '#666', fontSize: '12px' }}>
+                  Всего операций: {fields.length}
+                </div>
+              )}
+            </Card>
+          </Space>
         </Form>
       </Spin>
     </Modal>

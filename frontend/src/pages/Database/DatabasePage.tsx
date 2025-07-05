@@ -6,25 +6,18 @@
  * @updated: 2025-06-30 - Добавлен новый Excel Import Manager с БД
  */
 import React, { useState } from 'react';
-import { Button, Row, Col, message, Space, Tooltip, Modal } from 'antd';
+import { Button, message, Tooltip } from 'antd';
 import { 
   PlusOutlined, 
-  ReloadOutlined, 
-  ImportOutlined,
   FileExcelOutlined,
-  CheckCircleOutlined,
-  WarningOutlined
+  CheckCircleOutlined
 } from '@ant-design/icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ordersApi } from '../../services/ordersApi';
 import { OrdersFilter } from '../../types/order.types';
 import { OrdersList } from './components/OrdersList';
 import { OrderForm } from './components/OrderForm.SIMPLE';
-import { CSVImportModal } from './components/CSVImportModal';
-import AdvancedExcelUploader from '../../components/ExcelUploader/AdvancedExcelUploader';
-import { ExcelImportManagerAntd, FilterManagerAntd, InteractiveColumnMapper, ExcelImportsList } from '../../components/ExcelUploader';
-// import { EnhancedExcelImporter } from '../../components/ExcelUploader/EnhancedExcelImporter'; // Заменено на AdvancedExcelUploader
-import { useTranslation } from '../../i18n';
+import { ExcelImportModal } from '../../pages/Orders/components/ExcelImportModal';
 import { 
   ResponsiveContainer, 
   ResponsiveActions,
@@ -34,16 +27,11 @@ import { useResponsive, responsiveUtils } from '../../hooks';
 import './DatabasePage.css';
 
 export const DatabasePage: React.FC = () => {
-  const { t, tWithParams } = useTranslation();
+
   const screenInfo = useResponsive();
   const [showOrderForm, setShowOrderForm] = useState(false);
-  const [showCSVImport, setShowCSVImport] = useState(false);
-  const [showAdvancedExcelImport, setShowAdvancedExcelImport] = useState(false);
-  const [showExcelImportManager, setShowExcelImportManager] = useState(false);
-  const [showFilterManager, setShowFilterManager] = useState(false);
-  const [showInteractiveMapper, setShowInteractiveMapper] = useState(false);
-  const [showExcelImportsList, setShowExcelImportsList] = useState(false);
-  // const [showEnhancedExcelImport, setShowEnhancedExcelImport] = useState(false); // Заменено
+  const [showExcelImport, setShowExcelImport] = useState(false);
+
   const [editingOrderId, setEditingOrderId] = useState<number | undefined>();
   const [filter, setFilter] = useState<OrdersFilter>({ page: 1, limit: 10 });
   const queryClient = useQueryClient();
@@ -84,14 +72,14 @@ export const DatabasePage: React.FC = () => {
     try {
       console.log('🗑️ Удаляем заказ с ID:', orderId);
       await ordersApi.delete(orderId);
-      message.success(t('message.success.deleted'));
+      message.success('Заказ удален успешно');
       // Принудительно обновляем список заказов
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       await refetch(); // Принудительно перезагружаем данные
       console.log('✅ Заказ успешно удалён и список обновлён');
     } catch (error) {
       console.error('❌ Ошибка при удалении заказа:', error);
-      message.error(t('message.error.delete'));
+      message.error('Ошибка при удалении заказа');
     }
   };
 
@@ -105,135 +93,21 @@ export const DatabasePage: React.FC = () => {
     queryClient.invalidateQueries({ queryKey: ['orders'] });
   };
 
-  const handleCSVImportSuccess = () => {
-    queryClient.invalidateQueries({ queryKey: ['orders'] });
-    message.success(t('message.success.csv_imported'));
-  };
 
-  const handleAdvancedExcelUpload = async (file: File, settings: any) => {
-    try {
-      console.log('🚀 Новый импорт Excel с выбором колонок:', { fileName: file.name, settings });
 
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('settings', JSON.stringify(settings));
-
-      const response = await fetch('/api/orders/import-excel-with-mapping', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `Ошибка сервера: ${response.status}`);
-      }
-
-      const result = await response.json();
-      
-      // Обновляем список заказов
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
-      
-      message.success(
-        <div>
-          <CheckCircleOutlined /> Импорт завершен успешно!
-          <div style={{ fontSize: '12px', marginTop: '4px' }}>
-            Создано: {result.data.created}, Обновлено: {result.data.updated}
-          </div>
-        </div>
-      );
-      
-      return result;
-    } catch (error: any) {
-      console.error('❌ Ошибка импорта с маппингом:', error);
-      
-      message.error(
-        <div>
-          <WarningOutlined /> Ошибка импорта: {error.message}
-        </div>
-      );
-      
-      throw error;
-    }
-  };
-
-  const handleEnhancedExcelImportSuccess = (result: any) => {
+  const handleExcelImportSuccess = (result: any) => {
     queryClient.invalidateQueries({ queryKey: ['orders'] });
     message.success(
-      tWithParams('message.success.excel_imported', { created: result.created, updated: result.updated })
+      <div>
+        <CheckCircleOutlined /> Импорт завершен успешно!
+        <div style={{ fontSize: '12px', marginTop: '4px' }}>
+          Создано: {result.created || 0} заказов
+        </div>
+      </div>
     );
   };
 
-  const handleExcelUpload = async (file: File, data?: any[], settings?: any) => {
-    try {
-      console.log('🔶 Excel upload attempt (may be unstable)');
-      console.log('File:', file.name, 'Size:', file.size);
-      
-      // Check backend
-      try {
-        const apiUrl = process.env.REACT_APP_API_URL || '/api';
-        const healthCheck = await fetch(`${apiUrl}/orders`, {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' }
-        });
-        
-        if (!healthCheck.ok) {
-          throw new Error(`Backend unavailable: ${healthCheck.status}`);
-        }
-      } catch (error) {
-        console.error('Backend unavailable:', error);
-        message.error(
-          <div>
-            <div><WarningOutlined /> {t('message.error.backend_unavailable')}</div>
-            <div style={{ fontSize: '12px', marginTop: '4px' }}>
-              {t('message.try_csv_instead')}
-            </div>
-          </div>
-        );
-        throw error;
-      }
-      
-      // Try Excel upload (unstable)
-      const result = await ordersApi.importExcel(
-        file, 
-        settings?.colorFilters?.filter((f: any) => f.selected)?.map((f: any) => f.color) || []
-      );
-      
-      console.log('✅ Excel import successful:', result);
-      
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
-      
-      message.success(
-        <div>
-          <CheckCircleOutlined /> {t('message.success.excel_completed')}
-          <div style={{ fontSize: '12px', marginTop: '4px' }}>
-            {tWithParams('message.created_updated', { created: result.created || 0, updated: result.updated || 0 })}
-          </div>
-        </div>
-      );
-      
-      return result;
-      
-    } catch (error) {
-      console.error('❌ Excel import error:', error);
-      
-      // Suggest alternative
-      message.error(
-        <div>
-          <div><WarningOutlined /> {t('message.error.excel_upload')}</div>
-          <div style={{ fontSize: '12px', marginTop: '4px', color: '#1890ff' }}>
-            💡 {t('message.try_csv_stable')}
-          </div>
-        </div>
-      );
-      
-      // Auto-open CSV import as alternative
-      setTimeout(() => {
-        setShowCSVImport(true);
-      }, 2000);
-      
-      throw error;
-    }
-  };
+
 
   return (
     <ResponsiveContainer className="database-page">
@@ -260,180 +134,29 @@ export const DatabasePage: React.FC = () => {
               height: screenInfo.isMobile ? 44 : 'auto'
             }}
           >
-            {t('database.new_order')}
+            Новый заказ
           </Button>
           
-          {/* Импорт кнопки в адаптивном контейнере */}
-          <Space.Compact 
-            style={{ 
-              width: screenInfo.isMobile ? '100%' : 'auto',
-              display: 'flex',
-              flexDirection: screenInfo.isMobile ? 'column' : 'row'
-            }}
-          >
-            {/* Stable CSV import - recommended */}
-            <Tooltip title={t('tooltip.csv_reliable')}>
-              <Button
-                type="primary"
-                icon={<ImportOutlined />}
-                onClick={() => setShowCSVImport(true)}
-                size={componentSize}
-                style={{ 
-                  background: '#52c41a',
-                  borderColor: '#52c41a',
-                  width: screenInfo.isMobile ? '100%' : 'auto',
-                  height: screenInfo.isMobile ? 44 : 'auto',
-                  marginBottom: screenInfo.isMobile ? 8 : 0
-                }}
-              >
-                {screenInfo.isMobile ? t('database.csv_import') : t('database.csv_import')}
-                <CheckCircleOutlined style={{ marginLeft: 4 }} />
-              </Button>
-            </Tooltip>
-            
-            {/* Список импортов Excel */}
-            <Tooltip title="История импорта Excel файлов">
-              <Button
-                type="default"
-                icon={<FileExcelOutlined />}
-                onClick={() => setShowExcelImportsList(true)}
-                size={componentSize}
-                style={{ 
-                  width: screenInfo.isMobile ? '100%' : 'auto',
-                  height: screenInfo.isMobile ? 44 : 'auto',
-                  marginBottom: screenInfo.isMobile ? 8 : 0
-                }}
-              >
-                {screenInfo.isMobile ? '📋 История' : '📋 История импорта'}
-              </Button>
-            </Tooltip>
-            
-            {/* Менеджер фильтров */}
-      <Modal
-        title="⚙️ Менеджер фильтров импорта"
-        open={showFilterManager}
-        onCancel={() => setShowFilterManager(false)}
-        width={1200}
-        footer={null}
-        destroyOnClose
-        style={{ top: 20 }}
-      >
-        <FilterManagerAntd />
-      </Modal>
+          {/* EXCEL ИМПОРТ - ПРОСТОЙ И РАБОЧИЙ */}
+          <Tooltip title="Импорт заказов из Excel: колонка C-чертёж, E-количество, I-дедлайн, K-приоритет">
+            <Button
+              type="primary"
+              icon={<FileExcelOutlined />}
+              onClick={() => setShowExcelImport(true)}
+              size={componentSize}
+              style={{ 
+                background: 'linear-gradient(45deg, #52c41a, #389e0d)',
+                border: 'none',
+                width: screenInfo.isMobile ? '100%' : 'auto',
+                height: screenInfo.isMobile ? 44 : 'auto',
+                marginBottom: screenInfo.isMobile ? 8 : 0
+              }}
+            >
+              {screenInfo.isMobile ? 'Excel Импорт' : 'Excel Импорт'}
+              <CheckCircleOutlined style={{ marginLeft: 4, color: 'white' }} />
+            </Button>
+          </Tooltip>
 
-      {/* Новый интерактивный маппер колонок Excel */}
-      <Tooltip title="Интерактивный маппинг колонок Excel к БД">
-      <Button
-      type="primary"
-      icon={<FileExcelOutlined />}
-      onClick={() => setShowInteractiveMapper(true)}
-      size={componentSize}
-      style={{ 
-      background: 'linear-gradient(45deg, #1890ff, #722ed1)',
-      border: 'none',
-      width: screenInfo.isMobile ? '100%' : 'auto',
-      height: screenInfo.isMobile ? 44 : 'auto',
-      marginBottom: screenInfo.isMobile ? 8 : 0
-      }}
-      >
-      {screenInfo.isMobile ? '🎯 Excel Маппер' : '🎯 Excel Маппер'}
-      <CheckCircleOutlined style={{ marginLeft: 4, color: 'white' }} />
-      </Button>
-      </Tooltip>
-            
-            {/* Новый менеджер импорта Excel с БД */}
-            <Tooltip title="Полный менеджер импорта Excel с сохранением в базу данных">
-              <Button
-                type="default"
-                icon={<FileExcelOutlined />}
-                onClick={() => setShowExcelImportManager(true)}
-                size={componentSize}
-                style={{ 
-                  width: screenInfo.isMobile ? '100%' : 'auto',
-                  height: screenInfo.isMobile ? 44 : 'auto',
-                  marginBottom: screenInfo.isMobile ? 8 : 0
-                }}
-              >
-                {screenInfo.isMobile ? '🗄️ Менеджер' : '🗼 Менеджер'}
-              </Button>
-            </Tooltip>
-            
-            {/* Менеджер фильтров */}
-            <Tooltip title="Настройка фильтров импорта">
-              <Button
-                type="default"
-                icon={<ImportOutlined />}
-                onClick={() => setShowFilterManager(true)}
-                size={componentSize}
-                style={{ 
-                  width: screenInfo.isMobile ? '100%' : 'auto',
-                  height: screenInfo.isMobile ? 44 : 'auto',
-                  marginBottom: screenInfo.isMobile ? 8 : 0
-                }}
-              >
-                {screenInfo.isMobile ? '⚙️ Фильтры' : '⚙️ Фильтры'}
-              </Button>
-            </Tooltip>
-            
-            {/* Новый Excel импорт с выбором колонок */}
-            <Tooltip title="Новый импорт Excel с возможностью выбора любых колонок">
-              <Button
-                type="primary"
-                icon={<FileExcelOutlined />}
-                onClick={() => setShowAdvancedExcelImport(true)}
-                size={componentSize}
-                style={{ 
-                  background: 'linear-gradient(45deg, #52c41a, #389e0d)',
-                  border: 'none',
-                  width: screenInfo.isMobile ? '100%' : 'auto',
-                  height: screenInfo.isMobile ? 44 : 'auto',
-                  marginBottom: screenInfo.isMobile ? 8 : 0
-                }}
-              >
-                {screenInfo.isMobile ? '🆕 Excel (выбор колонок)' : '🆕 Excel (выбор колонок)'}
-                <CheckCircleOutlined style={{ marginLeft: 4, color: 'white' }} />
-              </Button>
-            </Tooltip>
-            
-            {/* Old Excel uploader - may be unstable */}
-            {!screenInfo.isMobile && (
-              <Tooltip title={t('tooltip.excel_1_unstable')}>
-                <Button
-                  type="default"
-                  icon={<FileExcelOutlined />}
-                  onClick={() => {
-                    // Create input for file selection
-                    const input = document.createElement('input');
-                    input.type = 'file';
-                    input.accept = '.xlsx,.xls';
-                    input.onchange = (e) => {
-                      const file = (e.target as HTMLInputElement).files?.[0];
-                      if (file) {
-                        handleExcelUpload(file);
-                      }
-                    };
-                    input.click();
-                  }}
-                  size={componentSize}
-                >
-                  {t('database.excel_1_0')}
-                  <WarningOutlined style={{ marginLeft: 4, color: '#faad14' }} />
-                </Button>
-              </Tooltip>
-            )}
-          </Space.Compact>
-          
-          <Button
-            icon={<ReloadOutlined />}
-            onClick={() => refetch()}
-            size={componentSize}
-            style={{ 
-              width: screenInfo.isMobile ? '100%' : 'auto',
-              height: screenInfo.isMobile ? 44 : 'auto'
-            }}
-          >
-            {t('database.refresh')}
-          </Button>
         </div>
       </ResponsiveActions>
 
@@ -459,68 +182,12 @@ export const DatabasePage: React.FC = () => {
         onSuccess={handleFormSuccess}
       />
 
-      {/* Stable CSV import */}
-      <CSVImportModal
-        visible={showCSVImport}
-        onClose={() => setShowCSVImport(false)}
-        onSuccess={handleCSVImportSuccess}
+      {/* Excel Импорт - простой и рабочий */}
+      <ExcelImportModal
+        visible={showExcelImport}
+        onClose={() => setShowExcelImport(false)}
+        onSuccess={handleExcelImportSuccess}
       />
-
-      {/* Список импортов Excel */}
-      <Modal
-        title="📋 История импорта Excel файлов"
-        open={showExcelImportsList}
-        onCancel={() => setShowExcelImportsList(false)}
-        width={1400}
-        footer={null}
-        destroyOnClose
-        style={{ top: 20 }}
-      >
-        <ExcelImportsList />
-      </Modal>
-      
-      {/* Новый интерактивный маппер Excel */}
-      <Modal
-        title="🎯 Интерактивный маппинг Excel колонок"
-        open={showInteractiveMapper}
-        onCancel={() => setShowInteractiveMapper(false)}
-        width={1400}
-        footer={null}
-        destroyOnClose
-        style={{ top: 20 }}
-      >
-        <InteractiveColumnMapper />
-      </Modal>
-      
-      {/* Новый менеджер импорта Excel с БД */}
-      <Modal
-        title="🗄️ Менеджер импорта Excel с базой данных"
-        open={showExcelImportManager}
-        onCancel={() => setShowExcelImportManager(false)}
-        width={1400}
-        footer={null}
-        destroyOnClose
-        style={{ top: 20 }}
-      >
-        <ExcelImportManagerAntd />
-      </Modal>
-
-      {/* Новый Excel импорт с выбором колонок */}
-      <Modal
-        title="🆕 Новый импорт Excel с выбором колонок"
-        open={showAdvancedExcelImport}
-        onCancel={() => setShowAdvancedExcelImport(false)}
-        width={1200}
-        footer={null}
-        destroyOnClose
-      >
-        <AdvancedExcelUploader
-          onUpload={handleAdvancedExcelUpload}
-          maxFileSize={50}
-          title="🆕 Новый импорт Excel с выбором колонок"
-          description="Выберите любые колонки из вашего Excel файла и настройте соответствие полям заказа. Система автоматически проанализирует структуру файла."
-        />
-      </Modal>
     </ResponsiveContainer>
   );
 };
