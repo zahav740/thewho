@@ -11,8 +11,7 @@ import * as ExcelJS from 'exceljs';
 import { Order, Priority } from '../../database/entities/order.entity';
 import { Operation, OperationType } from '../../database/entities/operation.entity';
 import { OrdersService } from './orders.service';
-import type { MulterFile } from '../../types/express';
-
+import type { Express } from 'express';
 
 export interface ColorFilter {
   color: string;

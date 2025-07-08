@@ -52,6 +52,7 @@ interface ExcelFile {
 interface ModernExcelUploaderProps {
   onUpload?: (file: File, data?: any[]) => Promise<any>;
   onPreview?: (data: any[]) => void;
+  onDownload?: (fileIndex: number) => void;
   maxFileSize?: number; // в MB
   acceptedFormats?: string[];
   showPreview?: boolean;
@@ -59,11 +60,13 @@ interface ModernExcelUploaderProps {
   columnMapping?: Record<string, string>;
   title?: string;
   description?: string;
+  statusMapping?: Record<string, {color: string; text: string; canDownload?: boolean}>;
 }
 
 const ModernExcelUploader: React.FC<ModernExcelUploaderProps> = ({
   onUpload,
   onPreview,
+  onDownload,
   maxFileSize = 10,
   acceptedFormats = ['.xlsx', '.xls'],
   showPreview = true,
@@ -71,6 +74,7 @@ const ModernExcelUploader: React.FC<ModernExcelUploaderProps> = ({
   columnMapping = {},
   title = 'Загрузка Excel файлов',
   description = 'Перетащите файл сюда или нажмите для выбора',
+  statusMapping
 }) => {
   const [files, setFiles] = useState<ExcelFile[]>([]);
   const [previewModalVisible, setPreviewModalVisible] = useState(false);
@@ -343,6 +347,16 @@ const ModernExcelUploader: React.FC<ModernExcelUploaderProps> = ({
                             onClick={() => handlePreview(index)}
                           >
                             Превью
+                          </Button>
+                        )}
+                        {file.status === 'done' && onDownload && (
+                          <Button 
+                            size="small" 
+                            type="primary"
+                            icon={<CloudUploadOutlined />}
+                            onClick={() => onDownload(index)}
+                          >
+                            Скачать
                           </Button>
                         )}
                         {file.status === 'error' && (

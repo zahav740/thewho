@@ -55,7 +55,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
 
   console.log('🔧 OrderForm (PDF) rendered:', { visible, orderId, isEdit });
 
-  const { control, handleSubmit, reset, formState: { errors } } = useForm<CreateOrderDto>({
+  const { control, handleSubmit, reset, getValues, formState: { errors } } = useForm<CreateOrderDto>({
     defaultValues: {
       drawingNumber: '',
       quantity: 1,
@@ -207,10 +207,13 @@ export const OrderForm: React.FC<OrderFormProps> = ({
 
     try {
       console.log('📁 Uploading PDF for order:', orderId);
-      const result = await pdfApi.uploadPdf(orderId, file);
+      // Нужно получить номер чертежа для нового API
+      const formData = getValues();
+      const drawingNumber = formData.drawingNumber || `order_${orderId}`;
+      const result = await pdfApi.uploadPdf(orderId, drawingNumber, file);
       
       if (result.success) {
-        setCurrentPdfPath(result.pdfPath);
+        setCurrentPdfPath(result.filename); // Используем filename вместо pdfPath
         // Обновляем кеш заказа
         queryClient.invalidateQueries({ queryKey: ['order', orderId] });
         queryClient.invalidateQueries({ queryKey: ['orders'] });
@@ -231,14 +234,11 @@ export const OrderForm: React.FC<OrderFormProps> = ({
       console.log('🗑️ Removing PDF for order:', orderId);
       const result = await pdfApi.deletePdf(orderId);
       
-      if (result.success) {
-        setCurrentPdfPath(undefined);
-        // Обновляем кеш заказа
-        queryClient.invalidateQueries({ queryKey: ['order', orderId] });
-        queryClient.invalidateQueries({ queryKey: ['orders'] });
-      } else {
-        throw new Error(result.message);
-      }
+      // deletePdf теперь возвращает объект с success и message
+      setCurrentPdfPath(undefined);
+      // Обновляем кеш заказа
+      queryClient.invalidateQueries({ queryKey: ['order', orderId] });
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
     } catch (error) {
       console.error('❌ PDF remove error:', error);
       throw error;

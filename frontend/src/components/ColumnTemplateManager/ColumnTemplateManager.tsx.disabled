@@ -1,0 +1,253 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  Settings, 
+  Plus, 
+  Edit3, 
+  Trash2, 
+  Eye, 
+  Save,
+  Star,
+  StarOff,
+  Check,
+  X,
+  ChevronUp,
+  ChevronDown,
+  Target,
+  Columns,
+  FileSpreadsheet
+} from 'lucide-react';
+
+// Типы данных
+interface DetectedColumn {
+  name: string;
+  index: number;
+  suggested: boolean;
+  suggestedSystemName: string;
+}
+
+interface ColumnSelection {
+  excelColumn: string;
+  systemName: string;
+  include: boolean;
+  order: number;
+}
+
+interface ColumnTemplate {
+  id: number;
+  name: string;
+  columnSelections: ColumnSelection[];
+  isDefault: boolean;
+  isActive: boolean;
+  usageCount: number;
+  createdAt: string;
+}
+
+// Сервис для работы с API шаблонов
+class ColumnTemplateService {
+  private baseUrl = '/api/excel-import/templates';
+
+  async detectColumns(fileId: number): Promise<DetectedColumn[]> {
+    const response = await fetch(`${this.baseUrl}/detect-columns/${fileId}`);
+    if (!response.ok) throw new Error('Ошибка распознавания колонок');
+    return response.json();
+  }
+
+  async getAllTemplates(): Promise<ColumnTemplate[]> {
+    const response = await fetch(this.baseUrl);
+    if (!response.ok) throw new Error('Ошибка получения шаблонов');
+    return response.json();
+  }
+
+  async getDefaultTemplate(): Promise<ColumnTemplate | null> {
+    const response = await fetch(`${this.baseUrl}/default`);
+    if (response.status === 404) return null;
+    if (!response.ok) throw new Error('Ошибка получения шаблона по умолчанию');
+    return response.json();
+  }
+
+  async createTemplate(data: {
+    name: string;
+    columnSelections: ColumnSelection[];
+    isDefault?: boolean;
+  }): Promise<ColumnTemplate> {
+    const response = await fetch(this.baseUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) throw new Error('Ошибка создания шаблона');
+    return response.json();
+  }
+
+  async updateTemplate(id: number, data: Partial<ColumnTemplate>): Promise<ColumnTemplate> {
+    const response = await fetch(`${this.baseUrl}/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) throw new Error('Ошибка обновления шаблона');
+    return response.json();
+  }
+
+  async deleteTemplate(id: number): Promise<void> {
+    const response = await fetch(`${this.baseUrl}/${id}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) throw new Error('Ошибка удаления шаблона');
+  }
+
+  async applyTemplateToFile(templateId: number, fileId: number): Promise<void> {
+    const response = await fetch(`${this.baseUrl}/${templateId}/apply-to-file/${fileId}`, {
+      method: 'POST',
+    });
+    if (!response.ok) throw new Error('Ошибка применения шаблона');
+  }
+}
+
+const templateService = new ColumnTemplateService();
+
+export default function ColumnTemplateManager({ fileId }: { fileId?: number }) {
+  const [detectedColumns, setDetectedColumns] = useState<DetectedColumn[]>([]);
+  const [templates, setTemplates] = useState<ColumnTemplate[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  // Загрузка шаблонов
+  const loadTemplates = async () => {
+    try {
+      const templatesData = await templateService.getAllTemplates();
+      setTemplates(templatesData);
+    } catch (error) {
+      console.error('Ошибка загрузки шаблонов:', error);
+    }
+  };
+
+  // Загрузка колонок из файла
+  const loadColumnsFromFile = async (fileId: number) => {
+    try {
+      setLoading(true);
+      const columns = await templateService.detectColumns(fileId);
+      setDetectedColumns(columns);
+    } catch (error) {
+      console.error('Ошибка загрузки колонок:', error);
+      alert('Ошибка загрузки колонок из файла');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadTemplates();
+    if (fileId) {
+      loadColumnsFromFile(fileId);
+    }
+  }, [fileId]);
+
+  return (
+    <div className="max-w-6xl mx-auto p-6">
+      {/* Заголовок */}
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-900 flex items-center">
+          <Settings className="w-6 h-6 mr-2 text-blue-600" />
+          Управление колонками
+        </h1>
+        <p className="text-gray-600">
+          Настройка наборов колонок для Excel файлов
+        </p>
+      </div>
+
+      {/* Простой интерфейс для демонстрации */}
+      <div className="bg-white rounded-lg border p-6">
+        <h2 className="text-lg font-semibold mb-4">Обнаруженные колонки</h2>
+        
+        {loading ? (
+          <div className="text-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="text-gray-600 mt-2">Анализируем колонки файла...</p>
+          </div>
+        ) : detectedColumns.length > 0 ? (
+          <div className="space-y-3">
+            {detectedColumns.map((col, index) => (
+              <div key={index} className="flex items-center justify-between p-3 border rounded">
+                <div>
+                  <div className="font-medium">{col.name}</div>
+                  <div className="text-sm text-gray-600">→ {col.suggestedSystemName}</div>
+                </div>
+                <div className="flex items-center">
+                  {col.suggested && (
+                    <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded mr-2">
+                      Рекомендуется
+                    </span>
+                  )}
+                  <input
+                    type="checkbox"
+                    defaultChecked={col.suggested}
+                    className="rounded"
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8">
+            <Columns className="w-12 h-12 mx-auto text-gray-400 mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              Колонки не обнаружены
+            </h3>
+            <p className="text-gray-600">
+              {fileId ? 'Загружаем файл и анализируем колонки...' : 'Выберите файл для анализа колонок'}
+            </p>
+          </div>
+        )}
+
+        {/* Сохраненные шаблоны */}
+        <div className="mt-8">
+          <h2 className="text-lg font-semibold mb-4">Сохраненные наборы колонок</h2>
+          
+          {templates.length === 0 ? (
+            <div className="text-center py-8 border-2 border-dashed border-gray-300 rounded-lg">
+              <Settings className="w-8 h-8 mx-auto text-gray-400 mb-2" />
+              <p className="text-gray-600">Нет сохраненных наборов колонок</p>
+              <button className="mt-3 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                Создать первый набор
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {templates.map((template) => (
+                <div key={template.id} className="border rounded-lg p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-medium flex items-center">
+                        {template.name}
+                        {template.isDefault && (
+                          <span className="ml-2 bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded">
+                            По умолчанию
+                          </span>
+                        )}
+                      </h3>
+                      <p className="text-sm text-gray-600">
+                        {template.columnSelections.filter(c => c.include).length} колонок • 
+                        Использований: {template.usageCount}
+                      </p>
+                    </div>
+                    <div className="flex space-x-2">
+                      <button className="p-2 text-blue-600 hover:bg-blue-50 rounded">
+                        <FileSpreadsheet className="w-4 h-4" />
+                      </button>
+                      <button className="p-2 text-green-600 hover:bg-green-50 rounded">
+                        <Edit3 className="w-4 h-4" />
+                      </button>
+                      <button className="p-2 text-red-600 hover:bg-red-50 rounded">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

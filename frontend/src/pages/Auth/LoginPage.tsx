@@ -316,6 +316,12 @@ export const LoginPage: React.FC = () => {
               </Link>
             </Text>
           </div>
+
+          <div style={{ textAlign: 'center', marginTop: '24px' }}>
+            <Text type="secondary" style={{ fontSize: '12px' }}>
+              {t('auth.role.admin')}: kasuf / kasuf123
+            </Text>
+          </div>
         </Card>
       </div>
     </div>

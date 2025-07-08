@@ -1,0 +1,130 @@
+import React, { useState, useCallback, useEffect } from 'react';
+import { 
+  Upload, 
+  FileSpreadsheet, 
+  Eye, 
+  Download, 
+  Trash2, 
+  RefreshCw, 
+  AlertCircle,
+  CheckCircle,
+  Clock,
+  Loader,
+  ChevronLeft,
+  ChevronRight,
+  Search,
+  Filter,
+  BarChart3
+} from 'lucide-react';
+
+// Типы данных
+interface ExcelFile {
+  id: number;
+  originalName: string;
+  description: string;
+  fileSize: number;
+  rowsCount: number;
+  sheetsCount: number;
+  status: 'uploading' | 'parsed' | 'error' | 'processing';
+  uploadedBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface ExcelFileData {
+  file: ExcelFile;
+  data: Record<string, any>[];
+  totalRows: number;
+  hasMore: boolean;
+}
+
+interface UploadOptions {
+  description?: string;
+  maxRows?: number;
+  sheetIndex?: number;
+  skipEmptyRows?: boolean;
+}
+
+interface Stats {
+  totalFiles: number;
+  totalSize: number;
+  statusCounts: Record<string, number>;
+  totalRows: number;
+}
+
+// Сервис для работы с API
+class ExcelImportService {
+  private baseUrl = '/api/excel-import';
+
+  async uploadFile(file: File, options: UploadOptions = {}): Promise<any> {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    if (options.description) formData.append('description', options.description);
+    if (options.maxRows) formData.append('maxRows', options.maxRows.toString());
+    if (options.sheetIndex !== undefined) formData.append('sheetIndex', options.sheetIndex.toString());
+    if (options.skipEmptyRows !== undefined) formData.append('skipEmptyRows', options.skipEmptyRows.toString());
+
+    const response = await fetch(`${this.baseUrl}/upload`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Ошибка загрузки: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async getFiles(page = 1, limit = 20, status?: string): Promise<any> {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+    });
+    
+    if (status) params.append('status', status);
+
+    const response = await fetch(`${this.baseUrl}/files?${params}`);
+    if (!response.ok) throw new Error('Ошибка получения списка файлов');
+    return response.json();
+  }
+
+  async getFileData(id: number, offset = 0, limit = 100): Promise<ExcelFileData> {
+    const params = new URLSearchParams({
+      offset: offset.toString(),
+      limit: limit.toString(),
+    });
+
+    const response = await fetch(`${this.baseUrl}/files/${id}/data?${params}`);
+    if (!response.ok) throw new Error('Ошибка получения данных файла');
+    return response.json();
+  }
+
+  async deleteFile(id: number): Promise<void> {
+    const response = await fetch(`${this.baseUrl}/files/${id}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) throw new Error('Ошибка удаления файла');
+  }
+
+  async reparseFile(id: number, options: UploadOptions): Promise<any> {
+    const response = await fetch(`${this.baseUrl}/files/${id}/reparse`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(options),
+    });
+    if (!response.ok) throw new Error('Ошибка повторной обработки');
+    return response.json();
+  }
+
+  async getStats(): Promise<Stats> {
+    const response = await fetch(`${this.baseUrl}/stats`);
+    if (!response.ok) throw new Error('Ошибка получения статистики');
+    return response.json();
+  }
+}
+
+const excelService = new ExcelImportService();
+
+export default ExcelImportService;

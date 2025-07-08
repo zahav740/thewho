@@ -38,8 +38,6 @@ import {
   exampleComprehensiveCalculation, 
   analyzeResults 
 } from '../../utils/ComprehensiveKPISystem';
-import { analyticsApi } from '../../services/analyticsApi';
-import { useQuery } from '@tanstack/react-query';
 import dayjs, { Dayjs } from 'dayjs';
 
 const { Title, Text } = Typography;
@@ -52,67 +50,8 @@ export const ComprehensiveAnalyticsPage: React.FC = () => {
     dayjs()
   ]);
 
-  // Загрузка полной сводки аналитики
-  const { data: analyticsData, isLoading, error } = useQuery({
-    queryKey: ['analytics-summary', selectedPeriod],
-    queryFn: () => {
-      if (!selectedPeriod || !selectedPeriod[0] || !selectedPeriod[1]) {
-        return analyticsApi.getAnalyticsSummary();
-      }
-      return analyticsApi.getAnalyticsSummary({
-        startDate: selectedPeriod[0].format('YYYY-MM-DD'),
-        endDate: selectedPeriod[1].format('YYYY-MM-DD')
-      });
-    },
-    staleTime: 5 * 60 * 1000,
-  });
-
-  // Используем реальные данные или показываем пустое состояние
-  const comprehensiveMetrics = analyticsData && analyticsData.operators.length > 0 ? {
-    overall: {
-      totalKPI: analyticsData.kpiOee.aggregated.overallKPI,
-      totalOEE: analyticsData.kpiOee.aggregated.overallOEE,
-      participatingOperators: analyticsData.summary.activeOperators,
-      activeMachines: analyticsData.summary.activeMachines,
-      averageKPIByType: {
-        operators: analyticsData.operators.length > 0 
-          ? Math.round(analyticsData.operators.reduce((sum: number, o: any) => sum + o.kpi, 0) / analyticsData.operators.length)
-          : 0,
-        setupSpecialists: 0,
-        universal: 0
-      }
-    },
-    rankings: {
-      operatorsByKPI: analyticsData.operators.sort((a: any, b: any) => b.kpi - a.kpi).map((op: any) => ({
-        operatorName: op.operatorName,
-        kpi: op.kpi,
-        type: 'operator'
-      })),
-      machinesByOEE: analyticsData.machines.sort((a: any, b: any) => b.oee - a.oee)
-    },
-    operators: {},
-    machines: {}
-  } : {
-    // Пустое состояние вместо примеров
-    overall: {
-      totalKPI: 0,
-      totalOEE: 0,
-      participatingOperators: 0,
-      activeMachines: 0,
-      averageKPIByType: {
-        operators: 0,
-        setupSpecialists: 0,
-        universal: 0
-      }
-    },
-    rankings: {
-      operatorsByKPI: [],
-      machinesByOEE: []
-    },
-    operators: {},
-    machines: {}
-  };
-  
+  // Получаем пример расчета
+  const comprehensiveMetrics = exampleComprehensiveCalculation();
   const insights = analyzeResults(comprehensiveMetrics);
 
   const getKPIColor = (value: number) => {
@@ -281,38 +220,12 @@ export const ComprehensiveAnalyticsPage: React.FC = () => {
               }}
               format="DD.MM.YYYY"
             />
-            <Button icon={<ReloadOutlined />} type="primary" loading={isLoading}>
+            <Button icon={<ReloadOutlined />} type="primary">
               Обновить
             </Button>
           </Space>
         </Space>
       </Card>
-
-      {/* Обработка ошибок */}
-      {error && (
-        <Alert
-          message="Ошибка загрузки аналитики"
-          description="Не удалось загрузить полную сводку аналитики."
-          type="warning"
-          style={{ marginBottom: '24px' }}
-          showIcon
-        />
-      )}
-
-      {!isLoading && !error && (!analyticsData || (analyticsData.operators.length === 0 && analyticsData.machines.length === 0)) && (
-        <Alert
-          message="Нет данных о производстве"
-          description="Добавьте записи смен через раздел 'Учет смен → Мониторинг' для отображения реальной аналитики."
-          type="info"
-          style={{ marginBottom: '24px' }}
-          showIcon
-          action={
-            <Button type="link" href="#/shifts">
-              Перейти к учету смен
-            </Button>
-          }
-        />
-      )}
 
       {/* Главные общие метрики */}
       <Row gutter={[16, 16]} style={{ marginBottom: '24px' }}>
@@ -373,23 +286,52 @@ export const ComprehensiveAnalyticsPage: React.FC = () => {
       </Row>
 
       {/* KPI по типам операторов */}
-      <Card title="📊 KPI операторов" style={{ marginBottom: '24px' }}>
+      <Card title="📊 KPI по типам операторов" style={{ marginBottom: '24px' }}>
         <Row gutter={16}>
-          <Col span={24}>
+          <Col span={8}>
             <Card size="small" style={{ textAlign: 'center' }}>
               <Statistic
-                title="👨‍🔧 Средний KPI всех операторов"
+                title="👨‍🔧 Операторы станков"
                 value={comprehensiveMetrics.overall.averageKPIByType.operators}
                 suffix="%"
                 valueStyle={{ color: getKPIColor(comprehensiveMetrics.overall.averageKPIByType.operators) }}
               />
-              <Text type="secondary">Основан на реальных данных смен</Text>
+              <Text type="secondary">Производят детали</Text>
+            </Card>
+          </Col>
+          <Col span={8}>
+            <Card size="small" style={{ textAlign: 'center' }}>
+              <Statistic
+                title="🔧 Наладчики"
+                value={comprehensiveMetrics.overall.averageKPIByType.setupSpecialists}
+                suffix="%"
+                valueStyle={{ color: getKPIColor(comprehensiveMetrics.overall.averageKPIByType.setupSpecialists) }}
+              />
+              <Text type="secondary">Настраивают станки</Text>
+            </Card>
+          </Col>
+          <Col span={8}>
+            <Card size="small" style={{ textAlign: 'center' }}>
+              <Statistic
+                title="⭐ Универсальные"
+                value={comprehensiveMetrics.overall.averageKPIByType.universal}
+                suffix="%"
+                valueStyle={{ color: getKPIColor(comprehensiveMetrics.overall.averageKPIByType.universal) }}
+              />
+              <Text type="secondary">И производят, и налаживают</Text>
             </Card>
           </Col>
         </Row>
       </Card>
 
-
+      {/* Особенности расчета KPI наладчика */}
+      <Alert
+        message="🔧 Особенности KPI наладчика"
+        description="KPI наладчика НЕ зависит от времени наладки (сложность разная!). Оценивается: качество наладки (50%) + готовность станка (30%) + безопасность (20%)"
+        type="info"
+        style={{ marginBottom: '24px' }}
+        showIcon
+      />
 
       {/* Детальные таблицы */}
       <Tabs defaultActiveKey="rankings" type="card">
@@ -421,132 +363,119 @@ export const ComprehensiveAnalyticsPage: React.FC = () => {
         </TabPane>
 
         <TabPane tab="📋 Детализация операторов" key="operators">
-          {analyticsData && analyticsData.operators.length > 0 ? (
-            <Row gutter={16}>
-              {analyticsData.operators.map((operator: any, index: number) => (
-                <Col span={8} key={operator.operatorName}>
-                  <Card 
-                    title={
-                      <Space>
-                        <UserOutlined />
-                        <span>👤 {operator.operatorName}</span>
-                      </Space>
-                    }
-                    size="small"
-                    style={{ marginBottom: '16px' }}
-                  >
-                    <Space direction="vertical" style={{ width: '100%' }}>
-                      <div>
-                        <Text strong>Тип: </Text>
-                        <Tag color="blue">
-                          Оператор станка
-                        </Tag>
-                      </div>
-                      <div>
-                        <Text strong>KPI: </Text>
-                        <Progress 
-                          percent={operator.kpi} 
-                          size="small" 
-                          strokeColor={getKPIColor(operator.kpi)}
-                        />
-                      </div>
-                      <Divider style={{ margin: '8px 0' }} />
-                      <div style={{ fontSize: '12px' }}>
-                        <p><strong>Смен:</strong> {operator.totalShifts}</p>
-                        <p><strong>Среднее производство:</strong> {operator.avgProduction} дет./смена</p>
-                        <p><strong>Качество:</strong> {operator.qualityRate}%</p>
-                      </div>
+          <Row gutter={16}>
+            {Object.entries(comprehensiveMetrics.operators).map(([operatorId, data]) => (
+              <Col span={8} key={operatorId}>
+                <Card 
+                  title={
+                    <Space>
+                      {getOperatorTypeIcon(data.type)}
+                      <span>Оператор {operatorId}</span>
                     </Space>
-                  </Card>
-                </Col>
-              ))}
-            </Row>
-          ) : (
-            <Card>
-              <div style={{ textAlign: 'center', padding: '40px' }}>
-                <UserOutlined style={{ fontSize: '48px', color: '#d9d9d9', marginBottom: '16px' }} />
-                <Text type="secondary">
-                  Нет данных об операторах за выбранный период
-                </Text>
-              </div>
-            </Card>
-          )}
+                  }
+                  size="small"
+                  style={{ marginBottom: '16px' }}
+                >
+                  <Space direction="vertical" style={{ width: '100%' }}>
+                    <div>
+                      <Text strong>Тип: </Text>
+                      <Tag color={getOperatorTypeColor(data.type)}>
+                        {getOperatorTypeName(data.type)}
+                      </Tag>
+                    </div>
+                    <div>
+                      <Text strong>KPI: </Text>
+                      <Progress 
+                        percent={data.kpi} 
+                        size="small" 
+                        strokeColor={getKPIColor(data.kpi)}
+                      />
+                    </div>
+                    <Divider style={{ margin: '8px 0' }} />
+                    {data.type === 'setup_specialist' && (
+                      <div style={{ fontSize: '12px' }}>
+                        <p><strong>Качество наладки:</strong> {data.details.setupQuality}%</p>
+                        <p><strong>Готовность станка:</strong> {data.details.machineReadiness}%</p>
+                        <p><strong>Безопасность:</strong> {data.details.safetyCompliance}%</p>
+                      </div>
+                    )}
+                    {data.type === 'operator' && (
+                      <div style={{ fontSize: '12px' }}>
+                        <p><strong>Произведено:</strong> {data.details.producedParts} дет.</p>
+                        <p><strong>Брак:</strong> {data.details.defectParts} дет.</p>
+                        <p><strong>Время производства:</strong> {data.details.productionTime} мин</p>
+                      </div>
+                    )}
+                  </Space>
+                </Card>
+              </Col>
+            ))}
+          </Row>
         </TabPane>
 
         <TabPane tab="🏭 Детализация станков" key="machines">
-          {analyticsData && analyticsData.machines.length > 0 ? (
-            <Row gutter={16}>
-              {analyticsData.machines.map((machine: any, index: number) => (
-                <Col span={8} key={machine.machineName}>
-                  <Card 
-                    title={
-                      <Space>
-                        <ToolOutlined />
-                        <span>🔧 {machine.machineName}</span>
-                      </Space>
-                    }
-                    size="small"
-                    style={{ marginBottom: '16px' }}
-                  >
-                    <Space direction="vertical" style={{ width: '100%' }}>
-                      <div>
-                        <Text strong>OEE: </Text>
-                        <Progress 
-                          percent={machine.oee} 
-                          size="small" 
-                          strokeColor={getOEEColor(machine.oee)}
-                        />
-                      </div>
-                      <Divider style={{ margin: '8px 0' }} />
-                      <div style={{ fontSize: '12px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                          <Text>Наладка:</Text>
-                          <Text>{machine.setupTimePercent?.toFixed(1) || 0}%</Text>
-                        </div>
-                        <Progress 
-                          percent={machine.setupTimePercent || 0} 
-                          strokeColor="#faad14"
-                          size="small"
-                          showInfo={false}
-                        />
-                        
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px' }}>
-                          <Text>Производство:</Text>
-                          <Text>{machine.productionTimePercent?.toFixed(1) || 0}%</Text>
-                        </div>
-                        <Progress 
-                          percent={machine.productionTimePercent || 0} 
-                          strokeColor="#52c41a"
-                          size="small"
-                          showInfo={false}
-                        />
-                        
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px' }}>
-                          <Text>Простои:</Text>
-                          <Text>{machine.downTimePercent?.toFixed(1) || 0}%</Text>
-                        </div>
-                        <Progress 
-                          percent={machine.downTimePercent || 0} 
-                          strokeColor="#f5222d"
-                          size="small"
-                          showInfo={false}
-                        />
-                      </div>
+          <Row gutter={16}>
+            {Object.entries(comprehensiveMetrics.machines).map(([machineId, data]) => (
+              <Col span={8} key={machineId}>
+                <Card 
+                  title={
+                    <Space>
+                      <ToolOutlined />
+                      <span>Станок {machineId}</span>
                     </Space>
-                  </Card>
-                </Col>
-              ))}
-            </Row>
-          ) : (
-            <Card>
-              <div style={{ textAlign: 'center', padding: '40px' }}>
-                <ToolOutlined style={{ fontSize: '48px', color: '#d9d9d9', marginBottom: '16px' }} />
-                <Text type="secondary">
-                  Нет данных о станках за выбранный период
-                </Text>
-              </div>
-            </Card>
-          )}
+                  }
+                  size="small"
+                  style={{ marginBottom: '16px' }}
+                >
+                  <Space direction="vertical" style={{ width: '100%' }}>
+                    <div>
+                      <Text strong>OEE: </Text>
+                      <Progress 
+                        percent={data.oee} 
+                        size="small" 
+                        strokeColor={getOEEColor(data.oee)}
+                      />
+                    </div>
+                    <Divider style={{ margin: '8px 0' }} />
+                    <div style={{ fontSize: '12px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <Text>Наладка:</Text>
+                        <Text>{data.details.setupPercent.toFixed(1)}%</Text>
+                      </div>
+                      <Progress 
+                        percent={data.details.setupPercent} 
+                        strokeColor="#faad14"
+                        size="small"
+                        showInfo={false}
+                      />
+                      
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px' }}>
+                        <Text>Производство:</Text>
+                        <Text>{data.details.productionPercent.toFixed(1)}%</Text>
+                      </div>
+                      <Progress 
+                        percent={data.details.productionPercent} 
+                        strokeColor="#52c41a"
+                        size="small"
+                        showInfo={false}
+                      />
+                      
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px' }}>
+                        <Text>Простои:</Text>
+                        <Text>{data.details.downPercent.toFixed(1)}%</Text>
+                      </div>
+                      <Progress 
+                        percent={data.details.downPercent} 
+                        strokeColor="#f5222d"
+                        size="small"
+                        showInfo={false}
+                      />
+                    </div>
+                  </Space>
+                </Card>
+              </Col>
+            ))}
+          </Row>
         </TabPane>
 
         <TabPane tab="🎯 Анализ и выводы" key="analysis">

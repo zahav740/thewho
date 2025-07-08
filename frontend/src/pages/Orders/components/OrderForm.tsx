@@ -35,6 +35,43 @@ import {
 } from '../../../types/order-v2.types';
 import { useTranslation } from '../../../hooks/useTranslation';
 
+// Функция для преобразования Priority в PriorityV2
+const convertPriorityToPriorityV2 = (priority: any): PriorityV2 => {
+  // Если это уже PriorityV2, возвращаем как есть
+  if (typeof priority === 'string') {
+    switch (priority) {
+      case 'HIGH': return PriorityV2.HIGH;
+      case 'MEDIUM': return PriorityV2.MEDIUM;
+      case 'LOW': return PriorityV2.LOW;
+      case 'URGENT': return PriorityV2.URGENT;
+      default: return PriorityV2.MEDIUM;
+    }
+  }
+  
+  // Если это числовое значение Priority
+  switch (priority) {
+    case 1: return PriorityV2.HIGH;
+    case 2: return PriorityV2.MEDIUM;
+    case 3: return PriorityV2.LOW;
+    case 4: return PriorityV2.URGENT;
+    default: return PriorityV2.MEDIUM;
+  }
+};
+
+// Функция для преобразования типа операции
+const convertOperationType = (operationType: any): OperationTypeV2 => {
+  if (typeof operationType === 'string') {
+    switch (operationType) {
+      case 'MILLING': return OperationTypeV2.MILLING;
+      case 'TURNING': return OperationTypeV2.TURNING;
+      case 'DRILLING': return OperationTypeV2.DRILLING;
+      case 'GRINDING': return OperationTypeV2.GRINDING;
+      default: return OperationTypeV2.MILLING;
+    }
+  }
+  return OperationTypeV2.MILLING;
+};
+
 const { Option } = Select;
 
 interface OrderFormProps {
@@ -139,9 +176,9 @@ export const OrderForm: React.FC<OrderFormProps> = ({
         drawingNumber: orderData.drawingNumber,
         quantity: orderData.quantity,
         deadline: orderData.deadline,
-        priority: orderData.priority,
+        priority: convertPriorityToPriorityV2(orderData.priority),
         workType: orderData.workType as WorkTypeV2,
-        operations: orderData.operations?.map((op: OperationV2): OrderFormOperationV2Dto => ({
+        operations: orderData.operations?.map((op: any): OrderFormOperationV2Dto => ({
           operationNumber: op.operationNumber,
           operationType: op.operationType || OperationTypeV2.MILLING,
           machineAxes: op.machineAxes || 3,

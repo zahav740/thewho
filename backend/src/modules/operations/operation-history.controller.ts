@@ -16,9 +16,9 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
+import { Response } from 'express';
 import { OperationHistoryService, ExportRequest } from './operation-history.service';
 import { createReadStream, existsSync } from 'fs';
-import { Response } from 'express';
 
 @ApiTags('operation-history')
 @Controller('operation-history')
@@ -125,7 +125,7 @@ export class OperationHistoryController {
   @ApiOperation({ summary: 'Скачать экспортированный файл' })
   async downloadFile(
     @Param('fileName') fileName: string,
-    @Res() res: any
+    @Res() res: Response
   ) {
     try {
       this.logger.log(`Запрос скачивания файла: ${fileName}`);

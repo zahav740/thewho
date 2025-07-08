@@ -1,0 +1,430 @@
+/**
+ * @file: column-template.service.ts
+ * @description: Сервис для работы с шаблонами колонок Excel файлов
+ * @created: 2025-07-02
+ */
+import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { ColumnTemplate, ColumnMapping } from '../../database/entities/column-template.entity';
+import { ExcelFile } from '../../database/entities/excel-file.entity';
+
+export interface CreateTemplateDto {
+  name: string;
+  description?: string;
+  category?: string;
+  columnMappings: ColumnMapping[];
+  isDefault?: boolean;
+  baseFileId?: number;
+}
+
+export interface UpdateTemplateDto {
+  name?: string;
+  description?: string;
+  category?: string;
+  columnMappings?: ColumnMapping[];
+  isDefault?: boolean;
+  isActive?: boolean;
+}
+
+export interface TemplateMatchResult {
+  template: ColumnTemplate;
+  matchScore: number;
+  matchedColumns: string[];
+  missingColumns: string[];
+  extraColumns: string[];
+}
+
+@Injectable()
+export class ColumnTemplateService {
+  private readonly logger = new Logger(ColumnTemplateService.name);
+
+  constructor(
+    @InjectRepository(ColumnTemplate)
+    private readonly templateRepository: Repository<ColumnTemplate>,
+    @InjectRepository(ExcelFile)
+    private readonly excelFileRepository: Repository<ExcelFile>,
+  ) {}
+
+  /**
+   * Создание нового шаблона колонок
+   */
+  async createTemplate(dto: CreateTemplateDto, createdBy?: string): Promise<ColumnTemplate> {
+    this.logger.log(`Создание шаблона: ${dto.name}`);
+
+    // Если это шаблон по умолчанию, сбрасываем флаг у других шаблонов
+    if (dto.isDefault) {
+      await this.resetDefaultTemplate();
+    }
+
+    const template = new ColumnTemplate();
+    template.name = dto.name;
+    template.description = dto.description;
+    template.category = dto.category;
+    template.columnMappings = dto.columnMappings;
+    template.isDefault = dto.isDefault || false;
+    template.createdBy = createdBy;
+    template.baseFileId = dto.baseFileId;
+
+    const savedTemplate = await this.templateRepository.save(template);
+    this.logger.log(`Шаблон создан с ID: ${savedTemplate.id}`);
+
+    return savedTemplate;
+  }
+
+  /**
+   * Создание шаблона на основе Excel файла
+   */
+  async createTemplateFromFile(
+    fileId: number, 
+    templateName: string,
+    systemColumnMappings: Record<string, string>, // excelColumn -> systemColumn
+    createdBy?: string
+  ): Promise<ColumnTemplate> {
+    const file = await this.excelFileRepository.findOne({ where: { id: fileId } });
+    if (!file) {
+      throw new NotFoundException(`Файл с ID ${fileId} не найден`);
+    }
+
+    if (!file.headers || file.headers.length === 0) {
+      throw new BadRequestException('Файл не содержит заголовков колонок');
+    }
+
+    // Создаем маппинг колонок
+    const columnMappings: ColumnMapping[] = file.headers.map(header => {
+      const systemColumn = systemColumnMappings[header] || header;
+      return {
+        excelColumn: header,
+        systemColumn: systemColumn,
+        dataType: this.guessDataType(file, header),
+        required: false,
+      };
+    });
+
+    return this.createTemplate({
+      name: templateName,
+      description: `Создан на основе файла: ${file.originalName}`,
+      category: 'Автоматический',
+      columnMappings,
+      baseFileId: fileId,
+    }, createdBy);
+  }
+
+  /**
+   * Получение всех шаблонов
+   */
+  async getAllTemplates(category?: string, activeOnly = true): Promise<ColumnTemplate[]> {
+    const queryBuilder = this.templateRepository.createQueryBuilder('template');
+
+    if (activeOnly) {
+      queryBuilder.where('template.isActive = :active', { active: true });
+    }
+
+    if (category) {
+      queryBuilder.andWhere('template.category = :category', { category });
+    }
+
+    return queryBuilder
+      .orderBy('template.isDefault', 'DESC')
+      .addOrderBy('template.usageCount', 'DESC')
+      .addOrderBy('template.name', 'ASC')
+      .getMany();
+  }
+
+  /**
+   * Получение шаблона по умолчанию
+   */
+  async getDefaultTemplate(): Promise<ColumnTemplate | null> {
+    return this.templateRepository.findOne({ 
+      where: { isDefault: true, isActive: true } 
+    });
+  }
+
+  /**
+   * Получение шаблона по ID
+   */
+  async getTemplate(id: number): Promise<ColumnTemplate> {
+    const template = await this.templateRepository.findOne({ where: { id } });
+    if (!template) {
+      throw new NotFoundException(`Шаблон с ID ${id} не найден`);
+    }
+    return template;
+  }
+
+  /**
+   * Обновление шаблона
+   */
+  async updateTemplate(id: number, dto: UpdateTemplateDto): Promise<ColumnTemplate> {
+    const template = await this.getTemplate(id);
+
+    // Если устанавливаем как дефолтный, сбрасываем флаг у других
+    if (dto.isDefault && !template.isDefault) {
+      await this.resetDefaultTemplate();
+    }
+
+    Object.assign(template, dto);
+    return this.templateRepository.save(template);
+  }
+
+  /**
+   * Удаление шаблона
+   */
+  async deleteTemplate(id: number): Promise<void> {
+    const template = await this.getTemplate(id);
+    
+    if (template.isDefault) {
+      throw new BadRequestException('Нельзя удалить шаблон по умолчанию');
+    }
+
+    await this.templateRepository.remove(template);
+    this.logger.log(`Шаблон удален: ${template.name} (ID: ${id})`);
+  }
+
+  /**
+   * Поиск подходящих шаблонов для заданных колонок
+   */
+  async findMatchingTemplates(headers: string[]): Promise<TemplateMatchResult[]> {
+    const allTemplates = await this.getAllTemplates();
+    const results: TemplateMatchResult[] = [];
+
+    for (const template of allTemplates) {
+      const matchResult = this.calculateTemplateMatch(template, headers);
+      if (matchResult.matchScore > 0) {
+        results.push(matchResult);
+      }
+    }
+
+    // Сортируем по убыванию соответствия
+    return results.sort((a, b) => b.matchScore - a.matchScore);
+  }
+
+  /**
+   * Применение шаблона к данным файла
+   */
+  async applyTemplateToFile(fileId: number, templateId: number): Promise<void> {
+    const file = await this.excelFileRepository.findOne({ where: { id: fileId } });
+    if (!file) {
+      throw new NotFoundException(`Файл с ID ${fileId} не найден`);
+    }
+
+    const template = await this.getTemplate(templateId);
+    
+    // Получаем исходные данные
+    const originalData = file.getParsedDataAsJson();
+    
+    // Применяем маппинг
+    const mappedData = template.applyMapping(originalData);
+    
+    // Валидируем данные
+    const validationErrors: string[] = [];
+    for (let i = 0; i < originalData.length; i++) {
+      const validation = template.validateData(originalData[i]);
+      if (!validation.valid) {
+        validationErrors.push(`Строка ${i + 2}: ${validation.errors.join(', ')}`);
+      }
+    }
+
+    // Сохраняем результат
+    file.columnTemplateId = templateId;
+    file.setMappedData(mappedData);
+    
+    if (validationErrors.length > 0) {
+      file.metadata = {
+        ...file.metadata,
+        validationErrors,
+        templateApplied: new Date(),
+      };
+    } else {
+      file.metadata = {
+        ...file.metadata,
+        templateApplied: new Date(),
+        validationPassed: true,
+      };
+    }
+
+    await this.excelFileRepository.save(file);
+
+    // Увеличиваем счетчик использования шаблона
+    template.usageCount += 1;
+    await this.templateRepository.save(template);
+
+    this.logger.log(`Шаблон ${template.name} применен к файлу ${file.originalName}`);
+  }
+
+  /**
+   * Получение категорий шаблонов
+   */
+  async getCategories(): Promise<string[]> {
+    const result = await this.templateRepository
+      .createQueryBuilder('template')
+      .select('DISTINCT template.category', 'category')
+      .where('template.category IS NOT NULL')
+      .andWhere('template.isActive = :active', { active: true })
+      .getRawMany();
+
+    return result.map(r => r.category).filter(Boolean);
+  }
+
+  /**
+   * Предложение маппинга колонок на основе AI/правил
+   */
+  async suggestColumnMapping(headers: string[]): Promise<Record<string, string>> {
+    const suggestions: Record<string, string> = {};
+    
+    // Простые правила для предложения маппинга
+    const mappingRules = {
+      // Общие поля
+      'название': ['name', 'title', 'product_name', 'item_name'],
+      'имя': ['name', 'first_name', 'full_name'],
+      'фамилия': ['last_name', 'surname'],
+      'email': ['email', 'e_mail', 'mail'],
+      'телефон': ['phone', 'mobile', 'telephone'],
+      'адрес': ['address', 'location'],
+      'дата': ['date', 'created_at', 'date_created'],
+      'количество': ['quantity', 'count', 'amount'],
+      'цена': ['price', 'cost', 'sum'],
+      'сумма': ['total', 'sum', 'amount'],
+      'статус': ['status', 'state'],
+      'описание': ['description', 'notes', 'comment'],
+      'артикул': ['sku', 'code', 'article'],
+      'категория': ['category', 'type', 'group'],
+    };
+
+    for (const header of headers) {
+      const headerLower = header.toLowerCase().trim();
+      
+      for (const [pattern, systemColumns] of Object.entries(mappingRules)) {
+        if (headerLower.includes(pattern)) {
+          suggestions[header] = systemColumns[0]; // Берем первый подходящий
+          break;
+        }
+      }
+
+      // Если не нашли в правилах, предлагаем как есть, но в snake_case
+      if (!suggestions[header]) {
+        suggestions[header] = header
+          .toLowerCase()
+          .replace(/\s+/g, '_')
+          .replace(/[^a-z0-9_]/g, '');
+      }
+    }
+
+    return suggestions;
+  }
+
+  /**
+   * Сброс флага "по умолчанию" у всех шаблонов
+   */
+  private async resetDefaultTemplate(): Promise<void> {
+    await this.templateRepository.update(
+      { isDefault: true },
+      { isDefault: false }
+    );
+  }
+
+  /**
+   * Расчет соответствия шаблона заголовкам
+   */
+  private calculateTemplateMatch(template: ColumnTemplate, headers: string[]): TemplateMatchResult {
+    const templateColumns = template.getExcelColumns();
+    const headerSet = new Set(headers.map(h => h.toLowerCase()));
+    const templateSet = new Set(templateColumns.map(c => c.toLowerCase()));
+
+    const matchedColumns: string[] = [];
+    const missingColumns: string[] = [];
+    const extraColumns: string[] = [];
+
+    // Проверяем совпадения
+    for (const col of templateColumns) {
+      if (headerSet.has(col.toLowerCase())) {
+        matchedColumns.push(col);
+      } else {
+        missingColumns.push(col);
+      }
+    }
+
+    // Проверяем лишние колонки
+    for (const header of headers) {
+      if (!templateSet.has(header.toLowerCase())) {
+        extraColumns.push(header);
+      }
+    }
+
+    // Рассчитываем score
+    const totalTemplateColumns = templateColumns.length;
+    const totalHeaders = headers.length;
+    const matchCount = matchedColumns.length;
+
+    let matchScore = 0;
+    if (totalTemplateColumns > 0) {
+      // Базовый score - процент совпадений
+      matchScore = (matchCount / totalTemplateColumns) * 100;
+      
+      // Штраф за лишние колонки
+      const extraPenalty = (extraColumns.length / totalHeaders) * 20;
+      matchScore -= extraPenalty;
+      
+      // Бонус за точное совпадение
+      if (matchCount === totalTemplateColumns && extraColumns.length === 0) {
+        matchScore += 10;
+      }
+    }
+
+    return {
+      template,
+      matchScore: Math.max(0, matchScore),
+      matchedColumns,
+      missingColumns,
+      extraColumns,
+    };
+  }
+
+  /**
+   * Определение типа данных на основе содержимого колонки
+   */
+  private guessDataType(file: ExcelFile, columnName: string): 'string' | 'number' | 'date' | 'boolean' | 'text' {
+    const data = file.getParsedDataAsJson();
+    if (data.length === 0) return 'string';
+
+    // Берем первые 10 не пустых значений для анализа
+    const sampleValues = data
+      .map(row => row[columnName])
+      .filter(val => val !== null && val !== undefined && val !== '')
+      .slice(0, 10);
+
+    if (sampleValues.length === 0) return 'string';
+
+    let numberCount = 0;
+    let dateCount = 0;
+    let booleanCount = 0;
+
+    for (const value of sampleValues) {
+      // Проверяем на число
+      if (typeof value === 'number' || !isNaN(Number(value))) {
+        numberCount++;
+      }
+      
+      // Проверяем на дату
+      const dateValue = new Date(value);
+      if (!isNaN(dateValue.getTime()) && value.toString().length > 5) {
+        dateCount++;
+      }
+      
+      // Проверяем на булево значение
+      const strValue = value.toString().toLowerCase();
+      if (['true', 'false', 'да', 'нет', '1', '0', 'yes', 'no'].includes(strValue)) {
+        booleanCount++;
+      }
+    }
+
+    // Определяем тип по большинству
+    const total = sampleValues.length;
+    if (numberCount / total > 0.8) return 'number';
+    if (dateCount / total > 0.8) return 'date';
+    if (booleanCount / total > 0.8) return 'boolean';
+
+    // Если значения длинные, то это text, иначе string
+    const avgLength = sampleValues.reduce((sum, val) => sum + val.toString().length, 0) / total;
+    return avgLength > 100 ? 'text' : 'string';
+  }
+}

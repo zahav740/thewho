@@ -25,11 +25,13 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiConsumes, ApiResponse } from '@nestjs/swagger';
-import { MulterFile, createExcelFile } from '../../types/express';
 import { Response } from 'express';
+import type { Express } from 'express';
 import { OrdersService, EnrichedOrder } from './orders.service';
 import { ExcelImportService, ImportResult } from './excel-import.service';
 import { ExcelColumnMapperService, ExcelFileAnalysis, ExcelImportSettings } from './excel-column-mapper.service';
+import { ExcelProductionLoaderService, ExcelProductionLoadResult } from './excel-production-loader.service';
+import { FlexibleExcelImportService, ColumnMapping, FlexibleImportSettings, ExcelAnalysisResult, FlexibleImportResult } from './flexible-excel-import.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderDto } from './dto/update-order.dto';
 import { OrdersFilterDto } from './dto/orders-filter.dto';
@@ -79,6 +81,8 @@ export class OrdersController {
     private readonly ordersService: OrdersService,
     private readonly excelImportService: ExcelImportService,
     private readonly excelColumnMapperService: ExcelColumnMapperService,
+    private readonly excelProductionLoaderService: ExcelProductionLoaderService,
+    private readonly flexibleExcelImportService: FlexibleExcelImportService,
     private readonly configService: ConfigService,
   ) {
     this.uploadDir = this.configService.get<string>('UPLOAD_DIR', join(process.cwd(), 'uploads', 'pdf'));
@@ -87,7 +91,6 @@ export class OrdersController {
       this.logger.log(`Created upload directory: ${this.uploadDir}`);
     }
   }
-
 
   @Get()
   @ApiOperation({ summary: 'Получить все заказы с фильтрацией и пагинацией' })
@@ -113,31 +116,25 @@ export class OrdersController {
 
   @Get('check-duplicate/:drawingNumber')
   @ApiOperation({ summary: 'Проверить дубликат заказа по номеру чертежа' })
-  @ApiResponse({ status: 200, description: 'Заказ найден' })
-  @ApiResponse({ status: 404, description: 'Заказ не найден' })
+  @ApiResponse({ status: 200, description: 'Результат проверки дубликата' })
   async checkOrderDuplicate(@Param('drawingNumber') drawingNumber: string) {
     try {
       const existingOrder = await this.ordersService.findByDrawingNumber(drawingNumber);
       this.logger.log(`Checked duplicate for drawingNumber: ${drawingNumber}, exists: ${!!existingOrder}`);
-      
-      if (existingOrder) {
-        // Если заказ найден, возвращаем его
-        return {
-          id: existingOrder.id,
-          drawingNumber: existingOrder.drawingNumber,
-          quantity: existingOrder.quantity,
-          deadline: existingOrder.deadline,
-          createdAt: existingOrder.createdAt,
-          operations: existingOrder.operations?.length || 0,
-        };
-      } else {
-        // Если заказ не найден, возвращаем 404
-        throw new NotFoundException('Заказ не найден');
-      }
+      return {
+        isDuplicate: !!existingOrder,
+        existingOrder: existingOrder
+          ? {
+              id: existingOrder.id,
+              drawingNumber: existingOrder.drawingNumber,
+              quantity: existingOrder.quantity,
+              deadline: existingOrder.deadline,
+              createdAt: existingOrder.createdAt,
+              operations: existingOrder.operations?.length || 0,
+            }
+          : null,
+      };
     } catch (error) {
-      if (error instanceof NotFoundException) {
-        throw error;
-      }
       this.logger.error(`Error checking duplicate for drawingNumber ${drawingNumber}: ${error.message}`, error.stack);
       throw new BadRequestException('Ошибка проверки дубликата заказа');
     }
@@ -282,44 +279,17 @@ export class OrdersController {
   @Delete('all/confirm')
   @ApiOperation({ summary: 'Удалить все заказы (с подтверждением)' })
   @ApiResponse({ status: 200, description: 'Количество удаленных заказов' })
-  async removeAll(@Body() body: { confirm?: boolean } = {}): Promise<{ deleted: number }> {
+  async removeAll(@Body() body?: { confirm?: boolean }): Promise<{ deleted: number }> {
     try {
+      // Убираем обязательное подтверждение для совместимости с фронтендом
       this.logger.log('Received request to delete all orders');
-      this.logger.log('Request body:', JSON.stringify(body));
-      
-      // Для DELETE запроса с телом разрешаем любое подтверждение или его отсутствие
-      const isConfirmed = body.confirm === true || 
-                         String(body.confirm) === 'true' || 
-                         Number(body.confirm) === 1 || 
-                         String(body.confirm) === '1' ||
-                         body.confirm === undefined || // Разрешаем отсутствие параметра
-                         Object.keys(body).length === 0; // Пустое тело тоже разрешаем
-      
-      this.logger.log(`Confirmation status: ${isConfirmed}`);
-      
-      if (!isConfirmed) {
-        this.logger.warn('Delete all orders request rejected - invalid confirmation');
-        throw new BadRequestException('Требуется подтверждение для удаления всех заказов');
-      }
-      
       const deleted = await this.ordersService.removeAll();
-      this.logger.log(`Successfully deleted all orders: ${deleted}`);
+      this.logger.log(`Deleted all orders: ${deleted}`);
       return { deleted };
     } catch (error) {
-      this.logger.error(`Error deleting all orders:`, error);
-      this.logger.error(`Error message: ${error.message}`);
-      this.logger.error(`Error stack: ${error.stack}`);
+      this.logger.error(`Error deleting all orders: ${error.message}`, error.stack);
       throw error;
     }
-  }
-
-  // Дополнительный маршрут для совместимости
-  @Post('all/delete')
-  @ApiOperation({ summary: 'Удалить все заказы (POST альтернатива)' })
-  @ApiResponse({ status: 200, description: 'Количество удаленных заказов' })
-  async removeAllPost(@Body() body: { confirm?: boolean } = {}): Promise<{ deleted: number }> {
-    this.logger.log('POST alternative route called for delete all orders');
-    return this.removeAll(body);
   }
 
   private async generateUniqueDrawingNumber(originalNumber: string): Promise<string> {
@@ -355,7 +325,7 @@ export class OrdersController {
       limits: { fileSize: 50 * 1024 * 1024 },
     }),
   )
-  async uploadExcel(@UploadedFile() file: MulterFile, @Body() body: any) {
+  async uploadExcel(@UploadedFile() file: Express.Multer.File, @Body() body: any) {
     try {
       this.logger.log(`Received Excel file: ${file.originalname}, size: ${file.size}`);
       if (!file || !file.buffer) {
@@ -418,13 +388,13 @@ export class OrdersController {
       limits: { fileSize: 50 * 1024 * 1024 },
     }),
   )
-  async analyzeExcel(@UploadedFile() file: MulterFile): Promise<ExcelFileAnalysis> {
+  async analyzeExcel(@UploadedFile() file: Express.Multer.File): Promise<ExcelFileAnalysis> {
     try {
       this.logger.log(`Analyzing Excel structure: ${file.originalname}`);
       if (!file || !file.buffer) {
         throw new BadRequestException('Файл отсутствует или некорректен');
       }
-      return await this.excelColumnMapperService.analyzeExcelStructure(createExcelFile(file));
+      return await this.excelColumnMapperService.analyzeExcelStructure(file);
     } catch (error) {
       this.logger.error(`Error analyzing Excel: ${error.message}`, error.stack);
       throw new BadRequestException(`Ошибка анализа Excel файла: ${error.message}`);
@@ -454,7 +424,7 @@ export class OrdersController {
     }),
   )
   async importExcelWithMapping(
-    @UploadedFile() file: MulterFile,
+    @UploadedFile() file: Express.Multer.File,
     @Body('settings') settingsJson: string
   ) {
     try {
@@ -471,7 +441,7 @@ export class OrdersController {
       }
 
       // Импортируем данные с пользовательским маппингом
-      const parsedOrders = await this.excelColumnMapperService.importWithMapping(createExcelFile(file), settings);
+      const parsedOrders = await this.excelColumnMapperService.importWithMapping(file, settings);
       
       // Создаем заказы в базе данных
       let created = 0;
@@ -480,13 +450,16 @@ export class OrdersController {
 
       for (const orderData of parsedOrders) {
         try {
-          const existingOrder = await this.ordersService.findByDrawingNumber(orderData.drawingNumber);
+          // Валидируем данные перед созданием заказа
+          const validatedOrderData = this.validateOrderData(orderData);
+          
+          const existingOrder = await this.ordersService.findByDrawingNumber(validatedOrderData.drawingNumber);
           
           if (existingOrder) {
-            await this.ordersService.update(existingOrder.id.toString(), orderData);
+            await this.ordersService.update(existingOrder.id.toString(), validatedOrderData);
             updated++;
           } else {
-            await this.ordersService.create(orderData);
+            await this.ordersService.create(validatedOrderData);
             created++;
           }
         } catch (error) {
@@ -529,7 +502,7 @@ export class OrdersController {
   @ApiResponse({ status: 200, description: 'Результат импорта Excel' })
   @UseInterceptors(FileInterceptor('file'))
   @UsePipes(new ValidationPipe())
-  async importExcel(@UploadedFile() file: MulterFile, @Body() importDto: ImportExcelDto): Promise<ImportResult> {
+  async importExcel(@UploadedFile() file: Express.Multer.File, @Body() importDto: ImportExcelDto): Promise<ImportResult> {
     try {
       this.logger.log(`Legacy Excel import: ${file.originalname}`);
       return await this.excelImportService.importOrders(file, importDto.colorFilters);
@@ -566,7 +539,7 @@ export class OrdersController {
   )
   async uploadPdf(
     @Param('id') id: string,
-    @UploadedFile() file: MulterFile,
+    @UploadedFile() file: Express.Multer.File,
     @Res() res: Response,
     @Query('action') action?: 'replace' | 'new_order' | 'revision' | 'force',
     @Query('force') force?: string,
@@ -617,6 +590,41 @@ export class OrdersController {
     }
   }
 
+  /**
+   * Валидирует данные заказа перед созданием/обновлением
+   * @param orderData - данные заказа
+   * @returns валидированные данные заказа
+   */
+  private validateOrderData(orderData: any): CreateOrderDto {
+    const validatedData: CreateOrderDto = {
+      drawingNumber: orderData.drawingNumber?.toString().trim(),
+      quantity: parseInt(orderData.quantity) || 1,
+      deadline: orderData.deadline,
+      priority: parseInt(orderData.priority) || 4,
+      workType: orderData.workType || 'production',
+      operations: orderData.operations || []
+    };
+
+    // Валидация обязательных полей
+    if (!validatedData.drawingNumber) {
+      throw new BadRequestException('Номер чертежа обязателен');
+    }
+
+    // Валидация приоритета
+    if (validatedData.priority < 1 || validatedData.priority > 5) {
+      validatedData.priority = 4;
+      this.logger.warn(`Invalid priority ${orderData.priority}, using default 4`);
+    }
+
+    // Валидация количества
+    if (validatedData.quantity < 1) {
+      validatedData.quantity = 1;
+      this.logger.warn(`Invalid quantity ${orderData.quantity}, using default 1`);
+    }
+
+    return validatedData;
+  }
+
   private async checkForDuplicate(fileHash: string, originalName: string, currentOrderId: string): Promise<DuplicateInfo> {
     try {
       const existingByHash = await this.ordersService.findFileByHash(fileHash);
@@ -635,7 +643,7 @@ export class OrdersController {
 
   private async handleFileUpload(
     order: Order,
-    file: MulterFile,
+    file: Express.Multer.File,
     fileHash: string,
     action: string,
     duplicateInfo: DuplicateInfo,
@@ -744,7 +752,7 @@ export class OrdersController {
   @Get(':id/pdf')
   @ApiOperation({ summary: 'Получить PDF файл заказа' })
   @ApiResponse({ status: 200, description: 'PDF файл' })
-  async getPdf(@Param('id') id: string, @Res() res: Response): Promise<Response> {
+  async getPdf(@Param('id') id: string, @Res() res: Response): Promise<void> {
     try {
       const order = await this.ordersService.findOne(id);
       if (!order.pdfPath) {
@@ -764,27 +772,98 @@ export class OrdersController {
   }
 
   @Get('pdf/:filename')
-  @ApiOperation({ summary: 'Получить PDF файл по имени файла' })
+  @ApiOperation({ summary: 'Получить PDF файл по имени файла (ИСПРАВЛЕННЫЙ)' })
   @ApiResponse({ status: 200, description: 'PDF файл' })
-  async getPdfByFilename(@Param('filename') filename: string, @Res() res: Response): Promise<Response> {
+  async getPdfByFilename(@Param('filename') filename: string, @Res() res: Response): Promise<void> {
     try {
-      const filePath = join(this.uploadDir, filename);
-      if (!fs.existsSync(filePath)) {
-        res.status(404).json({ message: 'PDF файл не найден', filename });
-        return;
+      this.logger.log(`📄 Запрос PDF файла: ${filename}`);
+      
+      // Проверяем основную папку uploads/pdf
+      const primaryPath = join(this.uploadDir, filename);
+      this.logger.log(`🔍 Проверка основной папки: ${primaryPath}`);
+      
+      if (fs.existsSync(primaryPath)) {
+        this.logger.log(`✅ Файл найден в основной папке: ${primaryPath}`);
+        const stats = fs.statSync(primaryPath);
+        res.set({
+          'Content-Type': 'application/pdf',
+          'Content-Disposition': `inline; filename="${filename}"`,
+          'Content-Length': stats.size.toString(),
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        });
+        return res.sendFile(primaryPath);
       }
-      const stats = fs.statSync(filePath);
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
-      res.setHeader('Content-Length', stats.size.toString());
-      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-      res.setHeader('Pragma', 'no-cache');
-      res.setHeader('Expires', '0');
-
-      res.sendFile(filePath);
+      
+      // Если не найден в основной папке, ищем в подпапках по номеру чертежа
+      this.logger.log(`🔍 Файл не найден в основной папке, ищем в подпапках...`);
+      
+      try {
+        const pdfDir = this.uploadDir;
+        const items = fs.readdirSync(pdfDir, { withFileTypes: true });
+        
+        for (const item of items) {
+          if (item.isDirectory()) {
+            const subfolderPath = join(pdfDir, item.name, filename);
+            this.logger.log(`🔍 Проверка подпапки: ${subfolderPath}`);
+            
+            if (fs.existsSync(subfolderPath)) {
+              this.logger.log(`✅ Файл найден в подпапке: ${subfolderPath}`);
+              const stats = fs.statSync(subfolderPath);
+              res.set({
+                'Content-Type': 'application/pdf',
+                'Content-Disposition': `inline; filename="${filename}"`,
+                'Content-Length': stats.size.toString(),
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0',
+              });
+              return res.sendFile(subfolderPath);
+            }
+          }
+        }
+      } catch (dirError) {
+        this.logger.error(`❌ Ошибка при поиске в подпапках: ${dirError.message}`);
+      }
+      
+      // Файл не найден нигде
+      this.logger.error(`❌ PDF файл не найден: ${filename}`);
+      
+      // Возвращаем диагностическую информацию
+      const diagnosticInfo = {
+        filename,
+        uploadDir: this.uploadDir,
+        primaryPath,
+        exists: false,
+        searchedLocations: [
+          { path: primaryPath, exists: false },
+        ],
+        availableFiles: this.getAvailableFiles(),
+        message: `PDF файл не найден: ${filename}`,
+        timestamp: new Date().toISOString()
+      };
+      
+      res.status(404).json(diagnosticInfo);
+      
     } catch (error) {
-      this.logger.error(`Error fetching PDF ${filename}: ${error.message}`, error.stack);
-      res.status(500).json({ message: 'Ошибка сервера при получении PDF', error: error.message });
+      this.logger.error(`❌ Ошибка получения PDF ${filename}: ${error.message}`, error.stack);
+      res.status(500).json({ 
+        message: 'Ошибка сервера при получении PDF файла', 
+        filename,
+        error: error.message,
+        timestamp: new Date().toISOString()
+      });
+    }
+  }
+  
+  private getAvailableFiles(): string[] {
+    try {
+      const files = fs.readdirSync(this.uploadDir);
+      return files.filter(file => file.endsWith('.pdf')).slice(0, 10); // Показываем только первые 10 PDF файлов
+    } catch (error) {
+      this.logger.error(`Ошибка получения списка файлов: ${error.message}`);
+      return [];
     }
   }
 
@@ -860,10 +939,12 @@ export class OrdersController {
       }
       const filePath = join(this.uploadDir, revision.filename);
       const stats = fs.statSync(filePath);
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `inline; filename="${revision.filename}"`);
-      res.setHeader('Content-Length', stats.size.toString());
-      return res.sendFile(filePath);
+      res.set({
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `inline; filename="${revision.filename}"`,
+        'Content-Length': stats.size.toString(),
+      });
+      res.sendFile(filePath);
     } catch (error) {
       this.logger.error(`Error fetching PDF revision ${revisionNumber} for order ${id}: ${error.message}`, error.stack);
       throw new BadRequestException('Ошибка получения ревизии PDF');
@@ -937,6 +1018,471 @@ export class OrdersController {
     } catch (error) {
       this.logger.error(`Error cleaning up PDF references: ${error.message}`, error.stack);
       throw new BadRequestException('Ошибка очистки PDF ссылок');
+    }
+  }
+
+  // Эндпоинты для работы с производственным планом (תוכנית יצור)
+  
+  @Post('import-production-plan')
+  @ApiOperation({ summary: 'Импорт производственного плана из Excel файла תוכנית יצור' })
+  @ApiConsumes('multipart/form-data')
+  @ApiResponse({ status: 200, description: 'Результат импорта производственного плана' })
+  @UseInterceptors(
+    FileInterceptor('file', {
+      fileFilter: (req, file, cb) => {
+        const allowedTypes = [
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'application/vnd.ms-excel',
+          'application/octet-stream',
+        ];
+        const isValidType = allowedTypes.includes(file.mimetype) || file.originalname.match(/\.(xlsx?|xls)$/);
+        if (isValidType) {
+          cb(null, true);
+        } else {
+          cb(new BadRequestException('Только Excel файлы (.xlsx, .xls) разрешены'), false);
+        }
+      },
+      limits: { fileSize: 50 * 1024 * 1024 },
+    }),
+  )
+  async importProductionPlan(
+    @UploadedFile() file: Express.Multer.File,
+    @Query('updateExisting') updateExisting: string = 'true',
+    @Query('priorityFilter') priorityFilter?: string
+  ): Promise<ExcelProductionLoadResult & { importedToDatabase: any }> {
+    try {
+      this.logger.log(`Importing production plan: ${file.originalname}`);
+      
+      if (!file || !file.buffer) {
+        throw new BadRequestException('Файл отсутствует или некорректен');
+      }
+
+      // Проверяем, что это файл производственного плана
+      const isValidFile = await this.excelProductionLoaderService.validateProductionPlanFile(file);
+      if (!isValidFile) {
+        throw new BadRequestException('Файл не содержит лист "תוכנית יצור"');
+      }
+
+      // Загружаем данные из Excel
+      const loadResult = await this.excelProductionLoaderService.loadProductionPlan(file);
+      
+      if (!loadResult.success || loadResult.data.length === 0) {
+        throw new BadRequestException('Не удалось извлечь данные из файла производственного плана');
+      }
+
+      // Фильтруем по приоритету если указано
+      let ordersToImport = loadResult.data;
+      if (priorityFilter) {
+        const priorities = priorityFilter.split(',').map(p => parseInt(p.trim())).filter(p => !isNaN(p));
+        if (priorities.length > 0) {
+          ordersToImport = this.excelProductionLoaderService.filterByPriority(loadResult.data, priorities);
+          this.logger.log(`Filtered by priority ${priorities.join(',')}: ${ordersToImport.length} orders`);
+        }
+      }
+
+      // Сортируем данные по приоритету и дате
+      ordersToImport = this.excelProductionLoaderService.sortByPriorityAndDate(ordersToImport);
+
+      // Импортируем в базу данных
+      let created = 0;
+      let updated = 0;
+      const importErrors: Array<{ order: string; error: string }> = [];
+      const shouldUpdateExisting = updateExisting === 'true';
+
+      for (const orderDto of ordersToImport) {
+        try {
+          const validatedOrderData = this.validateOrderData(orderDto);
+          const existingOrder = await this.ordersService.findByDrawingNumber(validatedOrderData.drawingNumber);
+          
+          if (existingOrder) {
+            if (shouldUpdateExisting) {
+              await this.ordersService.update(existingOrder.id.toString(), validatedOrderData);
+              updated++;
+            } else {
+              this.logger.log(`Skipping existing order: ${validatedOrderData.drawingNumber}`);
+            }
+          } else {
+            await this.ordersService.create(validatedOrderData);
+            created++;
+          }
+        } catch (error) {
+          importErrors.push({
+            order: orderDto.drawingNumber || 'Неизвестный',
+            error: error.message
+          });
+        }
+      }
+
+      const importedToDatabase = {
+        created,
+        updated,
+        totalProcessed: created + updated,
+        skipped: ordersToImport.length - created - updated - importErrors.length,
+        errors: importErrors,
+        updateExisting: shouldUpdateExisting,
+        priorityFilter: priorityFilter || 'Все'
+      };
+
+      this.logger.log(`Production plan import completed: created=${created}, updated=${updated}, errors=${importErrors.length}`);
+      
+      return {
+        ...loadResult,
+        importedToDatabase
+      };
+
+    } catch (error) {
+      this.logger.error(`Error importing production plan: ${error.message}`, error.stack);
+      throw new BadRequestException(`Ошибка импорта производственного плана: ${error.message}`);
+    }
+  }
+
+  @Post('validate-production-plan')
+  @ApiOperation({ summary: 'Проверить корректность файла производственного плана' })
+  @ApiConsumes('multipart/form-data')
+  @ApiResponse({ status: 200, description: 'Результат валидации' })
+  @UseInterceptors(
+    FileInterceptor('file', {
+      fileFilter: (req, file, cb) => {
+        const allowedTypes = [
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'application/vnd.ms-excel',
+          'application/octet-stream',
+        ];
+        const isValidType = allowedTypes.includes(file.mimetype) || file.originalname.match(/\.(xlsx?|xls)$/);
+        if (isValidType) {
+          cb(null, true);
+        } else {
+          cb(new BadRequestException('Только Excel файлы (.xlsx, .xls) разрешены'), false);
+        }
+      },
+      limits: { fileSize: 50 * 1024 * 1024 },
+    }),
+  )
+  async validateProductionPlan(@UploadedFile() file: Express.Multer.File) {
+    try {
+      this.logger.log(`Validating production plan file: ${file.originalname}`);
+      
+      if (!file || !file.buffer) {
+        throw new BadRequestException('Файл отсутствует или некорректен');
+      }
+
+      const isValid = await this.excelProductionLoaderService.validateProductionPlanFile(file);
+      const sheetNames = await this.excelProductionLoaderService.getSheetNames(file);
+
+      return {
+        isValidProductionPlan: isValid,
+        hasRequiredSheet: sheetNames.includes('תוכנית יצור'),
+        availableSheets: sheetNames,
+        filename: file.originalname,
+        size: file.size,
+        recommendation: isValid 
+          ? 'Файл корректен и готов для импорта производственного плана'
+          : 'Файл не содержит необходимый лист "תוכנית יצור"'
+      };
+
+    } catch (error) {
+      this.logger.error(`Error validating production plan: ${error.message}`, error.stack);
+      throw new BadRequestException(`Ошибка валидации файла: ${error.message}`);
+    }
+  }
+
+  @Post('preview-production-plan')
+  @ApiOperation({ summary: 'Предварительный просмотр данных производственного плана' })
+  @ApiConsumes('multipart/form-data')
+  @ApiResponse({ status: 200, description: 'Предварительный просмотр данных' })
+  @UseInterceptors(
+    FileInterceptor('file', {
+      fileFilter: (req, file, cb) => {
+        const allowedTypes = [
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'application/vnd.ms-excel',
+          'application/octet-stream',
+        ];
+        const isValidType = allowedTypes.includes(file.mimetype) || file.originalname.match(/\.(xlsx?|xls)$/);
+        if (isValidType) {
+          cb(null, true);
+        } else {
+          cb(new BadRequestException('Только Excel файлы (.xlsx, .xls) разрешены'), false);
+        }
+      },
+      limits: { fileSize: 50 * 1024 * 1024 },
+    }),
+  )
+  async previewProductionPlan(
+    @UploadedFile() file: Express.Multer.File,
+    @Query('limit') limit: string = '10'
+  ) {
+    try {
+      this.logger.log(`Previewing production plan: ${file.originalname}`);
+      
+      if (!file || !file.buffer) {
+        throw new BadRequestException('Файл отсутствует или некорректен');
+      }
+
+      const loadResult = await this.excelProductionLoaderService.loadProductionPlan(file);
+      
+      if (!loadResult.success) {
+        throw new BadRequestException('Не удалось обработать файл производственного плана');
+      }
+
+      const previewLimit = parseInt(limit) || 10;
+      const previewData = loadResult.data.slice(0, previewLimit);
+      
+      // Проверяем существующие заказы для предварительного просмотра
+      const existingChecks = await Promise.all(
+        previewData.map(async (order) => {
+          const existing = await this.ordersService.findByDrawingNumber(order.drawingNumber);
+          return {
+            drawingNumber: order.drawingNumber,
+            exists: !!existing,
+            existingId: existing?.id
+          };
+        })
+      );
+
+      return {
+        success: true,
+        preview: previewData.map((order, index) => ({
+          ...order,
+          existsInDatabase: existingChecks[index].exists,
+          existingOrderId: existingChecks[index].existingId
+        })),
+        statistics: loadResult.statistics,
+        fileInfo: loadResult.fileInfo,
+        totalRecords: loadResult.data.length,
+        previewLimit: previewLimit,
+        errors: loadResult.errors.slice(0, 5), // Показываем только первые 5 ошибок в превью
+        message: `Показано ${Math.min(previewLimit, loadResult.data.length)} из ${loadResult.data.length} записей`
+      };
+
+    } catch (error) {
+      this.logger.error(`Error previewing production plan: ${error.message}`, error.stack);
+      throw new BadRequestException(`Ошибка предварительного просмотра: ${error.message}`);
+    }
+  }
+
+  // Гибкий импорт Excel с пользовательским маппингом колонок
+  
+  @Post('analyze-excel-structure')
+  @ApiOperation({ summary: 'Анализ структуры Excel файла для настройки маппинга колонок' })
+  @ApiConsumes('multipart/form-data')
+  @ApiResponse({ status: 200, description: 'Структура Excel файла с колонками и образцами данных' })
+  @UseInterceptors(
+    FileInterceptor('file', {
+      fileFilter: (req, file, cb) => {
+        const allowedTypes = [
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'application/vnd.ms-excel',
+          'application/octet-stream',
+        ];
+        const isValidType = allowedTypes.includes(file.mimetype) || file.originalname.match(/\.(xlsx?|xls)$/);
+        if (isValidType) {
+          cb(null, true);
+        } else {
+          cb(new BadRequestException('Только Excel файлы (.xlsx, .xls) разрешены'), false);
+        }
+      },
+      limits: { fileSize: 50 * 1024 * 1024 },
+    }),
+  )
+  async analyzeExcelStructure(
+    @UploadedFile() file: Express.Multer.File,
+    @Query('sheetName') sheetName?: string
+  ): Promise<ExcelAnalysisResult> {
+    try {
+      this.logger.log(`Analyzing Excel structure: ${file.originalname}`);
+      
+      if (!file || !file.buffer) {
+        throw new BadRequestException('Файл отсутствует или некорректен');
+      }
+
+      return await this.flexibleExcelImportService.analyzeExcelStructure(file, sheetName);
+      
+    } catch (error) {
+      this.logger.error(`Error analyzing Excel structure: ${error.message}`, error.stack);
+      throw new BadRequestException(`Ошибка анализа структуры Excel: ${error.message}`);
+    }
+  }
+
+  @Post('preview-flexible-import')
+  @ApiOperation({ summary: 'Предварительный просмотр данных с пользовательским маппингом колонок' })
+  @ApiConsumes('multipart/form-data')
+  @ApiResponse({ status: 200, description: 'Предварительный просмотр импорта с маппингом' })
+  @UseInterceptors(
+    FileInterceptor('file', {
+      fileFilter: (req, file, cb) => {
+        const allowedTypes = [
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'application/vnd.ms-excel',
+          'application/octet-stream',
+        ];
+        const isValidType = allowedTypes.includes(file.mimetype) || file.originalname.match(/\.(xlsx?|xls)$/);
+        if (isValidType) {
+          cb(null, true);
+        } else {
+          cb(new BadRequestException('Только Excel файлы (.xlsx, .xls) разрешены'), false);
+        }
+      },
+      limits: { fileSize: 50 * 1024 * 1024 },
+    }),
+  )
+  async previewFlexibleImport(
+    @UploadedFile() file: Express.Multer.File,
+    @Body('settings') settingsJson: string,
+    @Query('limit') limit: string = '10'
+  ): Promise<FlexibleImportResult> {
+    try {
+      this.logger.log(`Preview flexible import: ${file.originalname}`);
+      
+      if (!file || !file.buffer) {
+        throw new BadRequestException('Файл отсутствует или некорректен');
+      }
+
+      let settings: FlexibleImportSettings;
+      try {
+        settings = JSON.parse(settingsJson);
+      } catch {
+        throw new BadRequestException('Некорректные настройки маппинга');
+      }
+
+      if (!settings.columnMapping || Object.keys(settings.columnMapping).length === 0) {
+        throw new BadRequestException('Необходимо указать маппинг колонок');
+      }
+
+      // Проверяем наличие обязательного поля drawingNumber
+      const hasDrawingNumber = Object.values(settings.columnMapping).includes('drawingNumber');
+      if (!hasDrawingNumber) {
+        throw new BadRequestException('Необходимо указать колонку для номера чертежа (drawingNumber)');
+      }
+
+      const previewLimit = parseInt(limit) || 10;
+      return await this.flexibleExcelImportService.previewWithMapping(file, settings, previewLimit);
+      
+    } catch (error) {
+      this.logger.error(`Error in preview flexible import: ${error.message}`, error.stack);
+      throw new BadRequestException(`Ошибка предварительного просмотра: ${error.message}`);
+    }
+  }
+
+  @Post('flexible-import')
+  @ApiOperation({ summary: 'Гибкий импорт Excel с пользовательским маппингом колонок' })
+  @ApiConsumes('multipart/form-data')
+  @ApiResponse({ status: 200, description: 'Результат гибкого импорта' })
+  @UseInterceptors(
+    FileInterceptor('file', {
+      fileFilter: (req, file, cb) => {
+        const allowedTypes = [
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'application/vnd.ms-excel',
+          'application/octet-stream',
+        ];
+        const isValidType = allowedTypes.includes(file.mimetype) || file.originalname.match(/\.(xlsx?|xls)$/);
+        if (isValidType) {
+          cb(null, true);
+        } else {
+          cb(new BadRequestException('Только Excel файлы (.xlsx, .xls) разрешены'), false);
+        }
+      },
+      limits: { fileSize: 50 * 1024 * 1024 },
+    }),
+  )
+  async flexibleImport(
+    @UploadedFile() file: Express.Multer.File,
+    @Body('settings') settingsJson: string,
+    @Query('updateExisting') updateExisting: string = 'true'
+  ) {
+    try {
+      this.logger.log(`Flexible import: ${file.originalname}`);
+      
+      if (!file || !file.buffer) {
+        throw new BadRequestException('Файл отсутствует или некорректен');
+      }
+
+      let settings: FlexibleImportSettings;
+      try {
+        settings = JSON.parse(settingsJson);
+      } catch {
+        throw new BadRequestException('Некорректные настройки маппинга');
+      }
+
+      if (!settings.columnMapping || Object.keys(settings.columnMapping).length === 0) {
+        throw new BadRequestException('Необходимо указать маппинг колонок');
+      }
+
+      // Проверяем наличие обязательного поля drawingNumber
+      const hasDrawingNumber = Object.values(settings.columnMapping).includes('drawingNumber');
+      if (!hasDrawingNumber) {
+        throw new BadRequestException('Необходимо указать колонку для номера чертежа (drawingNumber)');
+      }
+
+      // Импортируем данные с пользовательским маппингом
+      const parsedOrders = await this.flexibleExcelImportService.importWithMapping(file, settings);
+      
+      if (parsedOrders.length === 0) {
+        throw new BadRequestException('Не найдено валидных данных для импорта');
+      }
+
+      // Создаем заказы в базе данных
+      let created = 0;
+      let updated = 0;
+      const errors: Array<{ order: string; error: string }> = [];
+      const shouldUpdateExisting = updateExisting === 'true';
+
+      for (const orderData of parsedOrders) {
+        try {
+          // Валидируем данные перед созданием заказа
+          const validatedOrderData = this.validateOrderData(orderData);
+          
+          const existingOrder = await this.ordersService.findByDrawingNumber(validatedOrderData.drawingNumber);
+          
+          if (existingOrder) {
+            if (shouldUpdateExisting) {
+              await this.ordersService.update(existingOrder.id.toString(), validatedOrderData);
+              updated++;
+            } else {
+              this.logger.log(`Skipping existing order: ${validatedOrderData.drawingNumber}`);
+            }
+          } else {
+            await this.ordersService.create(validatedOrderData);
+            created++;
+          }
+        } catch (error) {
+          errors.push({
+            order: orderData.drawingNumber || 'Неизвестный',
+            error: error.message
+          });
+        }
+      }
+
+      const result = {
+        success: true,
+        message: 'Гибкий импорт Excel завершен успешно',
+        data: {
+          created,
+          updated,
+          totalRows: parsedOrders.length,
+          importedRows: created + updated,
+          skippedRows: parsedOrders.length - created - updated,
+          errors
+        },
+        file: {
+          originalname: file.originalname,
+          size: file.size,
+          flexibleMapping: true,
+          mappedColumns: Object.keys(settings.columnMapping).length
+        },
+        settings: {
+          columnMapping: settings.columnMapping,
+          updateExisting: shouldUpdateExisting
+        }
+      };
+
+      this.logger.log(`Flexible import completed: created=${created}, updated=${updated}, errors=${errors.length}`);
+      return result;
+      
+    } catch (error) {
+      this.logger.error(`Error in flexible import: ${error.message}`, error.stack);
+      throw new BadRequestException(`Ошибка гибкого импорта: ${error.message}`);
     }
   }
 }

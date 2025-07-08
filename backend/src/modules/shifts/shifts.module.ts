@@ -9,6 +9,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 // import { EventEmitterModule } from '@nestjs/event-emitter'; // Пакет не установлен
 import { ShiftsController } from './shifts.controller';
+import { ShiftsSimpleController } from './shifts-simple.controller';
 import { ShiftsService } from './shifts.service';
 import { ShiftRecord } from '../../database/entities/shift-record.entity';
 
@@ -17,7 +18,7 @@ import { ShiftRecord } from '../../database/entities/shift-record.entity';
     TypeOrmModule.forFeature([ShiftRecord]),
     // EventEmitterModule.forRoot(), // 🆕 Для отправки событий синхронизации (ОТКЛЮЧЕНО)
   ],
-  controllers: [ShiftsController], // Только основной контроллер
+  controllers: [ShiftsController, ShiftsSimpleController], // Оба контроллера
   providers: [ShiftsService],
   exports: [ShiftsService],
 })

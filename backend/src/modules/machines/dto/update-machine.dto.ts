@@ -1,6 +1,6 @@
 import { PartialType } from '@nestjs/swagger';
 import { CreateMachineDto } from './create-machine.dto';
-import { IsBoolean, IsOptional, IsNumber, IsDate } from 'class-validator';
+import { IsBoolean, IsOptional, IsNumber, IsDate, IsString } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 
@@ -25,4 +25,14 @@ export class UpdateMachineDto extends PartialType(CreateMachineDto) {
   @Type(() => Date)
   @IsDate()
   assignedAt?: Date;
+
+  @ApiPropertyOptional({ description: 'Статус станка' })
+  @IsOptional()
+  @IsString()
+  status?: string;
+
+  @ApiPropertyOptional({ description: 'Описание станка' })
+  @IsOptional()
+  @IsString()
+  description?: string;
 }

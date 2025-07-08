@@ -74,5 +74,3 @@ export class CreateOrderDto {
   @Type(() => CreateOperationDto)
   operations: CreateOperationDto[];
 }
-
-// Примечание: UpdateOrderDto и UpdateOperationDto находятся в update-order.dto.ts

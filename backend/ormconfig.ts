@@ -16,7 +16,7 @@ export const AppDataSource = new DataSource({
   username: process.env.DB_USERNAME || 'postgres',
   password: process.env.DB_PASSWORD || 'magarel',
   database: process.env.DB_NAME || 'thewho',
-  synchronize: false, // Отключаем, чтобы не пересоздавать таблицы
+  synchronize: true, // Временно включаем для создания схемы БД
   logging: process.env.NODE_ENV === 'development',
   entities: ['src/**/*.entity{.ts,.js}'],
   migrations: ['src/database/migrations/*{.ts,.js}'],

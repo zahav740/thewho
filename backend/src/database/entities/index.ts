@@ -7,7 +7,6 @@
  */
 // Экспортируем старые сущности без MachineType чтобы избежать конфликта
 export { Machine } from './machine.entity';
-export { Operator } from './operator.entity';
 export * from './order.entity';
 export * from './operation.entity';
 export * from './shift-record.entity';
@@ -18,8 +17,5 @@ export * from './operation-progress.entity';
 export * from './pdf-file.entity';
 export * from './file-hash.entity';
 export * from './pdf-revision.entity';
-
-// Экспортируем Excel import сущности
-export * from './excel/excel-import.entity';
-export * from './excel/excel-data.entity';
-export * from './excel/import-filter.entity';
+export * from './excel-file.entity';
+// export * from './column-template.entity'; // Отключено

@@ -1,0 +1,247 @@
+/**
+ * @file: column-template.controller.ts
+ * @description: Контроллер для управления пользовательскими наборами колонок
+ * @created: 2025-07-02
+ */
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  Query,
+  ParseIntPipe,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
+import { 
+  ApiTags, 
+  ApiOperation, 
+  ApiResponse,
+  ApiParam,
+  ApiBody,
+} from '@nestjs/swagger';
+import { 
+  ColumnTemplateService, 
+  CreateTemplateDto, 
+  UpdateTemplateDto 
+} from './column-template.service';
+
+@ApiTags('column-templates')
+@Controller('excel-import/templates')
+export class ColumnTemplateController {
+  constructor(private readonly templateService: ColumnTemplateService) {}
+
+  @Get('detect-columns/:fileId')
+  @ApiOperation({ 
+    summary: 'Распознавание колонок из Excel файла',
+    description: 'Анализирует загруженный файл и возвращает список обнаруженных колонок с предложениями'
+  })
+  @ApiParam({ name: 'fileId', description: 'ID Excel файла' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Список обнаруженных колонок',
+    schema: {
+      example: [
+        {
+          name: 'Название товара',
+          index: 0,
+          suggested: true,
+          suggestedSystemName: 'nazvanie_tovara'
+        },
+        {
+          name: 'Количество',
+          index: 1,
+          suggested: true,
+          suggestedSystemName: 'kolichestvo'
+        },
+        {
+          name: 'Комментарий',
+          index: 2,
+          suggested: false,
+          suggestedSystemName: 'kommentarij'
+        }
+      ]
+    }
+  })
+  @ApiResponse({ status: 404, description: 'Файл не найден' })
+  async detectColumns(@Param('fileId', ParseIntPipe) fileId: number) {
+    return this.templateService.detectColumnsFromFile(fileId);
+  }
+
+  @Post()
+  @ApiOperation({ 
+    summary: 'Создание пользовательского набора колонок',
+    description: 'Сохраняет выбранные пользователем колонки как шаблон'
+  })
+  @ApiBody({
+    description: 'Данные нового шаблона',
+    schema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', example: 'Мой набор колонок' },
+        columnSelections: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              excelColumn: { type: 'string', example: 'Название товара' },
+              systemName: { type: 'string', example: 'product_name' },
+              include: { type: 'boolean', example: true },
+              order: { type: 'number', example: 1 }
+            }
+          }
+        },
+        isDefault: { type: 'boolean', example: false }
+      },
+      required: ['name', 'columnSelections']
+    }
+  })
+  @ApiResponse({ status: 201, description: 'Шаблон успешно создан' })
+  async createTemplate(
+    @Body() dto: CreateTemplateDto,
+    @Query('createdBy') createdBy?: string,
+  ) {
+    return this.templateService.createTemplate(dto, createdBy);
+  }
+
+  @Get()
+  @ApiOperation({ 
+    summary: 'Получение всех сохраненных шаблонов',
+    description: 'Возвращает список пользовательских наборов колонок'
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Список шаблонов',
+    schema: {
+      example: [
+        {
+          id: 1,
+          name: 'Основные колонки',
+          isDefault: true,
+          usageCount: 15,
+          columnSelections: [
+            {
+              excelColumn: 'Название',
+              systemName: 'name',
+              include: true,
+              order: 1
+            }
+          ],
+          createdAt: '2025-07-02T10:00:00Z'
+        }
+      ]
+    }
+  })
+  async getAllTemplates() {
+    return this.templateService.getAllTemplates();
+  }
+
+  @Get('default')
+  @ApiOperation({ 
+    summary: 'Получение набора колонок по умолчанию',
+    description: 'Возвращает шаблон, установленный по умолчанию'
+  })
+  @ApiResponse({ status: 200, description: 'Шаблон по умолчанию' })
+  @ApiResponse({ status: 404, description: 'Шаблон по умолчанию не установлен' })
+  async getDefaultTemplate() {
+    return this.templateService.getDefaultTemplate();
+  }
+
+  @Get(':id')
+  @ApiOperation({ 
+    summary: 'Получение шаблона по ID',
+    description: 'Возвращает полную информацию о наборе колонок'
+  })
+  @ApiParam({ name: 'id', description: 'ID шаблона' })
+  @ApiResponse({ status: 200, description: 'Информация о шаблоне' })
+  @ApiResponse({ status: 404, description: 'Шаблон не найден' })
+  async getTemplate(@Param('id', ParseIntPipe) id: number) {
+    return this.templateService.getTemplate(id);
+  }
+
+  @Put(':id')
+  @ApiOperation({ 
+    summary: 'Обновление набора колонок',
+    description: 'Изменяет существующий пользовательский шаблон'
+  })
+  @ApiParam({ name: 'id', description: 'ID шаблона' })
+  @ApiBody({
+    description: 'Данные для обновления',
+    schema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string' },
+        columnSelections: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              excelColumn: { type: 'string' },
+              systemName: { type: 'string' },
+              include: { type: 'boolean' },
+              order: { type: 'number' }
+            }
+          }
+        },
+        isDefault: { type: 'boolean' },
+        isActive: { type: 'boolean' }
+      }
+    }
+  })
+  @ApiResponse({ status: 200, description: 'Шаблон успешно обновлен' })
+  @ApiResponse({ status: 404, description: 'Шаблон не найден' })
+  async updateTemplate(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateTemplateDto,
+  ) {
+    return this.templateService.updateTemplate(id, dto);
+  }
+
+  @Delete(':id')
+  @ApiOperation({ 
+    summary: 'Удаление набора колонок',
+    description: 'Удаляет пользовательский шаблон из системы'
+  })
+  @ApiParam({ name: 'id', description: 'ID шаблона' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Шаблон успешно удален',
+    schema: {
+      example: { message: 'Шаблон успешно удален' }
+    }
+  })
+  @ApiResponse({ status: 404, description: 'Шаблон не найден' })
+  @ApiResponse({ status: 400, description: 'Нельзя удалить шаблон по умолчанию' })
+  @HttpCode(HttpStatus.OK)
+  async deleteTemplate(@Param('id', ParseIntPipe) id: number) {
+    await this.templateService.deleteTemplate(id);
+    return { message: 'Шаблон успешно удален' };
+  }
+
+  @Post(':id/apply-to-file/:fileId')
+  @ApiOperation({ 
+    summary: 'Применение набора колонок к файлу',
+    description: 'Применяет выбранные колонки к существующему Excel файлу'
+  })
+  @ApiParam({ name: 'id', description: 'ID шаблона' })
+  @ApiParam({ name: 'fileId', description: 'ID Excel файла' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Шаблон успешно применен к файлу',
+    schema: {
+      example: { message: 'Набор колонок применен к файлу' }
+    }
+  })
+  @ApiResponse({ status: 404, description: 'Шаблон или файл не найден' })
+  @HttpCode(HttpStatus.OK)
+  async applyTemplateToFile(
+    @Param('id', ParseIntPipe) templateId: number,
+    @Param('fileId', ParseIntPipe) fileId: number,
+  ) {
+    await this.templateService.applyTemplateToFile(fileId, templateId);
+    return { message: 'Набор колонок применен к файлу' };
+  }
+}

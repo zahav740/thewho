@@ -1,9 +1,9 @@
 /**
  * @file: shift-record.entity.ts
- * @description: Entity для записей смен (ИСПРАВЛЕНО - добавлен setupOperator)
+ * @description: Entity для записей смен (ИСПРАВЛЕНО для соответствия БД)
  * @dependencies: typeorm, operation.entity, machine.entity
  * @created: 2025-01-28
- * @fixed: 2025-06-07 - Добавлено поле setupOperator
+ * @fixed: 2025-07-01 - Приведено в соответствие с реальной структурой БД
  */
 import {
   Entity,
@@ -40,11 +40,8 @@ export class ShiftRecord {
   @Column({ name: 'shiftType' })
   shiftType: string;
 
-  @Column({ name: 'setupTime', nullable: true })
+  @Column({ name: 'setupTime', nullable: true, default: 0 })
   setupTime: number;
-
-  @Column({ name: 'setupOperator', nullable: true })
-  setupOperator: string;
 
   @Column({ name: 'dayShiftQuantity', nullable: true })
   dayShiftQuantity: number;
@@ -78,16 +75,20 @@ export class ShiftRecord {
   })
   nightShiftTimePerUnit: number;
 
-  // ИСПРАВЛЕНО: поле в БД называется "drawingnumber", а не "drawingNumber"
-  @Column({ name: 'drawingnumber', nullable: true })
-  drawingNumber: string;
-
   @Column({ name: 'operationId', nullable: true })
   operationId: number;
 
-  // ИСПРАВЛЕНО: поле может быть NULL в БД
   @Column({ name: 'machineId', nullable: true })
   machineId: number;
+
+  @Column({ name: 'archived', default: false })
+  archived: boolean;
+
+  @Column({ name: 'archivedAt', nullable: true })
+  archivedAt: Date;
+
+  @Column({ name: 'resetAt', nullable: true })
+  resetAt: Date;
 
   @ManyToOne(() => Operation, { nullable: true })
   @JoinColumn({ name: 'operationId' })
@@ -102,13 +103,4 @@ export class ShiftRecord {
 
   @UpdateDateColumn({ name: 'updatedAt' })
   updatedAt: Date;
-
-  @Column({ name: 'archived', default: false })
-  archived: boolean;
-
-  @Column({ name: 'archivedAt', nullable: true })
-  archivedAt: Date;
-
-  @Column({ name: 'resetAt', nullable: true })
-  resetAt: Date;
 }

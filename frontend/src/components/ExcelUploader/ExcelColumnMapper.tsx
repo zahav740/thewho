@@ -1,8 +1,9 @@
 /**
- * @file: ExcelColumnMapper.tsx
+ * @file: ExcelColumnMapper.tsx (ФИНАЛЬНАЯ ИСПРАВЛЕННАЯ ВЕРСИЯ)
  * @description: Компонент для выбора и маппинга колонок Excel файла
  * @dependencies: antd, react
- * @created: 2025-06-25
+ * @created: 2025-07-03
+ * @fixed: Убраны все styled-jsx ошибки, добавлен функционал удаления и редактирования
  */
 import React, { useState, useEffect } from 'react';
 import {
@@ -22,15 +23,23 @@ import {
   message,
   Steps,
   Modal,
-  Spin
+  Spin,
+  Input,
+  Tooltip,
+  Popconfirm
 } from 'antd';
+import './ExcelColumnMapper.css';
 import {
   FileExcelOutlined,
   SettingOutlined,
   CheckCircleOutlined,
   ExclamationCircleOutlined,
   InfoCircleOutlined,
-  ArrowRightOutlined
+  ArrowRightOutlined,
+  DeleteOutlined,
+  EditOutlined,
+  SaveOutlined,
+  CloseOutlined
 } from '@ant-design/icons';
 
 const { Title, Text, Paragraph } = Typography;
@@ -45,6 +54,9 @@ interface ExcelColumnInfo {
   detectedType: 'text' | 'number' | 'date' | 'unknown';
   suggestedMapping: string | null;
   confidence: number;
+  isVisible: boolean;
+  isEditing?: boolean;
+  originalHeader?: string;
 }
 
 interface ExcelSheetInfo {
@@ -80,6 +92,8 @@ interface ExcelImportSettings {
   hasHeaders: boolean;
   startRow: number;
   columnMapping: ColumnMapping;
+  hiddenColumns: number[];
+  customHeaders: Record<number, string>;
   colorFilters?: string[];
 }
 
@@ -119,13 +133,16 @@ const ExcelColumnMapper: React.FC<ExcelColumnMapperProps> = ({
   const [hasHeaders, setHasHeaders] = useState(true);
   const [startRow, setStartRow] = useState(2);
   const [columnMapping, setColumnMapping] = useState<ColumnMapping>({});
+  const [hiddenColumns, setHiddenColumns] = useState<number[]>([]);
+  const [customHeaders, setCustomHeaders] = useState<Record<number, string>>({});
+  const [editingColumn, setEditingColumn] = useState<number | null>(null);
+  const [editingHeader, setEditingHeader] = useState<string>('');
   const [operationsSettings, setOperationsSettings] = useState({
     startColumn: 0,
     columnsPerOperation: 2,
     maxOperations: 5
   });
 
-  // Анализ файла при открытии модального окна
   useEffect(() => {
     if (visible && file) {
       analyzeFile();
@@ -148,12 +165,19 @@ const ExcelColumnMapper: React.FC<ExcelColumnMapperProps> = ({
       }
 
       const result: ExcelFileAnalysis = await response.json();
+      
+      result.sheets.forEach(sheet => {
+        sheet.columns = sheet.columns.map(col => ({
+          ...col,
+          isVisible: true,
+          isEditing: false,
+          originalHeader: col.header
+        }));
+      });
+      
       setAnalysis(result);
       setSelectedSheet(result.recommendedSheet);
-      
-      // Автоматически применяем предложенный маппинг
       applyAutoMapping(result.sheets[result.recommendedSheet]);
-      
       message.success('Структура файла проанализирована');
     } catch (error: any) {
       console.error('Ошибка анализа файла:', error);
@@ -194,7 +218,6 @@ const ExcelColumnMapper: React.FC<ExcelColumnMapperProps> = ({
       }
     });
     
-    // Настройка операций
     if (operationsStart > 0) {
       newMapping.operations = {
         startColumn: operationsStart,
@@ -213,6 +236,8 @@ const ExcelColumnMapper: React.FC<ExcelColumnMapperProps> = ({
 
   const handleSheetChange = (sheetIndex: number) => {
     setSelectedSheet(sheetIndex);
+    setHiddenColumns([]);
+    setCustomHeaders({});
     if (analysis) {
       applyAutoMapping(analysis.sheets[sheetIndex]);
     }
@@ -235,11 +260,79 @@ const ExcelColumnMapper: React.FC<ExcelColumnMapperProps> = ({
     }));
   };
 
+  const toggleColumnVisibility = (columnIndex: number) => {
+    setHiddenColumns(prev => {
+      const isCurrentlyHidden = prev.includes(columnIndex);
+      if (isCurrentlyHidden) {
+        return prev.filter(idx => idx !== columnIndex);
+      } else {
+        const newHidden = [...prev, columnIndex];
+        
+        setColumnMapping(prevMapping => {
+          const newMapping = { ...prevMapping };
+          Object.keys(newMapping).forEach(key => {
+            if (key !== 'operations' && newMapping[key as keyof ColumnMapping] === columnIndex) {
+              delete newMapping[key as keyof ColumnMapping];
+            }
+          });
+          return newMapping;
+        });
+        
+        return newHidden;
+      }
+    });
+  };
+
+  const startEditHeader = (columnIndex: number, currentHeader: string) => {
+    setEditingColumn(columnIndex);
+    setEditingHeader(customHeaders[columnIndex] || currentHeader);
+  };
+
+  const saveEditedHeader = () => {
+    if (editingColumn !== null) {
+      if (editingHeader.trim()) {
+        setCustomHeaders(prev => ({
+          ...prev,
+          [editingColumn]: editingHeader.trim()
+        }));
+        message.success('Заголовок обновлен');
+      } else {
+        setCustomHeaders(prev => {
+          const newHeaders = { ...prev };
+          delete newHeaders[editingColumn];
+          return newHeaders;
+        });
+      }
+    }
+    setEditingColumn(null);
+    setEditingHeader('');
+  };
+
+  const cancelEditHeader = () => {
+    setEditingColumn(null);
+    setEditingHeader('');
+  };
+
+  const resetHeader = (columnIndex: number) => {
+    setCustomHeaders(prev => {
+      const newHeaders = { ...prev };
+      delete newHeaders[columnIndex];
+      return newHeaders;
+    });
+    message.success('Заголовок сброшен к оригинальному');
+  };
+
   const validateMapping = (): boolean => {
     if (!columnMapping.drawingNumber) {
       message.error('Необходимо указать колонку с номером чертежа');
       return false;
     }
+    
+    if (hiddenColumns.includes(columnMapping.drawingNumber)) {
+      message.error('Колонка с номером чертежа не может быть скрыта');
+      return false;
+    }
+    
     return true;
   };
 
@@ -251,6 +344,8 @@ const ExcelColumnMapper: React.FC<ExcelColumnMapperProps> = ({
       hasHeaders,
       startRow,
       columnMapping,
+      hiddenColumns,
+      customHeaders,
       colorFilters: []
     };
     
@@ -367,6 +462,7 @@ const ExcelColumnMapper: React.FC<ExcelColumnMapperProps> = ({
 
   const renderColumnMapping = () => {
     const sheet = analysis!.sheets[selectedSheet];
+    const visibleColumns = sheet.columns.filter(col => !hiddenColumns.includes(col.columnIndex));
     
     const columns = [
       {
@@ -374,16 +470,84 @@ const ExcelColumnMapper: React.FC<ExcelColumnMapperProps> = ({
         dataIndex: 'columnLetter',
         key: 'columnLetter',
         width: 80,
-        render: (letter: string) => (
-          <Tag color="blue">{letter}</Tag>
+        render: (letter: string, record: ExcelColumnInfo) => (
+          <Space>
+            <Tag color={hiddenColumns.includes(record.columnIndex) ? 'default' : 'blue'}>
+              {letter}
+            </Tag>
+          </Space>
         )
       },
       {
         title: 'Заголовок',
         dataIndex: 'header',
         key: 'header',
-        width: 150,
-        ellipsis: true
+        width: 200,
+        render: (header: string, record: ExcelColumnInfo) => {
+          const currentHeader = customHeaders[record.columnIndex] || header;
+          const isEditing = editingColumn === record.columnIndex;
+          const hasCustomHeader = record.columnIndex in customHeaders;
+          
+          return (
+            <div>
+              {isEditing ? (
+                <Space.Compact style={{ width: '100%' }}>
+                  <Input
+                    value={editingHeader}
+                    onChange={(e) => setEditingHeader(e.target.value)}
+                    onPressEnter={saveEditedHeader}
+                    size="small"
+                    autoFocus
+                  />
+                  <Button
+                    type="primary"
+                    size="small"
+                    icon={<SaveOutlined />}
+                    onClick={saveEditedHeader}
+                  />
+                  <Button
+                    size="small"
+                    icon={<CloseOutlined />}
+                    onClick={cancelEditHeader}
+                  />
+                </Space.Compact>
+              ) : (
+                <Space>
+                  <Text 
+                    className={hasCustomHeader ? 'excel-custom-header' : ''}
+                  >
+                    {currentHeader}
+                  </Text>
+                  <Tooltip title="Редактировать заголовок">
+                    <Button
+                      type="text"
+                      size="small"
+                      icon={<EditOutlined />}
+                      onClick={() => startEditHeader(record.columnIndex, currentHeader)}
+                    />
+                  </Tooltip>
+                  {hasCustomHeader && (
+                    <Tooltip title="Сбросить к оригинальному">
+                      <Button
+                        type="text"
+                        size="small"
+                        icon={<CloseOutlined />}
+                        onClick={() => resetHeader(record.columnIndex)}
+                      />
+                    </Tooltip>
+                  )}
+                </Space>
+              )}
+              {hasCustomHeader && !isEditing && (
+                <div className="excel-original-header">
+                  <Text type="secondary">
+                    Оригинал: {record.originalHeader}
+                  </Text>
+                </div>
+              )}
+            </div>
+          );
+        }
       },
       {
         title: 'Тип',
@@ -436,13 +600,16 @@ const ExcelColumnMapper: React.FC<ExcelColumnMapperProps> = ({
             ([key, value]) => key !== 'operations' && value === record.columnIndex
           )?.[0];
           
+          const isHidden = hiddenColumns.includes(record.columnIndex);
+          
           return (
             <Select
               style={{ width: '100%' }}
               placeholder="Не использовать"
-              value={currentMapping}
+              value={isHidden ? undefined : currentMapping}
               onChange={(value) => handleMappingChange(value, record.columnIndex)}
               allowClear
+              disabled={isHidden}
             >
               {Object.entries(mappingLabels)
                 .filter(([key]) => key !== 'operations')
@@ -455,6 +622,51 @@ const ExcelColumnMapper: React.FC<ExcelColumnMapperProps> = ({
             </Select>
           );
         }
+      },
+      {
+        title: 'Действия',
+        key: 'actions',
+        width: 120,
+        render: (_: any, record: ExcelColumnInfo) => {
+          const isHidden = hiddenColumns.includes(record.columnIndex);
+          const isRequired = columnMapping.drawingNumber === record.columnIndex;
+          
+          return (
+            <Space>
+              <Tooltip title={isHidden ? 'Показать колонку' : 'Скрыть колонку'}>
+                <Button
+                  type="text"
+                  size="small"
+                  disabled={isRequired}
+                  onClick={() => toggleColumnVisibility(record.columnIndex)}
+                  style={{ 
+                    color: isHidden ? '#ff4d4f' : '#52c41a'
+                  }}
+                >
+                  {isHidden ? 'Показать' : 'Скрыть'}
+                </Button>
+              </Tooltip>
+              
+              {isHidden && (
+                <Popconfirm
+                  title="Удалить колонку?"
+                  description="Колонка будет полностью исключена из импорта"
+                  onConfirm={() => toggleColumnVisibility(record.columnIndex)}
+                  okText="Да"
+                  cancelText="Нет"
+                >
+                  <Button
+                    type="text"
+                    size="small"
+                    danger
+                    icon={<DeleteOutlined />}
+                    disabled={isRequired}
+                  />
+                </Popconfirm>
+              )}
+            </Space>
+          );
+        }
       }
     ];
 
@@ -464,25 +676,41 @@ const ExcelColumnMapper: React.FC<ExcelColumnMapperProps> = ({
           <SettingOutlined /> Настройка соответствия колонок
         </Title>
         <Paragraph type="secondary">
-          Укажите, какие колонки соответствуют полям заказа. Колонка "Номер чертежа" обязательна.
+          Укажите, какие колонки соответствуют полям заказа. Вы можете скрыть ненужные колонки и отредактировать заголовки.
         </Paragraph>
 
-        <Alert
-          message="Автоматическое определение"
-          description="Система автоматически определила возможные соответствия колонок. Проверьте и откорректируйте при необходимости."
-          type="info"
-          showIcon
-          style={{ marginBottom: 16 }}
-        />
+        <Row gutter={16} style={{ marginBottom: 16 }}>
+          <Col span={12}>
+            <Alert
+              message="🎯 Управление колонками"
+              description="Скрывайте ненужные колонки и редактируйте заголовки для точного импорта"
+              type="info"
+              showIcon
+            />
+          </Col>
+          <Col span={12}>
+            <Alert
+              message={`📊 Видимые колонки: ${visibleColumns.length} из ${sheet.columns.length}`}
+              description={hiddenColumns.length > 0 ? `Скрыто: ${hiddenColumns.length} колонок` : 'Все колонки видимы'}
+              type={hiddenColumns.length > 0 ? 'warning' : 'success'}
+              showIcon
+            />
+          </Col>
+        </Row>
 
-        <Table
-          columns={columns}
-          dataSource={sheet.columns}
-          rowKey="columnIndex"
-          size="small"
-          pagination={false}
-          scroll={{ y: 300 }}
-        />
+        <div className="excel-column-mapper">
+          <Table
+            columns={columns}
+            dataSource={sheet.columns}
+            rowKey="columnIndex"
+            size="small"
+            pagination={false}
+            scroll={{ y: 300 }}
+            rowClassName={(record) => 
+              hiddenColumns.includes(record.columnIndex) ? 'excel-hidden-row' : ''
+            }
+          />
+        </div>
 
         <Divider />
         
@@ -498,9 +726,9 @@ const ExcelColumnMapper: React.FC<ExcelColumnMapperProps> = ({
                   onChange={(value) => handleOperationsChange('startColumn', value)}
                   allowClear
                 >
-                  {sheet.columns.map(col => (
+                  {visibleColumns.map(col => (
                     <Option key={col.columnIndex} value={col.columnIndex}>
-                      {col.columnLetter} - {col.header}
+                      {col.columnLetter} - {customHeaders[col.columnIndex] || col.header}
                     </Option>
                   ))}
                 </Select>
@@ -539,13 +767,15 @@ const ExcelColumnMapper: React.FC<ExcelColumnMapperProps> = ({
 
   const renderSettingsReview = () => {
     const sheet = analysis!.sheets[selectedSheet];
+    const visibleColumns = sheet.columns.filter(col => !hiddenColumns.includes(col.columnIndex));
     const mappedFields = Object.entries(columnMapping)
       .filter(([key, value]) => key !== 'operations' && value)
       .map(([key, value]) => {
         const column = sheet.columns.find(col => col.columnIndex === value);
+        const displayHeader = column ? (customHeaders[column.columnIndex] || column.header) : 'Не найдена';
         return {
           field: mappingLabels[key],
-          column: column ? `${column.columnLetter} - ${column.header}` : 'Не найдена'
+          column: column ? `${column.columnLetter} - ${displayHeader}` : 'Не найдена'
         };
       });
 
@@ -572,11 +802,19 @@ const ExcelColumnMapper: React.FC<ExcelColumnMapperProps> = ({
                   <Text strong>Строк данных:</Text> {sheet.rowCount - (hasHeaders ? 1 : 0)}
                 </div>
                 <div>
+                  <Text strong>Видимых колонок:</Text> {visibleColumns.length} из {sheet.columnCount}
+                </div>
+                <div>
                   <Text strong>Заголовки:</Text> {hasHeaders ? 'Есть' : 'Нет'}
                 </div>
                 <div>
                   <Text strong>Начать с строки:</Text> {startRow}
                 </div>
+                {Object.keys(customHeaders).length > 0 && (
+                  <div>
+                    <Text strong>Изменено заголовков:</Text> {Object.keys(customHeaders).length}
+                  </div>
+                )}
               </Space>
             </Card>
           </Col>
@@ -606,6 +844,26 @@ const ExcelColumnMapper: React.FC<ExcelColumnMapperProps> = ({
           </Col>
         </Row>
 
+        {hiddenColumns.length > 0 && (
+          <Alert
+            message={`Скрытые колонки (${hiddenColumns.length})`}
+            description={
+              <div>
+                {hiddenColumns.map(colIndex => {
+                  const column = sheet.columns.find(col => col.columnIndex === colIndex);
+                  return column ? (
+                    <Tag key={colIndex} color="default" style={{ margin: 2 }}>
+                      {column.columnLetter} - {column.header}
+                    </Tag>
+                  ) : null;
+                })}
+              </div>
+            }
+            type="info"
+            style={{ marginTop: 16 }}
+          />
+        )}
+
         {!columnMapping.drawingNumber && (
           <Alert
             message="Внимание!"
@@ -627,7 +885,7 @@ const ExcelColumnMapper: React.FC<ExcelColumnMapperProps> = ({
     },
     {
       title: 'Настройка колонок',
-      description: 'Укажите соответствие колонок',
+      description: 'Управление колонками и заголовками',
       icon: <SettingOutlined />
     },
     {
@@ -647,8 +905,8 @@ const ExcelColumnMapper: React.FC<ExcelColumnMapperProps> = ({
       )}
       open={visible}
       onCancel={onCancel}
-      width={1200}
-      styles={{ body: { maxHeight: '70vh', overflowY: 'auto' } }}
+      width={1400}
+      styles={{ body: { maxHeight: '80vh', overflowY: 'auto' } }}
       footer={[
         <Button key="cancel" onClick={onCancel}>
           Отмена

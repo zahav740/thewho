@@ -479,6 +479,31 @@ export const translations: Record<'ru' | 'en', Record<string, string>> = {
     'order.filesystem.data_source': 'Сервис заказов',
     'order.filesystem.save_error': 'Ошибка сохранения заказа в файловую систему',
     'order.filesystem.update_error': 'Ошибка обновления заказа в файловой системе',
+
+    // Календарь - недостающие переводы
+    'calendar.modern_calendar': 'Современный календарь',
+    'calendar.period': 'Период',
+    'calendar.current_week': 'Текущая неделя',
+    'calendar.next_week': 'Следующая неделя',
+    'calendar.two_weeks': '2 недели',
+    'calendar.current_month': 'Текущий месяц',
+    'calendar.production_calendar': 'Производственный календарь',
+    'calendar.machine_utilization': 'Загрузка станков',
+    'calendar.upcoming_deadlines': 'Предстоящие сроки',
+    'calendar.modern_features': 'Современные возможности',
+    'calendar.features.integration': 'Полная интеграция с базой данных PostgreSQL',
+    'calendar.features.design': 'Современный дизайн без зависимости от внешних библиотек',
+    'calendar.features.clickable': 'Кликабельные ячейки с подробной информацией об операциях',
+    'calendar.features.realtime': 'Отображение данных в реальном времени из производственной CRM',
+    'calendar.features.interactive': 'Интерактивные карточки станков с мини-календарями',
+    'calendar.features.statistics': 'Статистика загрузки и эффективности в реальном времени',
+    'calendar.loading_calendar': 'Загрузка календаря...',
+    'calendar.no_data': 'Нет данных',
+    'calendar.no_data_desc': 'Нет активных станков или операций в выбранном периоде',
+    'calendar.refresh': 'Обновить',
+
+    // Активные операции - недостающие переводы
+    'active_operations.debug_mode': 'Режим отладки',
   },
 
   en: {

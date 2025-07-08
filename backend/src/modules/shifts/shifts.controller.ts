@@ -28,7 +28,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
 @ApiTags('shifts')
-@Controller('shifts')
+@Controller('shift-records')
 export class ShiftsController {
   private readonly logger = new Logger(ShiftsController.name);
 

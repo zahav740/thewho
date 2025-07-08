@@ -1,30 +1,45 @@
 /**
  * @file: operator.entity.ts
- * @description: Сущность оператора
- * @created: 2025-06-30
+ * @description: Entity для операторов
+ * @created: 2025-07-01
  */
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 
 @Entity('operators')
 export class Operator {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ type: 'varchar', length: 100 })
+  @Column({ length: 100 })
   name: string;
 
-  @Column({ type: 'varchar', length: 100, nullable: true })
-  position: string;
+  @Column({ length: 50, default: 'PRODUCTION' })
+  type: string;
 
-  @Column({ type: 'varchar', length: 20, nullable: true })
-  level: string;
+  @Column({ default: true })
+  active: boolean;
 
-  @Column({ type: 'boolean', default: true })
-  isActive: boolean;
+  @Column({ default: 0 })
+  experience: number;
 
-  @CreateDateColumn()
-  createdAt: Date;
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  hourlyrate: number;
 
-  @UpdateDateColumn()
-  updatedAt: Date;
+  @Column({ length: 100, nullable: true })
+  email: string;
+
+  @Column({ length: 20, nullable: true })
+  phone: string;
+
+  @CreateDateColumn({ name: 'createdat' })
+  createdat: Date;
+
+  @UpdateDateColumn({ name: 'updatedat' })
+  updatedat: Date;
 }

@@ -16,7 +16,7 @@ import {
   GlobalOutlined,
   MenuOutlined,
   BarChartOutlined,
-  // ShoppingCartOutlined, // Скрыта секция Заказы
+  FileExcelOutlined,
 } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
 import { useTranslation } from '../../i18n';
@@ -58,12 +58,6 @@ export const Layout: React.FC = () => {
   }, [location.pathname, isMobile]);
 
   const menuItems: MenuProps['items'] = [
-    // {
-    //   key: '/orders',
-    //   icon: <ShoppingCartOutlined />,
-    //   label: '📊 Заказы',
-    //   onClick: () => navigate('/orders'),
-    // },
     {
       key: '/database',
       icon: <DatabaseOutlined />,
@@ -103,14 +97,20 @@ export const Layout: React.FC = () => {
     {
       key: '/analytics',
       icon: <BarChartOutlined />,
-      label: '📊 Полная аналитика',
+      label: '📊 Аналитика KPI/OEE',
       onClick: () => navigate('/analytics'),
     },
     {
-      key: '/kpi-oee',
+      key: '/analytics-comprehensive',
       icon: <BarChartOutlined />,
-      label: '📊 KPI и OEE',
-      onClick: () => navigate('/kpi-oee'),
+      label: '📈 Полная аналитика',
+      onClick: () => navigate('/analytics-comprehensive'),
+    },
+    {
+      key: '/excel-import',
+      icon: <FileExcelOutlined />,
+      label: '📊 Excel импорт',
+      onClick: () => navigate('/excel-import'),
     },
   ];
 
@@ -251,6 +251,11 @@ export const Layout: React.FC = () => {
         style={{
           overflow: 'auto',
           height: '100vh',
+          // НЕ используем position: fixed - это вызывает проблемы
+          // position: 'fixed',
+          // left: 0,
+          // top: 0,
+          // bottom: 0,
           zIndex: 100
         }}
       >
@@ -258,6 +263,9 @@ export const Layout: React.FC = () => {
       </Sider>
       
       <AntLayout style={{ 
+        // НЕ используем marginLeft - Ant Design сам управляет отступами
+        // marginLeft: collapsed ? 80 : 250,
+        // transition: 'margin-left 0.2s'
         minHeight: '100vh'
       }}>
         <Header style={{ 
@@ -267,7 +275,7 @@ export const Layout: React.FC = () => {
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          height: '64px',
+          height: '64px', // Фиксированная высота
           minHeight: '64px',
           zIndex: 99
         }}>
@@ -293,8 +301,6 @@ export const Layout: React.FC = () => {
 
 function getPageTitle(pathname: string, t: (key: string) => string): string {
   switch (pathname) {
-    // case '/orders':
-    //   return '📊 Заказы - Улучшенная версия';
     case '/database':
       return t('page.database.title');
     case '/production':
@@ -308,9 +314,11 @@ function getPageTitle(pathname: string, t: (key: string) => string): string {
     case '/operators':
       return t('page.operators.title');
     case '/analytics':
-      return '📊 Полная аналитика производства';
-    case '/kpi-oee':
-      return '📊 KPI и OEE - Правильные расчеты';
+      return '📊 Аналитика KPI и OEE';
+    case '/analytics-comprehensive':
+      return '📈 Полная аналитика производства';
+    case '/excel-import':
+      return '📊 Excel импорт';
     case '/translations':
       return t('translations.title');
     default:

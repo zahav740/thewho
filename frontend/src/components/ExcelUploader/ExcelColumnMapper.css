@@ -1,0 +1,73 @@
+/* Стили для компонента ExcelColumnMapper */
+
+/* Стили для скрытых строк */
+.excel-column-mapper .ant-table-tbody .excel-hidden-row {
+  background-color: #f5f5f5 !important;
+  opacity: 0.6 !important;
+  transition: all 0.3s ease;
+}
+
+.excel-column-mapper .ant-table-tbody .excel-hidden-row:hover {
+  background-color: #e6e6e6 !important;
+  opacity: 0.7 !important;
+}
+
+.excel-column-mapper .ant-table-tbody .excel-hidden-row td {
+  color: #999 !important;
+}
+
+/* Стили для кастомных заголовков */
+.excel-custom-header {
+  color: #1890ff !important;
+  font-weight: bold !important;
+}
+
+.excel-original-header {
+  font-size: 12px;
+  color: #999;
+  margin-top: 2px;
+}
+
+.excel-original-header .ant-typography {
+  font-size: 12px !important;
+}
+
+/* Стили для редактирования заголовков */
+.excel-editing-header .ant-input {
+  font-size: 12px;
+}
+
+/* Стили для кнопок действий */
+.excel-column-actions .ant-btn {
+  padding: 2px 6px;
+  height: auto;
+  font-size: 11px;
+}
+
+/* Анимации */
+.excel-column-mapper .ant-table-tbody tr {
+  transition: background-color 0.3s ease, opacity 0.3s ease;
+}
+
+/* Дополнительные стили для лучшего UX */
+.excel-column-mapper .ant-tag {
+  margin: 0;
+}
+
+.excel-column-mapper .ant-space-compact {
+  width: 100%;
+}
+
+.excel-column-mapper .ant-input-group-compact .ant-btn {
+  border-radius: 0;
+}
+
+.excel-column-mapper .ant-input-group-compact .ant-btn:first-child {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.excel-column-mapper .ant-input-group-compact .ant-btn:last-child {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}

@@ -63,8 +63,8 @@ export const getOptimalApiUrl = async (): Promise<string> => {
       const commonIPs = ['192.168.1.100', '192.168.0.100', '192.168.1.101'];
       
       for (const ip of commonIPs) {
-        // Пробуем порт 5100
-        const ports = [5100];
+        // Пробуем разные порты
+        const ports = [5200, 5100, 3001];
         for (const port of ports) {
           try {
             const response = await fetch(`http://${ip}:${port}/api/auth/test`, { 
@@ -148,13 +148,16 @@ export const testApiConnection = async (apiUrl: string): Promise<boolean> => {
 // Функция для автоматического поиска доступного backend
 export const findAvailableBackend = async (): Promise<string> => {
   const candidates = [
-    'http://localhost:5100/api', // Продакшен backend
+    'http://localhost:5100/api', // Наш основной порт
+    'http://localhost:3001/api',
+    'http://localhost:5101/api',
+    'http://localhost:5200/api',
   ];
   
   // Если мобильное устройство, добавляем IP-адреса
   if (isMobileDevice()) {
     const ips = ['192.168.1.100', '192.168.0.100', '192.168.1.101', '192.168.1.102'];
-    const ports = [5100];
+    const ports = [5100, 3001, 5101];
     
     for (const ip of ips) {
       for (const port of ports) {

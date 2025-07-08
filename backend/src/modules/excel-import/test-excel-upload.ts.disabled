@@ -1,0 +1,207 @@
+/**
+ * @file: test-excel-upload.ts
+ * @description: Утилита для тестирования загрузки Excel файлов
+ * @created: 2025-07-03
+ */
+import * as fs from 'fs';
+import * as path from 'path';
+import * as FormData from 'form-data';
+import axios from 'axios';
+
+interface TestConfig {
+  baseUrl: string;
+  testFile: string;
+  uploadOptions?: {
+    description?: string;
+    uploadedBy?: string;
+    maxRows?: number;
+    sheetIndex?: number;
+    skipEmptyRows?: boolean;
+    headerRow?: number;
+  };
+}
+
+export class ExcelUploadTester {
+  private config: TestConfig;
+
+  constructor(config: TestConfig) {
+    this.config = config;
+  }
+
+  /**
+   * Тестирование валидации файла
+   */
+  async testValidation(): Promise<void> {
+    console.log('🔍 Тестирование валидации файла...');
+    
+    try {
+      const filePath = path.resolve(this.config.testFile);
+      
+      if (!fs.existsSync(filePath)) {
+        throw new Error(`Файл не найден: ${filePath}`);
+      }
+
+      const form = new FormData();
+      form.append('file', fs.createReadStream(filePath));
+
+      const response = await axios.post(
+        `${this.config.baseUrl}/excel-import/validate`,
+        form,
+        {
+          headers: form.getHeaders(),
+        }
+      );
+
+      console.log('✅ Валидация прошла успешно:', response.data);
+    } catch (error) {
+      console.error('❌ Ошибка валидации:', error.response?.data || error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Тестирование загрузки файла
+   */
+  async testUpload(): Promise<number> {
+    console.log('📤 Тестирование загрузки файла...');
+    
+    try {
+      const filePath = path.resolve(this.config.testFile);
+      
+      if (!fs.existsSync(filePath)) {
+        throw new Error(`Файл не найден: ${filePath}`);
+      }
+
+      const form = new FormData();
+      form.append('file', fs.createReadStream(filePath));
+
+      // Добавляем опции загрузки
+      if (this.config.uploadOptions) {
+        Object.entries(this.config.uploadOptions).forEach(([key, value]) => {
+          if (value !== undefined) {
+            form.append(key, String(value));
+          }
+        });
+      }
+
+      const response = await axios.post(
+        `${this.config.baseUrl}/excel-import/upload`,
+        form,
+        {
+          headers: form.getHeaders(),
+        }
+      );
+
+      console.log('✅ Загрузка прошла успешно:', response.data);
+      return response.data.id;
+    } catch (error) {
+      console.error('❌ Ошибка загрузки:', error.response?.data || error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Тестирование получения списка файлов
+   */
+  async testGetFilesList(): Promise<void> {
+    console.log('📋 Тестирование получения списка файлов...');
+    
+    try {
+      const response = await axios.get(`${this.config.baseUrl}/excel-import/files`);
+      console.log('✅ Список файлов получен:', response.data);
+    } catch (error) {
+      console.error('❌ Ошибка получения списка файлов:', error.response?.data || error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Тестирование получения данных файла
+   */
+  async testGetFileData(fileId: number): Promise<void> {
+    console.log(`📊 Тестирование получения данных файла ${fileId}...`);
+    
+    try {
+      const response = await axios.get(`${this.config.baseUrl}/excel-import/files/${fileId}/data`);
+      console.log('✅ Данные файла получены:', {
+        rowsCount: response.data.totalRows,
+        hasMore: response.data.hasMore,
+        sampleData: response.data.data.slice(0, 2)
+      });
+    } catch (error) {
+      console.error('❌ Ошибка получения данных файла:', error.response?.data || error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Тестирование получения статистики
+   */
+  async testGetStats(): Promise<void> {
+    console.log('📈 Тестирование получения статистики...');
+    
+    try {
+      const response = await axios.get(`${this.config.baseUrl}/excel-import/stats`);
+      console.log('✅ Статистика получена:', response.data);
+    } catch (error) {
+      console.error('❌ Ошибка получения статистики:', error.response?.data || error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Запуск всех тестов
+   */
+  async runAllTests(): Promise<void> {
+    console.log('🚀 Запуск всех тестов Excel Import...\n');
+    
+    try {
+      // 1. Валидация
+      await this.testValidation();
+      console.log('');
+
+      // 2. Загрузка
+      const fileId = await this.testUpload();
+      console.log('');
+
+      // 3. Список файлов
+      await this.testGetFilesList();
+      console.log('');
+
+      // 4. Данные файла
+      await this.testGetFileData(fileId);
+      console.log('');
+
+      // 5. Статистика
+      await this.testGetStats();
+      console.log('');
+
+      console.log('🎉 Все тесты прошли успешно!');
+    } catch (error) {
+      console.error('💥 Тесты завершились с ошибкой:', error.message);
+      process.exit(1);
+    }
+  }
+}
+
+// Пример использования
+async function main() {
+  const tester = new ExcelUploadTester({
+    baseUrl: 'http://localhost:5100/api', // Измените на ваш URL
+    testFile: './test-data.xlsx', // Путь к тестовому файлу
+    uploadOptions: {
+      description: 'Тестовый файл для проверки загрузки',
+      uploadedBy: 'test-user',
+      maxRows: 1000,
+      skipEmptyRows: true,
+      headerRow: 1,
+    },
+  });
+
+  await tester.runAllTests();
+}
+
+// Запуск тестов, если скрипт выполняется напрямую
+if (require.main === module) {
+  main().catch(console.error);
+}

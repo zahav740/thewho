@@ -150,24 +150,6 @@ export const ordersApi = {
     console.log('✅ API: Заказ успешно удалён:', response.status);
   },
 
-  // Проверить дубликат по номеру чертежа
-  checkDuplicate: async (drawingNumber: string): Promise<Order | null> => {
-    try {
-      console.log('🔍 Проверяем дубликат для чертежа:', drawingNumber);
-      const response = await api.get(`/orders/check-duplicate/${encodeURIComponent(drawingNumber)}`);
-      console.log('✅ Результат проверки дубликата:', response.data ? 'Найден' : 'Не найден');
-      return response.data;
-    } catch (error: any) {
-      if (error.response?.status === 404) {
-        // Если заказ не найден, это хорошо - дубликата нет
-        console.log('✅ Дубликат не найден для:', drawingNumber);
-        return null;
-      }
-      console.error('❌ Ошибка проверки дубликата:', error);
-      throw error;
-    }
-  },
-
   // Удалить выбранные заказы
   deleteBatch: async (ids: string[]): Promise<{ deleted: number }> => {
     console.log('API: Удаление выбранных заказов:', ids);
@@ -180,22 +162,12 @@ export const ordersApi = {
 
   // Удалить все заказы
   deleteAll: async (): Promise<{ deleted: number }> => {
-    console.log('🗑️ API Client: Отправляем запрос на удаление всех заказов');
-    try {
-      const response = await api.delete('/orders/all/confirm', {
-        data: { confirm: true }
-      });
-      console.log('✅ API Client: Ответ от сервера:', response.data);
-      return response.data;
-    } catch (error: any) {
-      console.error('❌ API Client: Ошибка удаления всех заказов:', {
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        data: error.response?.data,
-        message: error.message
-      });
-      throw error;
-    }
+    console.log('API: Удаление всех заказов');
+    const response = await api.delete('/orders/all/confirm', {
+      data: { confirm: true }
+    });
+    console.log('API: Результат удаления всех:', response.data);
+    return response.data;
   },
 
   // Получить все ID заказов
@@ -287,11 +259,30 @@ export const ordersApi = {
     return `${api.defaults.baseURL}/orders/${orderId}/pdf`;
   },
 
+  // ИСПРАВЛЕНО: Получить PDF файл через debug API с автоисправлением
+  getPdfUrlFixed: (orderId: number): string => {
+    return `${api.defaults.baseURL}/pdf-debug/order/${orderId}/file`;
+  },
+
   // Получить PDF файл по пути
   getPdfUrlByPath: (pdfPath: string): string => {
     // Извлекаем только имя файла из полного пути
     const filename = pdfPath.split('/').pop() || pdfPath;
     return `${api.defaults.baseURL}/orders/pdf/${filename}`;
+  },
+
+  // ДИАГНОСТИКА: Получить информацию о PDF заказа
+  getPdfInfo: async (orderId: number): Promise<any> => {
+    console.log('🔍 Диагностика PDF для заказа:', orderId);
+    const response = await api.get(`/pdf-debug/order/${orderId}/info`);
+    return response.data;
+  },
+
+  // ИСПРАВЛЕНИЕ: Автоматическое исправление пути к PDF
+  fixPdfPath: async (orderId: number): Promise<any> => {
+    console.log('🔧 Исправление PDF для заказа:', orderId);
+    const response = await api.get(`/pdf-debug/order/${orderId}/fix`);
+    return response.data;
   },
 
   // Удалить PDF файл заказа
@@ -300,221 +291,57 @@ export const ordersApi = {
     return response.data;
   },
 
-  // ===== НОВЫЕ МЕТОДЫ ДЛЯ ВЕРСИИ 2 =====
-
-  // Получить все заказы V2 с улучшенной фильтрацией
-  getAllV2: async (filter?: import('../types/order-v2.types').OrdersV2Filter): Promise<import('../types/order-v2.types').OrdersV2Response> => {
-    console.log('📋 API V2: Получение заказов с фильтрами:', filter);
-    const response = await api.get('/v2/orders', { params: filter });
-    console.log('✅ API V2: Получено заказов:', response.data.data?.length || 0);
+  // V2 API методы - улучшенные версии
+  getAllV2: async (filter?: OrdersFilter): Promise<OrdersResponse> => {
+    console.log('📊 V2: Получение заказов с фильтром:', filter);
+    const response = await api.get('/orders/v2', { params: filter });
     return response.data;
   },
 
-  // Получить заказ по ID V2
-  getByIdV2: async (id: number): Promise<import('../types/order-v2.types').OrderV2> => {
-    console.log('📋 API V2: Получение заказа по ID:', id);
-    const response = await api.get(`/v2/orders/${id}`);
-    console.log('✅ API V2: Заказ получен:', response.data.drawingNumber);
+  getByIdV2: async (id: number): Promise<Order> => {
+    console.log('🔍 V2: Получение заказа по ID:', id);
+    const response = await api.get(`/orders/v2/${id}`);
     return response.data;
   },
 
-  // Создать новый заказ V2
-  createV2: async (data: import('../types/order-v2.types').CreateOrderV2Dto): Promise<import('../types/order-v2.types').OrderV2> => {
-    console.log('📝 API V2: Создание заказа:', data);
-    
-    try {
-      // Приоритет уже является строкой (PriorityV2), не преобразуем
-      const preparedData = {
-        ...data,
-        priority: data.priority, // Оставляем как есть (строка)
-        operations: data.operations.map(op => ({
-          ...op,
-          operationNumber: Number(op.operationNumber),
-          machineAxes: Number(op.machineAxes),
-          estimatedTime: Number(op.estimatedTime)
-        }))
-      };
-      
-      console.log('📝 API V2: Отформатированные данные:', preparedData);
-        
-        // Дополнительная отладка для поиска ошибок 400
-        console.log('🔍 Отладка данных перед отправкой:', {
-          drawingNumber: preparedData.drawingNumber,
-          quantity: preparedData.quantity,
-          deadline: preparedData.deadline,
-          priority: `'${preparedData.priority}' (${typeof preparedData.priority})`,
-          workType: `'${preparedData.workType}' (${typeof preparedData.workType})`,
-          operationsCount: preparedData.operations?.length,
-          firstOperation: preparedData.operations?.[0]
-        });
-      
-      const response = await api.post('/v2/orders', preparedData);
-      console.log('✅ API V2: Заказ создан:', response.data.drawingNumber);
-      return response.data;
-    } catch (error: any) {
-      console.error('❌ API V2: Ошибка создания заказа:', error.response?.data || error.message);
-      
-      // Детальная отладка ошибок 400
-      if (error.response?.status === 400 && error.response?.data?.message) {
-        console.error('🔍 Детали ошибки 400:', {
-          statusCode: error.response.data.statusCode,
-          error: error.response.data.error,
-          message: error.response.data.message,
-          ПОЛНОЕ_СООБЩЕНИЕ: error.response.data
-        });
-        
-        if (Array.isArray(error.response.data.message)) {
-          console.error('🐛 Ошибки валидации:', error.response.data.message);
-          error.response.data.message.forEach((msg: string, index: number) => {
-            console.error(`   ${index + 1}. ${msg}`);
-          });
-        }
-      }
-      
-      throw error;
-    }
+  createV2: async (data: any): Promise<Order> => {
+    console.log('📝 V2: Создание заказа:', data);
+    const response = await api.post('/orders/v2', data);
+    return response.data;
   },
 
-  // Обновить заказ V2
-  updateV2: async (id: number, data: import('../types/order-v2.types').UpdateOrderV2Dto): Promise<import('../types/order-v2.types').OrderV2> => {
-    console.log(`📝 API V2: Обновление заказа ${id}:`, data);
-    
-    try {
-      // Приоритет уже является строкой (PriorityV2), не преобразуем
-      const preparedData = {
-        ...data,
-        priority: data.priority, // Оставляем как есть (строка или undefined)
-        operations: data.operations ? data.operations.map(op => ({
-          ...op,
-          operationNumber: Number(op.operationNumber),
-          machineAxes: Number(op.machineAxes),
-          estimatedTime: Number(op.estimatedTime)
-        })) : undefined
-      };
-      
-      console.log('📝 API V2: Отформатированные данные:', preparedData);
-      
-      const response = await api.put(`/v2/orders/${id}`, preparedData);
-      console.log('✅ API V2: Заказ обновлен:', response.data.drawingNumber);
-      return response.data;
-    } catch (error: any) {
-      console.error('❌ API V2: Ошибка обновления заказа:', error.response?.data || error.message);
-      throw error;
-    }
+  updateV2: async (id: number, data: any): Promise<Order> => {
+    console.log('📝 V2: Обновление заказа:', id, data);
+    const response = await api.put(`/orders/v2/${id}`, data);
+    return response.data;
   },
 
-  // Удалить заказ V2
   deleteV2: async (id: number): Promise<void> => {
-    console.log('🗑️ API V2: Удаляем заказ с ID:', id);
-    const response = await api.delete(`/v2/orders/${id}`);
-    console.log('✅ API V2: Заказ успешно удалён:', response.status);
+    console.log('🗑️ V2: Удаление заказа:', id);
+    await api.delete(`/orders/v2/${id}`);
   },
 
-  // Массовое удаление выбранных заказов V2
-  deleteSelectedV2: async (ids: number[]): Promise<any> => {
-    console.log('🗑️ API V2: Массовое удаление заказов:', ids);
-    const response = await api.delete('/v2/orders/batch/selected', {
-      data: { ids }
-    });
-    console.log('✅ API V2: Заказы успешно удалены:', response.data);
+  deleteSelectedV2: async (ids: number[]): Promise<{ deleted: number; total: number }> => {
+    console.log('🗑️ V2: Удаление выбранных заказов:', ids);
+    const response = await api.delete('/orders/v2/batch', { data: { ids } });
     return response.data;
   },
 
-  // Удалить все заказы V2
-  deleteAllV2: async (): Promise<any> => {
-    console.log('🗑️ API V2: Удаление всех заказов');
+  deleteAllV2: async (): Promise<{ deleted: number }> => {
+    console.log('🗑️ V2: Удаление всех заказов');
+    const response = await api.delete('/orders/v2/all');
+    return response.data;
+  },
+
+  checkDuplicate: async (drawingNumber: string): Promise<Order | null> => {
+    console.log('🔍 Проверка дубликата по номеру чертежа:', drawingNumber);
     try {
-      const response = await api.delete('/v2/orders/all', {
-        data: { confirm: true } // Добавляем подтверждение для безопасности
-      });
-      console.log('✅ API V2: Все заказы удалены:', response.data);
+      const response = await api.get(`/orders/check-duplicate/${encodeURIComponent(drawingNumber)}`);
       return response.data;
     } catch (error: any) {
-      console.error('❌ API V2: Ошибка удаления всех заказов:', {
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        data: error.response?.data,
-        message: error.message
-      });
-      
-      // Пробуем альтернативный метод
-      if (error.response?.status === 400) {
-        console.log('⚠️ Пробуем альтернативный метод удаления...');
-        try {
-          const alternativeResponse = await api.post('/v2/orders/delete-all', {
-            confirm: true
-          });
-          console.log('✅ API V2: Все заказы удалены альтернативным методом:', alternativeResponse.data);
-          return alternativeResponse.data;
-        } catch (altError: any) {
-          console.error('❌ API V2: Альтернативный метод также не сработал:', altError.response?.data);
-        }
+      if (error.response?.status === 404) {
+        return null; // Заказ не найден - не дубликат
       }
-      
-      throw error;
-    }
-  },
-
-  // Парсинг Excel файла V2
-  parseExcelV2: async (file: File): Promise<any> => {
-    console.log('📊 API V2: Парсинг Excel файла:', file.name);
-    
-    const formData = new FormData();
-    formData.append('file', file);
-    
-    try {
-      const response = await api.post('/v2/orders/parse-excel', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-      
-      console.log('✅ API V2: Excel файл спарсен:', response.data);
-      return response.data;
-    } catch (error: any) {
-      console.error('❌ API V2: Ошибка парсинга Excel:', error.response?.data || error.message);
-      throw error;
-    }
-  },
-
-  // Массовое создание заказов V2
-  createBatchV2: async (orders: import('../types/order-v2.types').CreateOrderV2Dto[]): Promise<import('../types/order-v2.types').ExcelImportV2Result> => {
-    console.log('📝 API V2: Массовое создание заказов:', orders.length);
-    
-    try {
-      const response = await api.post('/v2/orders/batch', { orders });
-      console.log('✅ API V2: Заказы созданы:', response.data);
-      return response.data;
-    } catch (error: any) {
-      console.error('❌ API V2: Ошибка массового создания:', error.response?.data || error.message);
-      throw error;
-    }
-  },
-
-  // Получить статистику заказов V2
-  getStatsV2: async (): Promise<import('../types/order-v2.types').OrdersV2Stats> => {
-    console.log('📊 API V2: Получение статистики заказов');
-    
-    try {
-      const response = await api.get('/v2/orders/stats');
-      console.log('✅ API V2: Статистика получена:', response.data);
-      return response.data;
-    } catch (error: any) {
-      console.error('❌ API V2: Ошибка получения статистики:', error.response?.data || error.message);
-      throw error;
-    }
-  },
-
-  // Пересчитать приоритеты заказов V2
-  recalculatePrioritiesV2: async (): Promise<any> => {
-    console.log('🔄 API V2: Пересчет приоритетов заказов');
-    
-    try {
-      const response = await api.post('/v2/orders/recalculate-priorities');
-      console.log('✅ API V2: Приоритеты пересчитаны:', response.data);
-      return response.data;
-    } catch (error: any) {
-      console.error('❌ API V2: Ошибка пересчета приоритетов:', error.response?.data || error.message);
       throw error;
     }
   },

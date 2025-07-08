@@ -50,7 +50,7 @@ export const OrdersPage: React.FC = () => {
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['orders-v2', filter],
-    queryFn: () => ordersApi.getAllV2(filter),
+    queryFn: () => ordersApi.getAllV2(filter as any),
   });
 
   // Глобальный callback для обновления списка заказов
@@ -157,9 +157,9 @@ window.refreshOrdersListV2 = async () => {
     
     return {
       total: totalOrders, // 🔧 Общее количество из API, а не на странице
-      highPriority: orders.filter(o => String(o.priority) === 'HIGH').length,
-      overdue: orders.filter(o => new Date(o.deadline) < now).length,
-      pending: orders.filter(o => (o as any).status === 'pending').length
+      highPriority: orders.filter((o: any) => String(o.priority) === 'HIGH').length,
+      overdue: orders.filter((o: any) => new Date(o.deadline) < now).length,
+      pending: orders.filter((o: any) => (o as any).status === 'pending').length
     };
   }, [data]);
 
@@ -284,7 +284,7 @@ window.refreshOrdersListV2 = async () => {
       {/* Адаптивная таблица заказов */}
       <ResponsiveTableWrapper>
         <OrdersList
-          data={data}
+          data={data as any}
           loading={isLoading}
           error={error}
           filter={filter}

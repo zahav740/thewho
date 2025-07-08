@@ -9,7 +9,7 @@ import './utils/browserMode.js';
  */
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { ConfigProvider, App as AntdApp } from 'antd';
+import { ConfigProvider } from 'antd';
 import ruRU from 'antd/locale/ru_RU';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
@@ -107,7 +107,7 @@ const root = ReactDOM.createRoot(
 );
 
 root.render(
-  // <React.StrictMode>
+  <React.StrictMode>
     <QueryClientProvider client={queryClient}>
       <ConfigProvider 
         locale={ruRU}
@@ -141,13 +141,11 @@ root.render(
           },
         }}
       >
-        <AntdApp>
-          <App />
-        </AntdApp>
+        <App />
         {!isMobileDevice && <ReactQueryDevtools initialIsOpen={false} />}
       </ConfigProvider>
     </QueryClientProvider>
-  // </React.StrictMode>
+  </React.StrictMode>
 );
 
 // Удаление загрузочного экрана после инициализации React

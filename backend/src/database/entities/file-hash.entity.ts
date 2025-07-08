@@ -3,6 +3,7 @@
  * @description: Entity для хранения хешей загруженных файлов и предотвращения дубликатов
  * @dependencies: typeorm
  * @created: 2025-06-24
+ * @updated: 2025-07-07 - Приведено в соответствие со схемой БД
  */
 import {
   Entity,
@@ -17,10 +18,10 @@ import { Order } from './order.entity';
 
 @Entity('file_hashes')
 export class FileHash {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
+  @PrimaryGeneratedColumn()
+  id: number;
 
-  @Column({ name: 'file_hash', type: 'varchar', length: 64, unique: true })
+  @Column({ name: 'file_hash', type: 'varchar', length: 32, unique: true })
   fileHash: string;
 
   @Column({ name: 'filename', type: 'varchar', length: 255 })
@@ -36,8 +37,11 @@ export class FileHash {
   @JoinColumn({ name: 'order_id' })
   order: Order;
 
-  @Column({ name: 'order_id', type: 'integer' })
-  orderId: number;
+  @Column({ name: 'drawing_number', type: 'varchar', length: 100 })
+  drawingNumber: string;
+
+  @Column({ name: 'file_path', type: 'varchar', length: 500 })
+  filePath: string;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamp' })
   createdAt: Date;

@@ -76,8 +76,41 @@ export class MachinesController {
   /**
    * Получить реальные данные операции по ID с данными заказа
    */
-  private async getOperationDetails(operationId: number) {
+  private async getOperationDetails(operationId: number | string) {
     try {
+      // Если operationId - строка типа "Операция 10 - C6HP0021A", извлекаем информацию
+      if (typeof operationId === 'string' && operationId.includes('Операция')) {
+        this.logger.warn(`Получена строка вместо ID операции: ${operationId}`);
+        
+        // Извлекаем номер операции и номер чертежа
+        const match = operationId.match(/Операция (\d+) - (.+)/);
+        if (match) {
+          const operationNumber = parseInt(match[1]);
+          const drawingNumber = match[2];
+          
+          // Ищем операцию по номеру и чертежу
+          const result = await this.dataSource.query(`
+            SELECT 
+              op.id,
+              op."operationNumber",
+              op.operationtype as "operationType",
+              op."estimatedTime",
+              op."orderId",
+              op."actualQuantity",
+              ord.drawing_number as "orderDrawingNumber",
+              ord.quantity as "orderQuantity"
+            FROM operations op
+            LEFT JOIN orders ord ON op."orderId" = ord.id
+            WHERE op."operationNumber" = $1 AND ord.drawing_number = $2
+          `, [operationNumber, drawingNumber]);
+          
+          return result[0] || null;
+        }
+        
+        return null;
+      }
+      
+      // Обычный поиск по числовому ID
       const result = await this.dataSource.query(`
         SELECT 
           op.id,

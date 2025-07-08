@@ -15,9 +15,10 @@ import { ActiveOperationsPage } from './pages/ActiveOperations';
 import { OperatorsPage } from './pages/Operators';
 import { TranslationsPage } from './pages/Translations';
 import { TranslationTestPage } from './pages/TranslationTest/TranslationTestPage';
-import { OrdersPage } from './pages/Orders/OrdersPage';
+import { KPIAnalyticsPage } from './pages/Analytics/KPIAnalyticsPage';
 import { ComprehensiveAnalyticsPage } from './pages/Analytics/ComprehensiveAnalyticsPage';
-import { KPIOEEPage } from './pages/KPIOEEPage';
+import ExcelImportPage from './pages/ExcelImport';
+import PdfTestFixPage from './pages/PdfTestFixPage';
 
 const App: React.FC = () => {
   return (
@@ -44,8 +45,7 @@ const App: React.FC = () => {
                   </ProtectedRoute>
                 }
               >
-                <Route index element={<Navigate to="/orders" replace />} />
-                <Route path="orders" element={<OrdersPage />} />
+                <Route index element={<Navigate to="/database" replace />} />
                 <Route path="database" element={<DatabasePage />} />
                 <Route path="production" element={<ProductionPage />} />
                 <Route path="shifts" element={<ShiftsPage />} />
@@ -54,8 +54,10 @@ const App: React.FC = () => {
                 <Route path="operators" element={<OperatorsPage />} />
                 <Route path="translations" element={<TranslationsPage />} />
                 <Route path="translation-test" element={<TranslationTestPage />} />
-                <Route path="analytics" element={<ComprehensiveAnalyticsPage />} />
-                <Route path="kpi-oee" element={<KPIOEEPage />} />
+                <Route path="analytics" element={<KPIAnalyticsPage />} />
+                <Route path="analytics-comprehensive" element={<ComprehensiveAnalyticsPage />} />
+                <Route path="excel-import" element={<ExcelImportPage />} />
+                <Route path="pdf-test" element={<PdfTestFixPage />} />
               </Route>
             </Routes>
           </Router>

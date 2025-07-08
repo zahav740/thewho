@@ -4,9 +4,10 @@
  * @dependencies: class-validator
  * @created: 2025-01-28
  */
-import { IsEnum, IsNotEmpty, IsNumber, IsString, Min } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { IsEnum, IsNotEmpty, IsNumber, IsString, Min, IsOptional, IsDate } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { MachineType } from '../../../database/entities/machine.entity';
+import { Type } from 'class-transformer';
 
 export class CreateMachineDto {
   @ApiProperty({ example: 'F1', description: 'Код станка' })
@@ -22,4 +23,20 @@ export class CreateMachineDto {
   @IsNumber()
   @Min(3)
   axes: number;
+
+  @ApiPropertyOptional({ description: 'Статус станка', default: 'idle' })
+  @IsOptional()
+  @IsString()
+  status?: string;
+
+  @ApiPropertyOptional({ description: 'Описание станка' })
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @ApiPropertyOptional({ description: 'Время назначения операции' })
+  @IsOptional()
+  @Type(() => Date)
+  @IsDate()
+  assignedAt?: Date;
 }

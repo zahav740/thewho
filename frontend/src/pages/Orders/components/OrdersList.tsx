@@ -11,6 +11,9 @@ import type { ColumnsType } from 'antd/es/table';
 import { OrderV2, OrdersV2Filter, OrdersV2Response, PriorityV2 } from '../../../types/order-v2.types';
 import { useTranslation } from '../../../i18n';
 import { DeleteMenuButton } from './DeleteMenuButton';
+import { PdfPreview } from '../../../components/common';
+import { PdfPreviewFixed } from '../../../components/common/PdfPreviewFixed';
+import { PdfPreviewSimple } from '../../../components/common/PdfPreviewSimple';
 import dayjs from 'dayjs';
 
 const { Search } = Input;
@@ -163,18 +166,24 @@ export const OrdersList: React.FC<OrdersListProps> = ({
       render: (text: string, record: OrderV2) => (
         <Space>
           <span style={{ fontWeight: 'bold', color: '#1890ff' }}>{text}</span>
-          {record.pdfPath && (
-            <Tooltip title="Открыть PDF чертеж">
-              <Button
-                type="link"
-                size="small"
-                icon={<FilePdfOutlined />}
-                href={`/api/orders/${record.id}/pdf`}
-                target="_blank"
-                className="pdf-button"
-              />
-            </Tooltip>
-          )}
+          <PdfPreviewSimple
+            orderId={record.id}
+            drawingNumber={record.drawingNumber}
+            pdfPath={record.pdfPath}
+            onPdfUpdate={(pdfPath) => {
+              // Обновляем заказ в списке
+              if (data?.data) {
+                const updatedData = data.data.map(order => 
+                  order.id === record.id ? { ...order, pdfPath } : order
+                );
+                // Можно добавить callback для обновления состояния
+              }
+              onRefresh?.(); // Обновляем список
+            }}
+            size="small"
+            showUpload={true}
+            showDelete={true}
+          />
         </Space>
       ),
     },

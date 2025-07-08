@@ -14,7 +14,7 @@ import {
   Button,
   Space,
   Table,
-  App,
+  message,
   Spin,
   Tabs,
   Divider,
@@ -29,10 +29,10 @@ import { pdfApi } from '../../../services/pdfApi';
 import { CreateOrderDto, Priority } from '../../../types/order.types';
 import { OperationType } from '../../../types/operation.types';
 import { useTranslation } from '../../../i18n';
-import { InlinePdfViewer } from '../../../components/common/InlinePdfViewer';
+import { InlinePdfViewerFixed as InlinePdfViewer } from '../../../components/common/InlinePdfViewer.FIXED';
 
 const { Option } = Select;
-const { TabPane } = Tabs;
+// const { TabPane } = Tabs; // Deprecated, replaced with items prop
 
 interface OrderFormProps {
   visible: boolean;
@@ -48,7 +48,6 @@ export const OrderForm: React.FC<OrderFormProps> = ({
   onSuccess,
 }) => {
   const { t, tWithParams } = useTranslation();
-  const { message } = App.useApp();
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('1');
   const [currentPdfPath, setCurrentPdfPath] = useState<string | undefined>();
@@ -58,7 +57,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
 
   console.log('🔧 OrderForm (ИСПРАВЛЕННАЯ PDF) rendered:', { visible, orderId, isEdit });
 
-  const { control, handleSubmit, reset, formState: { errors } } = useForm<CreateOrderDto>({
+  const { control, handleSubmit, reset, getValues, formState: { errors } } = useForm<CreateOrderDto>({
     defaultValues: {
       drawingNumber: '',
       quantity: 1,
@@ -84,8 +83,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
   // Загрузка данных в форму
   useEffect(() => {
     if (orderData && visible && isEdit) {
-      console.log('📥 Loading REAL data into form:', orderData);
-      console.log('🔍 Order operations from API:', orderData.operations);
+      console.log('📥 Loading data into form:', orderData);
       
       reset({
         drawingNumber: orderData.drawingNumber || '',
@@ -93,16 +91,14 @@ export const OrderForm: React.FC<OrderFormProps> = ({
         deadline: orderData.deadline || dayjs().format('YYYY-MM-DD'),
         priority: orderData.priority || Priority.MEDIUM,
         workType: orderData.workType || '',
-        // ✅ ИСПРАВЛЕНО: Загружаем ТОЛЬКО реальные операции из API, без моковых значений
-        operations: orderData.operations ? orderData.operations.map((op: any, index: number) => {
-          console.log(`📋 Loading operation ${index + 1}:`, op);
-          return {
-            operationNumber: op.operationNumber,
-            operationType: op.operationType,
-            machineAxes: op.machineAxes,
-            estimatedTime: op.estimatedTime,
-          };
-        }) : [], // Если нет операций - оставляем пустой массив
+        operations: orderData.operations && orderData.operations.length > 0 
+          ? orderData.operations.map((op: any) => ({
+              operationNumber: Number(op.operationNumber) || 1,
+              operationType: op.operationType || OperationType.MILLING,
+              machineAxes: Number(op.machineAxes) || 3,
+              estimatedTime: Number(op.estimatedTime) || 60,
+            }))
+          : [],
       });
 
       // Загружаем информацию о PDF
@@ -139,7 +135,10 @@ export const OrderForm: React.FC<OrderFormProps> = ({
       if (pdfFile && newOrder.id) {
         try {
           console.log('📁 Uploading PDF for new order:', newOrder.id);
-          await pdfApi.uploadPdf(newOrder.id, pdfFile);
+          // Извлекаем номер чертежа из формы
+          const formData = getValues();
+          const drawingNumber = formData.drawingNumber || `order_${newOrder.id}`;
+          await pdfApi.uploadPdf(newOrder.id, drawingNumber, pdfFile);
           message.success('PDF файл также загружен');
         } catch (error) {
           console.error('❌ PDF upload error for new order:', error);
@@ -166,7 +165,10 @@ export const OrderForm: React.FC<OrderFormProps> = ({
       if (pdfFile && orderId) {
         try {
           console.log('📁 Uploading PDF for updated order:', orderId);
-          await pdfApi.uploadPdf(orderId, pdfFile);
+          // Извлекаем номер чертежа из формы
+          const formData = getValues();
+          const drawingNumber = formData.drawingNumber || `order_${orderId}`;
+          await pdfApi.uploadPdf(orderId, drawingNumber, pdfFile);
           message.success('PDF файл также обновлен');
         } catch (error) {
           console.error('❌ PDF upload error for updated order:', error);
@@ -222,7 +224,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
       machineAxes: 3,
       estimatedTime: 60,
     };
-    console.log('➕ Adding NEW operation (not from database):', newOp);
+    console.log('➕ Adding operation:', newOp);
     append(newOp);
   };
 
@@ -248,14 +250,11 @@ export const OrderForm: React.FC<OrderFormProps> = ({
       console.log('🗑️ Removing PDF for order:', orderId);
       const result = await pdfApi.deletePdf(orderId);
       
-      if (result.success) {
-        setCurrentPdfPath(undefined);
-        queryClient.invalidateQueries({ queryKey: ['order', orderId] });
-        queryClient.invalidateQueries({ queryKey: ['orders'] });
-        message.success('PDF файл удален');
-      } else {
-        throw new Error(result.message);
-      }
+      // deletePdf теперь возвращает объект с success и message
+      setCurrentPdfPath(undefined);
+      queryClient.invalidateQueries({ queryKey: ['order', orderId] });
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      message.success(result.message || 'PDF файл удален');
     } catch (error) {
       console.error('❌ PDF remove error:', error);
       message.error('Ошибка при удалении PDF файла');
@@ -368,17 +367,20 @@ export const OrderForm: React.FC<OrderFormProps> = ({
       ]}
     >
       <Spin spinning={loading || orderLoading}>
-        <Tabs activeKey={activeTab} onChange={setActiveTab} type="card">
-          {/* Вкладка 1: Основная информация */}
-          <TabPane 
-            tab={
-              <Space>
-                <span>📋</span>
-                <span>Основная информация</span>
-              </Space>
-            } 
-            key="1"
-          >
+        <Tabs 
+          activeKey={activeTab} 
+          onChange={setActiveTab} 
+          type="card"
+          items={[
+            {
+              key: '1',
+              label: (
+                <Space>
+                  <span>📋</span>
+                  <span>Основная информация</span>
+                </Space>
+              ),
+              children: (
             <Form layout="vertical">
               <Form.Item
                 label={t('order_form.drawing_number')}
@@ -473,28 +475,27 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                 </div>
               </Form.Item>
             </Form>
-          </TabPane>
-
-          {/* Вкладка 2: PDF Документация (ИСПРАВЛЕННАЯ) */}
-          <TabPane 
-            tab={
-              <Space>
-                <FilePdfOutlined />
-                <span>PDF Документация</span>
-                {currentPdfPath && (
-                  <span style={{ 
-                    backgroundColor: '#52c41a', 
-                    color: 'white', 
-                    borderRadius: '50%', 
-                    width: '8px', 
-                    height: '8px', 
-                    display: 'inline-block' 
-                  }} />
-                )}
-              </Space>
-            } 
-            key="2"
-          >
+              )
+            },
+            {
+              key: '2',
+              label: (
+                <Space>
+                  <FilePdfOutlined />
+                  <span>PDF Документация</span>
+                  {currentPdfPath && (
+                    <span style={{ 
+                      backgroundColor: '#52c41a', 
+                      color: 'white', 
+                      borderRadius: '50%', 
+                      width: '8px', 
+                      height: '8px', 
+                      display: 'inline-block' 
+                    }} />
+                  )}
+                </Space>
+              ),
+              children: (
             <div style={{ padding: '16px 0' }}>
               <Alert
                 message="Диагностика PDF"
@@ -604,8 +605,10 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                 </div>
               )}
             </div>
-          </TabPane>
-        </Tabs>
+              )
+            }
+          ]}
+        />
       </Spin>
     </Modal>
   );

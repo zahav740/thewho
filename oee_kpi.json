@@ -1,0 +1,225 @@
+{
+    "workbook": {
+      "name": "OEE_KPI_Производство.xlsx",
+      "sheets": [
+        {
+          "name": "Данные",
+          "columns": [
+            {"name": "Дата", "width": 10},
+            {"name": "Станок", "width": 12},
+            {"name": "Оператор", "width": 12},
+            {"name": "Смена", "width": 12},
+            {"name": "Наладка", "width": 12},
+            {"name": "Производство", "width": 12},
+            {"name": "Простои", "width": 12},
+            {"name": "План_шт", "width": 12},
+            {"name": "Факт_шт", "width": 12},
+            {"name": "Брак", "width": 12},
+            {"name": "Годные", "width": 12},
+            {"name": "Доступность", "width": 15},
+            {"name": "Производительность", "width": 15},
+            {"name": "Качество", "width": 15},
+            {"name": "OEE", "width": 15},
+            {"name": "Доля_наладки", "width": 15},
+            {"name": "Качество_наладки", "width": 15},
+            {"name": "KPI", "width": 15}
+          ],
+          "header_format": {
+            "row": 1,
+            "font_bold": true,
+            "font_size": 11,
+            "fill_color": "lightblue",
+            "alignment": "center"
+          },
+          "formulas": [
+            {"cell": "K2", "value": "=I2-J2"},
+            {"cell": "L2", "value": "=(D2-G2)/D2*100"},
+            {"cell": "M2", "value": "=IF(H2>0,I2/H2*100,0)"},
+            {"cell": "N2", "value": "=IF(I2>0,K2/I2*100,0)"},
+            {"cell": "O2", "value": "=L2*M2*N2/10000"},
+            {"cell": "P2", "value": "=E2/D2*100"},
+            {"cell": "Q2", "value": "=IF(I2>0,(I2-J2)/I2*100,0)"},
+            {"cell": "R2", "value": "=O2*0.5+(100-P2)*0.2+Q2*0.15+90*0.15"}
+          ],
+          "formula_copy": {
+            "range": "K2:R2",
+            "copy_to": "K3:R50"
+          },
+          "conditional_formatting": [
+            {
+              "range": "O2:O50",
+              "rules": [
+                {"type": "cell_value", "operator": ">=", "value": 80, "format": {"fill_color": "00FF00"}},
+                {"type": "cell_value", "operator": "between", "value": [70, 79], "format": {"fill_color": "FFFF00"}},
+                {"type": "cell_value", "operator": "<", "value": 70, "format": {"fill_color": "FF0000"}}
+              ]
+            },
+            {
+              "range": "P2:P50",
+              "rules": [
+                {"type": "cell_value", "operator": "<=", "value": 40, "format": {"fill_color": "00FF00"}},
+                {"type": "cell_value", "operator": "between", "value": [41, 60], "format": {"fill_color": "FFFF00"}},
+                {"type": "cell_value", "operator": ">", "value": 60, "format": {"fill_color": "FF0000"}}
+              ]
+            },
+            {
+              "range": "N2:N50",
+              "rules": [
+                {"type": "cell_value", "operator": ">=", "value": 95, "format": {"fill_color": "00FF00"}},
+                {"type": "cell_value", "operator": "between", "value": [90, 94], "format": {"fill_color": "FFFF00"}},
+                {"type": "cell_value", "operator": "<", "value": 90, "format": {"fill_color": "FF0000"}}
+              ]
+            },
+            {
+              "range": "R2:R50",
+              "rules": [
+                {"type": "cell_value", "operator": ">=", "value": 85, "format": {"fill_color": "00FF00"}},
+                {"type": "cell_value", "operator": "between", "value": [75, 84], "format": {"fill_color": "FFFF00"}},
+                {"type": "cell_value", "operator": "<", "value": 75, "format": {"fill_color": "FF0000"}}
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Ввод_данных",
+          "content": [
+            {"cell": "A1", "value": "ФОРМА ВВОДА ДАННЫХ ЗА СМЕНУ"},
+            {"cell": "A3", "value": "Дата:"},
+            {"cell": "A4", "value": "Станок:"},
+            {"cell": "A5", "value": "Оператор:"},
+            {"cell": "A7", "value": "ВРЕМЕННЫЕ ДАННЫЕ (в минутах):"},
+            {"cell": "A8", "value": "Продолжительность смены:"},
+            {"cell": "A9", "value": "Время наладки:"},
+            {"cell": "A10", "value": "Время производства:"},
+            {"cell": "A11", "value": "Время простоев:"},
+            {"cell": "A13", "value": "ПРОИЗВОДСТВЕННЫЕ ДАННЫЕ:"},
+            {"cell": "A14", "value": "Запланировано деталей:"},
+            {"cell": "A15", "value": "Фактически произведено:"},
+            {"cell": "A16", "value": "Из них брак:"},
+            {"cell": "A18", "value": "КНОПКА \"ДОБАВИТЬ ЗАПИСЬ\""},
+            {"cell": "C8", "value": 480}
+          ],
+          "data_validation": [
+            {
+              "cell": "C4",
+              "type": "list",
+              "source": "CNC-1,CNC-2,CNC-3,CNC-4,CNC-5,CNC-6,CNC-7"
+            },
+            {
+              "cell": "C5",
+              "type": "list",
+              "source": "Профи-фрезеровщик,Средний специалист,Слабый фрезеровщик,Помощник,Новый токарь"
+            }
+          ],
+          "button": {
+            "cell": "A18",
+            "name": "AddRecord",
+            "macro": "AddRecord"
+          }
+        },
+        {
+          "name": "Сводка",
+          "columns": [
+            {"name": "Станок", "width": 12},
+            {"name": "Ср_OEE", "width": 12},
+            {"name": "Ср_Доступность", "width": 12},
+            {"name": "Ср_Производительность", "width": 12},
+            {"name": "Ср_Качество", "width": 12},
+            {"name": "Ср_Доля_наладки", "width": 12},
+            {"name": "Общий_KPI", "width": 12},
+            {"name": "Статус", "width": 12}
+          ],
+          "content": [
+            {"cell": "A2", "value": "CNC-1"},
+            {"cell": "A3", "value": "CNC-2"},
+            {"cell": "A4", "value": "CNC-3"},
+            {"cell": "A5", "value": "CNC-4"},
+            {"cell": "A6", "value": "CNC-5"},
+            {"cell": "A7", "value": "CNC-6"},
+            {"cell": "A8", "value": "CNC-7"}
+          ],
+          "formulas": [
+            {"cell": "B2", "value": "=AVERAGEIF(Данные!B:B,\"CNC-1\",Данные!O:O)"},
+            {"cell": "C2", "value": "=AVERAGEIF(Данные!B:B,\"CNC-1\",Данные!L:L)"},
+            {"cell": "D2", "value": "=AVERAGEIF(Данные!B:B,\"CNC-1\",Данные!M:M)"},
+            {"cell": "E2", "value": "=AVERAGEIF(Данные!B:B,\"CNC-1\",Данные!N:N)"},
+            {"cell": "F2", "value": "=AVERAGEIF(Данные!B:B,\"CNC-1\",Данные!P:P)"},
+            {"cell": "G2", "value": "=AVERAGEIF(Данные!B:B,\"CNC-1\",Данные!R:R)"},
+            {"cell": "H2", "value": "=IF(G2>=85,\"🏆 Отлично\",IF(G2>=75,\"✅ Хорошо\",IF(G2>=65,\"⚠️ Средне\",\"❌ Плохо\")))"}
+          ],
+          "formula_copy": {
+            "range": "B2:H2",
+            "copy_to": "B3:H8",
+            "replacements": [
+              {"row": 3, "replace": "CNC-1", "with": "CNC-2"},
+              {"row": 4, "replace": "CNC-1", "with": "CNC-3"},
+              {"row": 5, "replace": "CNC-1", "with": "CNC-4"},
+              {"row": 6, "replace": "CNC-1", "with": "CNC-5"},
+              {"row": 7, "replace": "CNC-1", "with": "CNC-6"},
+              {"row": 8, "replace": "CNC-1", "with": "CNC-7"}
+            ]
+          }
+        },
+        {
+          "name": "Dashboard",
+          "content": [
+            {"cell": "A1", "value": "DASHBOARD ПРОИЗВОДСТВА"},
+            {"cell": "A3", "value": "Дата обновления:"},
+            {"cell": "C3", "value": "=TODAY()"},
+            {"cell": "A5", "value": "📊 ОБЩИЕ ПОКАЗАТЕЛИ"},
+            {"cell": "A6", "value": "Средний OEE по цеху:"},
+            {"cell": "A7", "value": "Средний OEE по цеху:"},
+            {"cell": "A8", "value": "Лучший станок:"},
+            {"cell": "A9", "value": "Худший станок:"},
+            {"cell": "A11", "value": "🎯 ДОСТИЖЕНИЕ ЦЕЛЕЙ"},
+            {"cell": "A12", "value": "OEE > 80%:"},
+            {"cell": "A13", "value": "KPI > 75%:"},
+            {"cell": "A14", "value": "Доля наладки < 50%:"},
+            {"cell": "A16", "value": "⚠️ ПРОБЛЕМНЫЕ ЗОНЫ"},
+            {"cell": "A17", "value": "Высокая доля наладки >60%:"},
+            {"cell": "A18", "value": "Низкое качество <90%:"},
+            {"cell": "A19", "value": "Низкий OEE <70%:"}
+          ],
+          "formulas": [
+            {"cell": "C6", "value": "=ROUND(AVERAGE(Данные!O:O),1)&\"%\""},
+            {"cell": "C7", "value": "=ROUND(AVERAGE(Данные!R:R),1)&\"%\""},
+            {"cell": "C8", "value": "=INDEX(Данные!B:B,MATCH(MAX(Данные!O:O),Данные!O:O,0))"},
+            {"cell": "C9", "value": "=INDEX(Данные!B:B,MATCH(MIN(Данные!O:O),Данные!O:O,0))"},
+            {"cell": "C12", "value": "=ROUND(COUNTIF(Данные!O:O,\">80\")/COUNTA(Данные!O:O)*100,0)&\"%\""},
+            {"cell": "C13", "value": "=ROUND(COUNTIF(Данные!R:R,\">75\")/COUNTA(Данные!R:R)*100,0)&\"%\""},
+            {"cell": "C14", "value": "=ROUND(COUNTIF(Данные!P:P,\"<50\")/COUNTA(Данные!P:P)*100,0)&\"%\""},
+            {"cell": "C17", "value": "=COUNTIF(Данные!P:P,\">60\")&\" случаев\""},
+            {"cell": "C18", "value": "=COUNTIF(Данные!N:N,\"<90\")&\" случаев\""},
+            {"cell": "C19", "value": "=COUNTIF(Данные!O:O,\"<70\")&\" случаев\""}
+          ]
+        },
+        {
+          "name": "Настройки",
+          "content": [
+            {"cell": "A1", "value": "НАСТРОЙКИ И СПРАВОЧНИКИ"},
+            {"cell": "A3", "value": "СПИСОК СТАНКОВ:"},
+            {"cell": "A4", "value": "CNC-1 (Фрезерный)"},
+            {"cell": "A5", "value": "CNC-2 (Фрезерный)"},
+            {"cell": "A6", "value": "CNC-3 (Фрезерный)"},
+            {"cell": "A7", "value": "CNC-4 (Фрезерный)"},
+            {"cell": "A8", "value": "CNC-5 (Фрезерный)"},
+            {"cell": "A9", "value": "CNC-6 (Токарный)"},
+            {"cell": "A10", "value": "CNC-7 (Токарный)"},
+            {"cell": "C3", "value": "ОПЕРАТОРЫ:"},
+            {"cell": "C4", "value": "Профи-фрезеровщик"},
+            {"cell": "C5", "value": "Средний специалист"},
+            {"cell": "C6", "value": "Слабый фрезеровщик"},
+            {"cell": "C7", "value": "Помощник"},
+            {"cell": "C8", "value": "Новый токарь"},
+            {"cell": "E3", "value": "ЦЕЛЕВЫЕ ПОКАЗАТЕЛИ:"},
+            {"cell": "E4", "value": "OEE цель: 80%"},
+            {"cell": "E5", "value": "Доступность цель: 95%"},
+            {"cell": "E6", "value": "Производительность цель: 90%"},
+            {"cell": "E7", "value": "Качество цель: 95%"},
+            {"cell": "E8", "value": "Доля наладки цель: <50%"},
+            {"cell": "E9", "value": "KPI цель: 85%"}
+          ]
+        }
+      ]
+    }
+  }

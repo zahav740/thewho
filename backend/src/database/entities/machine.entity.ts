@@ -44,6 +44,12 @@ export class Machine {
   @Column({ name: 'assignedAt', nullable: true })
   assignedAt: Date;
 
+  @Column({ name: 'status', default: 'idle', nullable: true })
+  status: string;
+
+  @Column({ name: 'description', nullable: true })
+  description: string;
+
   // УБРАНА СВЯЗЬ С ОПЕРАЦИЯМИ - она не используется в текущей системе
   // @OneToMany(() => Operation, (operation) => operation.machineEntity, { nullable: true })
   // operations: Operation[];

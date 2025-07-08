@@ -16,14 +16,14 @@ export class OrdersFilterDto {
   @Type(() => Number)
   @IsNumber()
   @Min(1)
-  page?: number = 1;
+  page?: number;
 
-  @ApiPropertyOptional({ example: 100, description: 'Количество записей на странице' })
+  @ApiPropertyOptional({ example: 10, description: 'Количество записей на странице' })
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
   @Min(1)
-  limit?: number = 1000; // Увеличиваем лимит до 1000 заказов
+  limit?: number;
 
   @ApiPropertyOptional({ example: '2', description: 'Фильтр по приоритету (строки "1", "2", "3", "4")' })
   @IsOptional()
@@ -41,12 +41,12 @@ export class OrdersFilterDto {
   @IsString()
   status?: string;
 
-  @ApiPropertyOptional({ example: '2024-01-01', description: 'Фильтр по дедлайну от' })
+  @ApiPropertyOptional({ example: '2025-01-01', description: 'Дедлайн от (включительно)' })
   @IsOptional()
   @IsString()
   deadlineFrom?: string;
 
-  @ApiPropertyOptional({ example: '2024-12-31', description: 'Фильтр по дедлайну до' })
+  @ApiPropertyOptional({ example: '2025-12-31', description: 'Дедлайн до (включительно)' })
   @IsOptional()
   @IsString()
   deadlineTo?: string;

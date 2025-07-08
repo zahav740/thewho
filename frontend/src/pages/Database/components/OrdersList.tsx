@@ -60,14 +60,12 @@ export const OrdersList: React.FC<OrdersListProps> = ({
 
   const handleDeleteAll = async () => {
     try {
-      console.log('🗑️ Frontend: Отправляем запрос на удаление всех заказов');
       const result = await ordersApi.deleteAll();
-      console.log('✅ Frontend: Успешно удалены все заказы:', result);
       message.success(tWithParams('message.success.deleted_all', { count: result.deleted }));
       setSelectedRowKeys([]);
       onRefresh?.();
     } catch (error) {
-      console.error('❌ Frontend: Ошибка удаления всех заказов:', error);
+      console.error('Error deleting all orders:', error);
       message.error(t('message.error.delete_all'));
     }
   };

@@ -14,7 +14,7 @@ import { MachinesController } from './machines.controller';
 import { MachinesService } from './machines.service';
 import { MachinesStatusController } from './machines-status.controller';
 import { MachineAssignmentController } from './machine-assignment.controller';
-import { MachinesEnhancedController } from './machines.controller.enhanced';
+import { MachinesEnhancedController } from './machines-enhanced.controller';
 
 @Module({
   imports: [

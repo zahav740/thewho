@@ -6,7 +6,7 @@
  */
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { Machine, MachineType } from '../../database/entities/machine.entity';
 import { CreateMachineDto } from './dto/create-machine.dto';
 import { UpdateMachineDto } from './dto/update-machine.dto';
@@ -16,6 +16,7 @@ export class MachinesService {
   constructor(
     @InjectRepository(Machine)
     private readonly machineRepository: Repository<Machine>,
+    private readonly dataSource: DataSource,
   ) {}
 
   async findAll(): Promise<Machine[]> {
@@ -30,6 +31,68 @@ export class MachinesService {
       return machines;
     } catch (error) {
       console.error('MachinesService.findAll Ошибка:', error);
+      throw error;
+    }
+  }
+
+  async findAllWithOperations(): Promise<any[]> {
+    try {
+      console.log('MachinesService.findAllWithOperations: Получение станков с активными операциями');
+      
+      const query = `
+        SELECT 
+          m.id,
+          m.code as "machineName",
+          m.type,
+          m.axes,
+          m."isActive",
+          NOT m."isOccupied" as "isAvailable",
+          m."currentOperation",
+          m."assignedAt" as "lastFreedAt",
+          m.status,
+          m.description,
+          m."createdAt",
+          m."updatedAt",
+          -- Операция данные
+          o.id as "currentOperationId",
+          CASE 
+            WHEN o.id IS NOT NULL THEN 
+              JSON_BUILD_OBJECT(
+                'operationNumber', o."operationNumber",
+                'operationType', o.operationtype,
+                'estimatedTime', o."estimatedTime",
+                'status', o.status,
+                'orderId', o."orderId",
+                'orderDrawingNumber', ord.drawing_number,
+                'orderQuantity', ord.quantity,
+                'orderPriority', ord.priority,
+                'orderDeadline', ord.deadline,
+                'orderWorkType', ord."workType",
+                'producedQuantity', COALESCE(o."actualQuantity", 0)
+              )
+            ELSE NULL
+          END as "currentOperationDetails"
+        FROM machines m
+        LEFT JOIN operations o ON m.id = o."machineId" AND o.status = 'IN_PROGRESS'
+        LEFT JOIN orders ord ON o."orderId" = ord.id
+        WHERE m."isActive" = true
+        ORDER BY m.code ASC
+      `;
+      
+      const machines = await this.dataSource.query(query);
+      
+      console.log(`MachinesService.findAllWithOperations: Найдено ${machines.length} станков`);
+      
+      // Логируем станки с операциями для отладки
+      const withOperations = machines.filter(m => m.currentOperationDetails);
+      console.log(`MachinesService.findAllWithOperations: Станки с активными операциями: ${withOperations.length}`);
+      withOperations.forEach(m => {
+        console.log(`  • ${m.machineName}: операция ${m.currentOperationDetails.operationNumber}, заказ ${m.currentOperationDetails.orderDrawingNumber}`);
+      });
+      
+      return machines;
+    } catch (error) {
+      console.error('MachinesService.findAllWithOperations Ошибка:', error);
       throw error;
     }
   }

@@ -12,7 +12,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Not, IsNull } from 'typeorm';
+import { Repository, Not, IsNull, In } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { Logger } from '@nestjs/common';
 import { Order } from '../../database/entities/order.entity';
@@ -418,71 +418,33 @@ export class OrdersService {
   }
 
   async removeAll(): Promise<number> {
-    this.logger.log('🗑️ SERVICE: Starting removeAll operation');
-
     try {
-      // Сначала узнаем сколько заказов есть
-      const countBefore = await this.orderRepository.count();
-      this.logger.log(`📊 SERVICE: Found ${countBefore} orders before deletion`);
+      // Сначала получаем все ID заказов
+      const allOrders = await this.orderRepository.find({ select: ['id'] });
       
-      if (countBefore === 0) {
-        this.logger.log('ℹ️ SERVICE: No orders to delete');
-        return 0;
-      }
-
-      // Получаем все ID заказов
-      const orders = await this.orderRepository.find({ select: ['id'] });
-      const orderIds = orders.map(order => order.id);
-      
-      if (orderIds.length === 0) {
-        this.logger.log('ℹ️ SERVICE: No order IDs found - database may be empty');
-        return 0;
-      }
-      
-      this.logger.log(`📋 SERVICE: Order IDs to delete: ${orderIds.join(', ')}`);
-
-      // Удаляем все операции сначала (из-за FK ограничений)
-      if (orderIds.length > 0) {
-        const operationsResult = await this.operationRepository
-          .createQueryBuilder()
-          .delete()
-          .from(Operation)
-          .where('orderId IN (:...orderIds)', { orderIds })
-          .execute();
+      if (allOrders.length > 0) {
+        const orderIds = allOrders.map(order => order.id);
         
-        this.logger.log(`🔧 SERVICE: Deleted ${operationsResult.affected || 0} operations`);
+        // Сначала удаляем все операции, связанные с заказами
+        this.logger.log(`Deleting operations for ${orderIds.length} orders`);
+        await this.operationRepository.delete({ order: { id: In(orderIds) } });
         
-        // Теперь удаляем все заказы
-        const ordersResult = await this.orderRepository
-          .createQueryBuilder()
-          .delete()
-          .from(Order)
-          .where('id IN (:...orderIds)', { orderIds })
-          .execute();
+        // Затем удаляем сами заказы
+        this.logger.log(`Deleting ${orderIds.length} orders`);
+        const result = await this.orderRepository.delete(orderIds);
         
-        const deletedCount = ordersResult.affected || 0;
-        
-        this.logger.log(`✅ SERVICE: Successfully deleted ${deletedCount} orders`);
-        
-        // Проверяем что действительно удалили все
-        const countAfter = await this.orderRepository.count();
-        this.logger.log(`📊 SERVICE: Orders remaining after deletion: ${countAfter}`);
-        
+        const deletedCount = result.affected || allOrders.length;
+        this.logger.log(`All orders removed successfully: ${deletedCount} deleted`);
         return deletedCount;
-      } else {
-        this.logger.log('ℹ️ SERVICE: No orders to delete (empty result)');
-        return 0;
       }
+      
+      this.logger.log('No orders to delete');
+      return 0;
     } catch (error) {
-      this.logger.error(`❌ SERVICE: Error removing all orders:`, error);
-      this.logger.error(`❌ SERVICE: Error details: ${error.message}`);
-      if (error.stack) {
-        this.logger.error(`❌ SERVICE: Error stack: ${error.stack}`);
-      }
-      throw new InternalServerErrorException(`Ошибка удаления всех заказов: ${error.message}`);
+      this.logger.error(`Error removing all orders: ${error.message}`);
+      throw new InternalServerErrorException('Ошибка удаления всех заказов');
     }
   }
-
   async uploadPdf(id: string, filename: string): Promise<EnrichedOrder> {
     this.logger.log(`Uploading PDF for order ${id}: ${filename}`);
 

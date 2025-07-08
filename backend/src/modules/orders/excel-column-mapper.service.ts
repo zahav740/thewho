@@ -6,8 +6,7 @@
  */
 import { Injectable, BadRequestException } from '@nestjs/common';
 import * as ExcelJS from 'exceljs';
-import type { MulterFile } from '../../types/express';
-
+import type { Express } from 'express';
 
 export interface ExcelColumnInfo {
   columnIndex: number;
@@ -61,7 +60,7 @@ export class ExcelColumnMapperService {
   /**
    * Анализ структуры Excel файла для выбора колонок
    */
-  async analyzeExcelStructure(file: MulterFile): Promise<ExcelFileAnalysis> {
+  async analyzeExcelStructure(file: Express.Multer.File): Promise<ExcelFileAnalysis> {
     console.log('🔍 АНАЛИЗ СТРУКТУРЫ EXCEL:', {
       fileName: file.originalname,
       size: file.size,
@@ -238,29 +237,95 @@ export class ExcelColumnMapperService {
     return { suggestedMapping: null, confidence: 0 };
   }
 
+  private isDrawingNumberLike(header: string, values: string[]): boolean {
+    const keywords = ['номер', 'чертеж', 'drawing', 'number', 'код', 'артикул'];
+    const hasKeyword = keywords.some(kw => header.includes(kw));
+    
+    // Проверяем формат значений (обычно содержат буквы и цифры)
+    const hasAlphaNum = values.some(v => /[a-zA-Zа-яА-Я]/.test(v) && /\d/.test(v));
+    
+    return hasKeyword || hasAlphaNum;
+  }
+
+  private isQuantityLike(header: string, values: string[], type: 'text' | 'number' | 'date' | 'unknown'): boolean {
+    const keywords = ['количество', 'кол-во', 'qty', 'quantity', 'шт'];
+    const hasKeyword = keywords.some(kw => header.includes(kw));
+    
+    // Должно быть числовым типом и разумными значениями
+    const isReasonableQty = type === 'number' && values.every(v => {
+      const num = Number(v);
+      return !isNaN(num) && num > 0 && num < 10000;
+    });
+    
+    return hasKeyword || isReasonableQty;
+  }
+
+  private isDeadlineLike(header: string, type: 'text' | 'number' | 'date' | 'unknown'): boolean {
+    const keywords = ['срок', 'дедлайн', 'deadline', 'дата', 'date', 'до'];
+    const hasKeyword = keywords.some(kw => header.includes(kw));
+    
+    return hasKeyword || type === 'date';
+  }
+
+  private isPriorityLike(header: string, values: string[]): boolean {
+    const keywords = ['приоритет', 'priority', 'важность'];
+    const hasKeyword = keywords.some(kw => header.includes(kw));
+    
+    const hasPriorityValues = values.some(v => 
+      ['высокий', 'низкий', 'средний', 'критический', 'high', 'low', 'medium', 'critical'].includes(v.toLowerCase())
+    );
+    
+    return hasKeyword || hasPriorityValues;
+  }
+
+  private isWorkTypeLike(header: string): boolean {
+    const keywords = ['тип', 'работа', 'type', 'work', 'описание', 'description'];
+    return keywords.some(kw => header.includes(kw));
+  }
+
+  private isOperationLike(header: string, values: string[]): boolean {
+    const keywords = ['операция', 'operation', 'фрез', 'токар', 'сверл', 'milling', 'turning'];
+    const hasKeyword = keywords.some(kw => header.includes(kw));
+    
+    const hasOperationValues = values.some(v => 
+      ['фрезерная', 'токарная', 'сверление', 'milling', 'turning', 'drilling'].includes(v.toLowerCase())
+    );
+    
+    return hasKeyword || hasOperationValues;
+  }
+
+  /**
+   * Преобразование номера колонки в букву
+   */
+  private numberToLetter(num: number): string {
+    let result = '';
+    while (num > 0) {
+      num--;
+      result = String.fromCharCode(65 + (num % 26)) + result;
+      num = Math.floor(num / 26);
+    }
+    return result;
+  }
+
   /**
    * Импорт данных с пользовательским маппингом
    */
-  async importWithMapping(file: MulterFile, settings: ExcelImportSettings): Promise<any[]> {
-    console.log('📊 ИМПОРТ С ПОЛЬЗОВАТЕЛЬСКИМ МАППИНГОМ:', {
-      fileName: file.originalname,
-      settings: JSON.stringify(settings)
-    });
-
-    if (!file || !file.buffer) {
-      throw new BadRequestException('Файл не предоставлен или поврежден');
-    }
+  async importWithMapping(
+    file: Express.Multer.File, 
+    settings: ExcelImportSettings
+  ): Promise<any[]> {
+    console.log('📥 ИМПОРТ С МАППИНГОМ:', settings);
 
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(file.buffer);
 
-    const worksheet = workbook.worksheets[settings.sheetIndex];
+    const worksheet = workbook.getWorksheet(settings.sheetIndex + 1); // ExcelJS использует 1-based индексы
     if (!worksheet) {
-      throw new BadRequestException(`Лист с индексом ${settings.sheetIndex} не найден`);
+      throw new BadRequestException('Выбранный лист не найден');
     }
 
-    const orders: any[] = [];
     const startRow = settings.startRow || (settings.hasHeaders ? 2 : 1);
+    const orders = [];
 
     for (let rowIndex = startRow; rowIndex <= worksheet.rowCount; rowIndex++) {
       const row = worksheet.getRow(rowIndex);
@@ -268,40 +333,13 @@ export class ExcelColumnMapperService {
       // Пропускаем пустые строки
       if (this.isEmptyRow(row)) continue;
 
-      const order: any = {};
-
-      // Маппим основные поля
-      if (settings.columnMapping.drawingNumber) {
-        order.drawingNumber = row.getCell(settings.columnMapping.drawingNumber).value?.toString()?.trim();
-      }
-      
-      if (settings.columnMapping.quantity) {
-        const qty = row.getCell(settings.columnMapping.quantity).value;
-        order.quantity = typeof qty === 'number' ? qty : parseInt(qty?.toString() || '1', 10) || 1;
-      }
-      
-      if (settings.columnMapping.deadline) {
-        order.deadline = this.parseDate(row.getCell(settings.columnMapping.deadline).value);
-      }
-      
-      if (settings.columnMapping.priority) {
-        order.priority = this.parsePriority(row.getCell(settings.columnMapping.priority).value?.toString());
-      }
-      
-      if (settings.columnMapping.workType) {
-        order.workType = row.getCell(settings.columnMapping.workType).value?.toString()?.trim() || 'CNC';
-      }
-
-      // Операции (если настроены)
-      if (settings.columnMapping.operations) {
-        order.operations = this.parseOperationsFromMapping(row, settings.columnMapping.operations);
-      } else {
-        order.operations = [];
-      }
-
-      // Пропускаем заказы без номера чертежа
-      if (order.drawingNumber) {
-        orders.push(order);
+      try {
+        const order = this.mapRowToOrder(row, settings.columnMapping);
+        if (order) {
+          orders.push(order);
+        }
+      } catch (error) {
+        console.warn(`Ошибка в строке ${rowIndex}:`, error.message);
       }
     }
 
@@ -310,11 +348,11 @@ export class ExcelColumnMapperService {
   }
 
   /**
-   * Проверка пустой строки
+   * Проверка на пустую строку
    */
   private isEmptyRow(row: ExcelJS.Row): boolean {
-    for (let colIndex = 1; colIndex <= row.cellCount; colIndex++) {
-      const cellValue = row.getCell(colIndex).value;
+    for (let i = 1; i <= Math.min(10, row.cellCount); i++) {
+      const cellValue = row.getCell(i).value;
       if (cellValue !== null && cellValue !== undefined && String(cellValue).trim() !== '') {
         return false;
       }
@@ -322,11 +360,84 @@ export class ExcelColumnMapperService {
     return true;
   }
 
-  private parseOperationsFromMapping(row: ExcelJS.Row, opsConfig: any): any[] {
-    const operations: any[] = [];
-    const { startColumn, columnsPerOperation, maxOperations } = opsConfig;
+  /**
+   * Маппинг строки в объект заказа согласно настройкам
+   */
+  private mapRowToOrder(row: ExcelJS.Row, mapping: ColumnMapping): any | null {
+    const order: any = {};
 
-    for (let opIndex = 0; opIndex < (maxOperations || 10); opIndex++) {
+    // Номер чертежа (обязательное поле)
+    if (mapping.drawingNumber) {
+      const drawingNumber = row.getCell(mapping.drawingNumber).value?.toString()?.trim();
+      if (!drawingNumber) return null;
+      order.drawingNumber = drawingNumber;
+    } else {
+      return null; // Без номера чертежа не создаем заказ
+    }
+
+    // Количество
+    if (mapping.quantity) {
+      const quantity = parseInt(row.getCell(mapping.quantity).value?.toString() || '1', 10);
+      order.quantity = isNaN(quantity) ? 1 : quantity;
+    } else {
+      order.quantity = 1;
+    }
+
+    // Срок
+    if (mapping.deadline) {
+      const deadlineValue = row.getCell(mapping.deadline).value;
+      order.deadline = this.parseDate(deadlineValue);
+    } else {
+      // Дедлайн через месяц по умолчанию
+      const defaultDeadline = new Date();
+      defaultDeadline.setMonth(defaultDeadline.getMonth() + 1);
+      order.deadline = defaultDeadline;
+    }
+
+    // Приоритет
+    if (mapping.priority) {
+      const priorityValue = row.getCell(mapping.priority).value?.toString();
+      order.priority = this.parsePriority(priorityValue);
+    } else {
+      order.priority = 'MEDIUM';
+    }
+
+    // Тип работы
+    if (mapping.workType) {
+      const workType = row.getCell(mapping.workType).value?.toString()?.trim();
+      order.workType = workType || 'Не указан';
+    } else {
+      order.workType = 'Не указан';
+    }
+
+    // Операции
+    order.operations = [];
+    if (mapping.operations) {
+      const operations = this.parseOperationsFromRow(row, mapping.operations);
+      order.operations = operations;
+    }
+
+    // Если операций нет, добавляем стандартную
+    if (order.operations.length === 0) {
+      order.operations.push({
+        operationNumber: 1,
+        operationType: 'MILLING',
+        estimatedTime: 60,
+        machineAxes: 3
+      });
+    }
+
+    return order;
+  }
+
+  /**
+   * Парсинг операций из строки
+   */
+  private parseOperationsFromRow(row: ExcelJS.Row, operationsConfig: ColumnMapping['operations']): any[] {
+    const operations = [];
+    const { startColumn, columnsPerOperation, maxOperations } = operationsConfig;
+
+    for (let opIndex = 0; opIndex < maxOperations; opIndex++) {
       const baseCol = startColumn + (opIndex * columnsPerOperation);
       
       // Номер операции
@@ -354,59 +465,6 @@ export class ExcelColumnMapperService {
     }
 
     return operations;
-  }
-
-  private isDrawingNumberLike(header: string, values: string[]): boolean {
-    const keywords = ['номер', 'чертеж', 'drawing', 'number', 'код', 'артикул'];
-    const hasKeyword = keywords.some(kw => header.includes(kw));
-    
-    // Проверяем формат значений (обычно содержат буквы и цифры)
-    const hasAlphaNum = values.some(v => /[a-zA-Zа-яА-Я]/.test(v) && /\d/.test(v));
-    
-    return hasKeyword || hasAlphaNum;
-  }
-
-  private isDeadlineLike(header: string, type: string): boolean {
-    const keywords = ['срок', 'дата', 'deadline', 'date', 'готовность'];
-    return keywords.some(kw => header.includes(kw)) || type === 'date';
-  }
-
-  private isPriorityLike(header: string, values: string[]): boolean {
-    const keywords = ['приоритет', 'priority', 'важность'];
-    const hasKeyword = keywords.some(kw => header.includes(kw));
-    
-    const priorityValues = values.some(v => 
-      ['critical', 'high', 'medium', 'low', 'критичный', 'высокий', 'средний', 'низкий'].includes(v.toLowerCase())
-    );
-    
-    return hasKeyword || priorityValues;
-  }
-
-  private isWorkTypeLike(header: string): boolean {
-    const keywords = ['тип', 'type', 'работа', 'work', 'операция'];
-    return keywords.some(kw => header.includes(kw));
-  }
-
-  private isOperationLike(header: string, values: string[]): boolean {
-    const keywords = ['операция', 'operation', 'оп', 'op'];
-    return keywords.some(kw => header.includes(kw));
-  }
-
-  private numberToLetter(num: number): string {
-    let result = '';
-    while (num > 0) {
-      num--;
-      result = String.fromCharCode(65 + (num % 26)) + result;
-      num = Math.floor(num / 26);
-    }
-    return result;
-  }
-
-  private isQuantityLike(header: string, values: string[], type: 'text' | 'number' | 'date' | 'unknown'): boolean {
-    const keywords = ['количество', 'кол-во', 'qty', 'quantity', 'шт'];
-    const hasKeyword = keywords.some(kw => header.includes(kw));
-    
-    return hasKeyword && type === 'number';
   }
 
   /**

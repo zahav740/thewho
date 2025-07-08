@@ -6,8 +6,7 @@
  */
 import { Injectable, BadRequestException } from '@nestjs/common';
 import * as ExcelJS from 'exceljs';
-import type { MulterFile } from '../../types/express';
-
+import type { Express } from 'express';
 
 export interface ExcelOrderPreview {
   rowNumber: number;
@@ -68,7 +67,7 @@ export class ExcelPreviewService {
   /**
    * ОСНОВНОЙ МЕТОД: Детальный анализ Excel файла с превью всех заказов
    */
-  async analyzeExcelFile(file: MulterFile): Promise<ExcelPreviewResult> {
+  async analyzeExcelFile(file: Express.Multer.File): Promise<ExcelPreviewResult> {
     console.log('🔍 АНАЛИЗ EXCEL: Начало детального анализа файла:', {
       originalname: file.originalname,
       size: file.size,

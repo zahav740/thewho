@@ -6,7 +6,7 @@
  */
 import React from 'react';
 import { message } from 'antd';
-import ImprovedExcelUploader from './ImprovedExcelUploader';
+import ModernExcelUploader from './ModernExcelUploader';
 
 const ExcelUploaderExample: React.FC = () => {
   // Обработчик загрузки файлов
@@ -66,7 +66,7 @@ const ExcelUploaderExample: React.FC = () => {
 
   return (
     <div style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto' }}>
-      <ImprovedExcelUploader
+      <ModernExcelUploader
         title="CRM Система - Загрузка заказов"
         description="Загрузите Excel файл с заказами. Зеленый статус означает готовность к скачиванию."
         onUpload={handleUpload}

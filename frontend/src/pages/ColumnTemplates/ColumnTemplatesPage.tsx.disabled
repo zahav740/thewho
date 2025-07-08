@@ -1,0 +1,112 @@
+/**
+ * @file: ColumnTemplatesPage.tsx
+ * @description: Страница управления шаблонами колонок
+ * @created: 2025-07-02
+ */
+import React, { useState } from 'react';
+import { FileSpreadsheet, Upload, Settings } from 'lucide-react';
+import ColumnTemplateManager from '../../components/ColumnTemplateManager';
+import DemoColumnManager from '../../components/ColumnTemplateManager/DemoColumnManager';
+
+export const ColumnTemplatesPage: React.FC = () => {
+  const [selectedFileId, setSelectedFileId] = useState<number | undefined>();
+  const [showDemo, setShowDemo] = useState(true); // Показываем демо по умолчанию
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Хлебные крошки */}
+      <div className="bg-white shadow-sm border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center py-4">
+            <div className="flex items-center space-x-2 text-sm text-gray-500">
+              <span>Главная</span>
+              <span>/</span>
+              <span className="text-gray-900">Управление колонками</span>
+            </div>
+            
+            <div className="flex space-x-3">
+              <button
+                onClick={() => setShowDemo(!showDemo)}
+                className={`px-4 py-2 rounded-md text-sm font-medium ${
+                  showDemo 
+                    ? 'bg-blue-600 text-white' 
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              >
+                {showDemo ? '👁️ Демо версия' : '🔧 Реальная версия'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Основной контент */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        {showDemo ? (
+          // Демонстрационная версия
+          <DemoColumnManager />
+        ) : (
+          // Реальная версия
+          <>
+            {/* Выбор файла для анализа */}
+            <div className="mb-8 bg-white rounded-lg shadow-sm border p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                <FileSpreadsheet className="w-5 h-5 mr-2 text-blue-600" />
+                Выбор файла для анализа колонок
+              </h2>
+              
+              <div className="flex items-center space-x-4">
+                <div className="flex-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    ID файла для анализа
+                  </label>
+                  <input
+                    type="number"
+                    value={selectedFileId || ''}
+                    onChange={(e) => setSelectedFileId(e.target.value ? parseInt(e.target.value) : undefined)}
+                    placeholder="Введите ID загруженного Excel файла"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div className="pt-6">
+                  <button
+                    onClick={() => setSelectedFileId(1)} // Для демонстрации
+                    className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center"
+                  >
+                    <Upload className="w-4 h-4 mr-1" />
+                    Тестовый файл
+                  </button>
+                </div>
+              </div>
+              
+              <div className="mt-3 text-sm text-gray-600">
+                <p>💡 Сначала загрузите Excel файл через раздел "Импорт Excel", затем используйте его ID здесь</p>
+              </div>
+            </div>
+
+            {/* Компонент управления шаблонами */}
+            <ColumnTemplateManager fileId={selectedFileId} />
+          </>
+        )}
+
+        {/* Инструкция */}
+        {!showDemo && (
+          <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-6">
+            <h3 className="text-lg font-semibold text-blue-900 mb-3 flex items-center">
+              <Settings className="w-5 h-5 mr-2" />
+              Как использовать
+            </h3>
+            <div className="text-blue-800 space-y-2">
+              <p><strong>1.</strong> Загрузите Excel файл через основной интерфейс импорта</p>
+              <p><strong>2.</strong> Введите ID файла в поле выше для анализа колонок</p>
+              <p><strong>3.</strong> Система покажет все обнаруженные колонки с рекомендациями</p>
+              <p><strong>4.</strong> Выберите нужные колонки и сохраните как набор</p>
+              <p><strong>5.</strong> Используйте сохраненные наборы для новых файлов</p>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};

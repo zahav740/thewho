@@ -168,20 +168,27 @@ export const ProductionPage: React.FC = () => {
 
   // Группировка машин по типам
   const millingMachines = machines
-    ?.filter(machine => machine.machineType === 'MILLING' || machine.machineType === 'milling' || machine.machineType.includes('milling'))
-    .sort((a, b) => a.machineName.localeCompare(b.machineName));
+    ?.filter(machine => {
+      const machineType = machine.machineType || '';
+      return machineType === 'MILLING' || machineType === 'milling' || machineType.includes('milling');
+    })
+    .sort((a, b) => (a.machineName || '').localeCompare(b.machineName || ''));
   
   const turningMachines = machines
-    ?.filter(machine => machine.machineType === 'TURNING' || machine.machineType === 'turning' || machine.machineType.includes('turning'))
-    .sort((a, b) => a.machineName.localeCompare(b.machineName));
+    ?.filter(machine => {
+      const machineType = machine.machineType || '';
+      return machineType === 'TURNING' || machineType === 'turning' || machineType.includes('turning');
+    })
+    .sort((a, b) => (a.machineName || '').localeCompare(b.machineName || ''));
   
   const otherMachines = machines
-    ?.filter(machine => 
-      !['MILLING', 'milling', 'TURNING', 'turning'].includes(machine.machineType) &&
-      !machine.machineType.includes('milling') &&
-      !machine.machineType.includes('turning')
-    )
-    .sort((a, b) => a.machineName.localeCompare(b.machineName));
+    ?.filter(machine => {
+      const machineType = machine.machineType || '';
+      return !['MILLING', 'milling', 'TURNING', 'turning'].includes(machineType) &&
+        !machineType.includes('milling') &&
+        !machineType.includes('turning');
+    })
+    .sort((a, b) => (a.machineName || '').localeCompare(b.machineName || ''));
 
   return (
     <ResponsiveContainer className="production-page">

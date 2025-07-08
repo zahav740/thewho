@@ -1,271 +1,55 @@
-# ========================================
-# 🎯 PRODUCTION CRM - GITIGNORE
-# ========================================
-# Исключаем все ненужные файлы для продакшн кода
-
-# ========================================
-# 📁 CORE APPLICATION FILES TO KEEP:
-# ========================================
-# frontend/src/
-# frontend/public/
-# frontend/package.json
-# backend/src/
-# backend/package.json
-# docker-compose.yml
-# README.md (основной)
-
-# ========================================
-# 🚫 DEPENDENCIES & NODE MODULES
-# ========================================
+# Dependencies
 node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
 .pnpm-debug.log*
-package-lock.json
-yarn.lock
 
-# ========================================
-# 🚫 BUILD & DIST FOLDERS
-# ========================================
+# Production builds
 dist/
 build/
-.next/
-.nuxt/
-coverage/
-.nyc_output
-build-beget/
-deploy_package/
-deployment-beget/
 
-# ========================================
-# 🚫 ENVIRONMENT & CONFIG FILES
-# ========================================
+# Environment files (корневые и во всех подпапках)
 .env
-!.env.example
+.env.*
+**/.env
+**/.env.*
 .env.local
 .env.development
 .env.production
+.env.test
+.env.staging
 .env.beget
-.env.security
-.env.sqlite
-.env.supabase
-.env.prod
+.env.beget.mobile
 .env.beget.supabase
+.env.prod
+.env.security
 .env.supabase.production
+backend/.env
+frontend/.env
+!.env.example
+!**/.env.example
+# Uploads
+uploads/
+public/uploads/
 
-# ========================================
-# 🚫 EXCEL & OFFICE FILES
-# ========================================
-*.xlsx
-*.xlsm
-*.xls
-*.xlsb
-*.csv
-*.ods
-~$*
-*.tmp
-
-# Specific Excel files
-OEE_*.xlsx
-Advanced_OEE_*.xlsx
-Beautiful_OEE_*.xlsx
-Bulletproof_OEE_*.xlsx
-Clean_OEE_*.xlsx
-Corrected_OEE_*.xlsx
-Fixed_OEE_*.xlsx
-Ultimate_OEE_*.xlsx
-Полный_Отчет_*.xlsx
-Система_Мониторинга_*.xlsx
-Проф_Система_*.xlsx
-test_*.xlsx
-
-# ========================================
-# 🚫 BATCH & SCRIPT FILES
-# ========================================
-*.bat
-*.cmd
-*.sh
-*.ps1
-
-# Specific batch files
-START-*.bat
-TEST-*.bat
-CHECK-*.bat
-FIX-*.bat
-QUICK-*.bat
-FINAL-*.bat
-BUILD-*.bat
-COMPILE-*.bat
-DEBUG-*.bat
-DIAGNOSE-*.bat
-CLEAN-*.bat
-EMERGENCY-*.bat
-RESTART-*.bat
-FORCE-*.bat
-RADICAL-*.bat
-DISABLE-*.bat
-REINSTALL-*.bat
-SECURITY-*.bat
-SOLUTION-*.bat
-BEGET-*.bat
-CREATE-*.bat
-RUN-*.bat
-RUSSIAN.bat
-SIMPLE_RUN.bat
-BILD.bat
-
-# Russian batch files
-БЫСТРАЯ-*.bat
-БЫСТРЫЙ-*.bat
-ДИАГНОСТИКА-*.bat
-ЗАПУСК-*.bat
-ИСПРАВИТЬ-*.bat
-ИСПРАВЛЕНИЕ-*.bat
-ПЕРЕЗАПУСК-*.bat
-ПОЛНОЕ-*.bat
-ПРОВЕРКА-*.bat
-РЕШЕНИЕ-*.bat
-СОЗДАТЬ-*.bat
-ФИНАЛЬНАЯ-*.bat
-ФИНАЛЬНОЕ-*.bat
-ЭКСПРЕСС-*.bat
-
-# ========================================
-# 🚫 MARKDOWN DOCUMENTATION FILES
-# ========================================
-*.md
-!README.md
-!CHANGELOG.md
-!CONTRIBUTING.md
-!LICENSE.md
-
-# Specific documentation files
-ADVANCED_OEE_INSTRUCTIONS.md
-ALL-TYPESCRIPT-ERRORS-FIXED.md
-ANALYTICS-FIXES-REPORT.md
-AUTH-SETUP-INSTRUCTIONS.md
-BEGET-DEPLOYMENT-GUIDE.md
-COMPILATION-ERRORS-FIXED.md
-EXCEL-*.md
-FINAL-*.md
-FIXES-*.md
-ORDERS-V2-*.md
-PORTS-*.md
-PROJECT-STATUS-*.md
-SECURITY-*.md
-SOLUTION-*.md
-SUCCESS-REPORT.md
-SUPABASE-SETUP.md
-TYPE-FIXES-*.md
-TYPESCRIPT-*.md
-
-# Russian documentation
-АНАЛИЗ-*.md
-ВРЕМЕННОЕ-*.md
-ВСЕ-*.md
-ДОБАВЛЕНА-*.md
-ЗАПУСК-*.md
-ИНСТРУКЦИЯ-*.md
-ИСПРАВЛЕНИЕ-*.md
-ИСПРАВЛЕНИЯ-*.md
-ОБЪЯСНЕНИЕ-*.md
-ОТЧЕТ-*.md
-РЕШЕНИЕ-*.md
-УДАЛЕНИЕ-*.md
-ФИНАЛЬНАЯ-*.md
-ФИНАЛЬНОЕ-*.md
-ФИНАЛЬНЫЕ-*.md
-ФИНАЛЬНЫЙ-*.md
-
-# ========================================
-# 🚫 PYTHON FILES
-# ========================================
-*.py
-*.pyc
-*.pyo
-*.pyd
-__pycache__/
-*.so
-.Python
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-requirements.txt
-
-# Specific Python files
-boss_*.py
-claude.py
-excel.py
-svodka.py
-script_name.py
-test.py
-test_excel.py
-create_*.py
-run_system.py
-advanced_*.py
-
-# ========================================
-# 🚫 JAVASCRIPT TEST & UTILITY FILES
-# ========================================
-test-*.js
-create-test-*.js
-fix-*.js
-
-# ========================================
-# 🚫 ARCHIVES & DEPLOYMENTS
-# ========================================
-*.zip
-*.tar.gz
-*.rar
-*.7z
-backend-beget-deployment.zip
-frontend-beget-deployment.*
-beget-*.zip
-deploy.zip
-
-# ========================================
-# 🚫 DATABASE FILES
-# ========================================
+# Database
 *.sqlite
 *.sqlite3
 *.db
-*.sql
-CHECK-EXCEL-DATABASE.sql
-CREATE-EXCEL-IMPORT-TABLES.sql
-TEST-ANALYTICS-DATA.sql
 
-# ========================================
-# 🚫 LOGS & TEMPORARY FILES
-# ========================================
+# Logs
 logs/
 *.log
-*.tmp
-*.temp
-*.backup
-.cache/
-.history/
 
-# ========================================
-# 🚫 OS & SYSTEM FILES
-# ========================================
+# OS files
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db
-desktop.ini
 
-# ========================================
-# 🚫 IDE & EDITOR FILES
-# ========================================
-.vscode/
+# IDE files
 .idea/
+.vscode/
 *.swp
 *.swo
 *~
@@ -275,63 +59,69 @@ desktop.ini
 *.launch
 .settings/
 *.sublime-workspace
-*.sublime-project
 
-# ========================================
-# 🚫 MONITORING & ANALYTICS
-# ========================================
-monitoring/
-fail2ban/
-nginx/
-oee_kpi.json
+# Testing
+coverage/
+.nyc_output
 
-# ========================================
-# 🚫 FIXES & TEMP DIRECTORIES
-# ========================================
-FIXES/
-excel_output/
-scripts/
+# Temporary files
+*.tmp
+*.temp
+.cache/
 
-# ========================================
-# 🚫 CONFIG FILES
-# ========================================
-nginx.beget.conf
-ecosystem.*.config.js
-ecosystem.config.json
-.htaccess
-
-# ========================================
-# 🚫 BACKUP & DELETED FILES
-# ========================================
-*.backup
-*.BACKUP.*
-*.deleted
-11.ts.backup
-111.txt
-KPIAnalyticsPage.tsx.deleted
-
-# ========================================
-# 🚫 DOCKER OVERRIDE FILES
-# ========================================
+# Docker
 docker-compose.override.yml
-docker-compose.beget.yml
-docker-compose.prod.yml
-docker-compose.security.yml
-docker-compose.supabase.yml
 
-# ========================================
-# ✅ WHAT TO KEEP (WHITELIST)
-# ========================================
-# The following are kept (not ignored):
-# - frontend/src/**
-# - frontend/public/**
-# - frontend/package.json
-# - backend/src/**
-# - backend/package.json
-# - docker-compose.yml (main)
-# - README.md (main)
-# - .gitignore (this file)
 
-# ========================================
-# 🎯 END OF GITIGNORE
-# ========================================
+# Игнорировать все Excel файлы
+*.xlsx
+*.xlsm
+*.xls
+*.xlsb
+*.csv
+
+# Временные файлы Excel
+~$*
+
+# История и другие временные файлы
+.history/
+*.backup
+*.tmp
+*.temp
+
+# Файлы сборки и деплоя
+build-beget/
+deploy_package/
+deployment-beget/
+build/
+dist/
+*.zip
+*.tar.gz
+
+# Системные файлы
+.DS_Store
+Thumbs.db
+
+# Файлы окружения и конфигурации (дополнительные)
+# Основные .env файлы уже указаны выше
+
+# Логи
+*.log
+logs/
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/

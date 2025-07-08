@@ -1,0 +1,81 @@
+/**
+ * @file: column-template.entity.ts
+ * @description: Сущность для хранения пользовательских наборов колонок
+ * @created: 2025-07-02
+ */
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  Index,
+} from 'typeorm';
+
+export interface ColumnSelection {
+  excelColumn: string;  // Название колонки в Excel
+  systemName: string;   // Как называть в системе
+  include: boolean;     // Включать ли эту колонку
+  order: number;        // Порядок отображения
+}
+
+@Entity('column_templates')
+@Index(['name'])
+@Index(['isDefault'])
+export class ColumnTemplate {
+  @PrimaryGeneratedColumn()
+  id: number;
+
+  @Column({ type: 'varchar', length: 255 })
+  name: string;
+
+  @Column({ type: 'json' })
+  columnSelections: ColumnSelection[];
+
+  @Column({ type: 'boolean', default: false })
+  isDefault: boolean;
+
+  @Column({ type: 'boolean', default: true })
+  isActive: boolean;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  createdBy: string;
+
+  @Column({ type: 'int', default: 0 })
+  usageCount: number;
+
+  @CreateDateColumn()
+  createdAt: Date;
+
+  @UpdateDateColumn()
+  updatedAt: Date;
+
+  // Методы для работы с выбранными колонками
+  getSelectedColumns(): ColumnSelection[] {
+    return this.columnSelections
+      .filter(col => col.include)
+      .sort((a, b) => a.order - b.order);
+  }
+
+  getColumnByExcelName(excelColumn: string): ColumnSelection | undefined {
+    return this.columnSelections.find(col => 
+      col.excelColumn.toLowerCase() === excelColumn.toLowerCase()
+    );
+  }
+
+  // Применение шаблона к данным - оставляем только выбранные колонки
+  applyToData(excelData: Record<string, any>[]): Record<string, any>[] {
+    const selectedColumns = this.getSelectedColumns();
+    
+    return excelData.map(row => {
+      const newRow: Record<string, any> = {};
+      
+      for (const column of selectedColumns) {
+        const value = row[column.excelColumn];
+        newRow[column.systemName] = value;
+      }
+      
+      return newRow;
+    });
+  }
+}

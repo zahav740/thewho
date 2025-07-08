@@ -3,7 +3,7 @@
  * @description: Контроллер для аналитики операций с реальными данными из БД
  * @dependencies: typeorm, entities
  * @created: 2025-06-11
- * @fixed: 2025-06-30 - Исправлены ошибки компиляции
+ * @fixed: 2025-06-11 - Исправлены поля для поиска операций и смен
  */
 import { Controller, Get, Param, Query, Logger } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
@@ -54,6 +54,7 @@ export class OperationAnalyticsController {
       }
 
       // 2. Находим текущую активную операцию на станке
+      // ВАЖНО: В операциях используем поле assignedMachine с различными статусами
       console.log(`🔍 Поиск активной операции для станка ${machineId}`);
       
       const currentOperation = await this.operationRepository.findOne({
@@ -83,6 +84,7 @@ export class OperationAnalyticsController {
       }
 
       // 3. Получаем все записи смен для этой операции
+      // ВАЖНО: В shift_records используем поле machineId
       const dateFilter = startDate && endDate ? {
         date: Between(new Date(startDate), new Date(endDate))
       } : {};
@@ -169,7 +171,7 @@ export class OperationAnalyticsController {
         dayShiftOperator: shift.dayShiftOperator || 'Не указан',
         nightShiftOperator: shift.nightShiftOperator || 'Не указан',
         setupTime: shift.setupTime || 0,
-        setupOperator: shift.dayShiftOperator || 'Не указан',
+        setupOperator: shift.dayShiftOperator || 'Не указан', // Примерное значение
         operationId: shift.operationId,
         drawingNumber: shift.operation?.order?.drawingNumber || 'N/A'
       }));
@@ -190,11 +192,9 @@ export class OperationAnalyticsController {
   private calculateOperationAnalytics(operation: Operation, order: Order, shifts: ShiftRecord[]) {
     // Рассчитываем общее количество произведенных деталей
     let totalProduced = 0;
-    let totalSetupTime = 0;      // Время наладки
-    let totalProductionTime = 0; // Время производства 
-    let totalDownTime = 0;       // Простои
+    let totalWorkingTime = 0;
+    let totalSetupTime = 0;
     let totalShifts = 0;
-    const shiftDuration = 480;   // 8 часов стандартная смена
 
     const operatorStats = new Map();
 
@@ -205,46 +205,26 @@ export class OperationAnalyticsController {
       const nightTime = shift.nightShiftTimePerUnit || 0;
 
       totalProduced += dayQuantity + nightQuantity;
-      
-      // ИСПРАВЛЕННАЯ ЛОГИКА: наладка - это рабочее время
-      const setupTime = shift.setupTime || 0;
-      const productionTime = (dayQuantity * dayTime) + (nightQuantity * nightTime);
-      const downTime = Math.max(0, shiftDuration - setupTime - productionTime);
-      
-      totalSetupTime += setupTime;
-      totalProductionTime += productionTime;
-      totalDownTime += downTime;
+      totalWorkingTime += (dayQuantity * dayTime) + (nightQuantity * nightTime);
+      totalSetupTime += shift.setupTime || 0;
 
       // Учитываем смены
       if (dayQuantity > 0) {
         totalShifts++;
-        this.updateOperatorStats(operatorStats, shift.dayShiftOperator, dayQuantity, dayTime, setupTime, productionTime, downTime);
+        this.updateOperatorStats(operatorStats, shift.dayShiftOperator, dayQuantity, dayTime);
       }
       if (nightQuantity > 0) {
         totalShifts++;
-        this.updateOperatorStats(operatorStats, shift.nightShiftOperator, nightQuantity, nightTime, setupTime, productionTime, downTime);
+        this.updateOperatorStats(operatorStats, shift.nightShiftOperator, nightQuantity, nightTime);
       }
     });
 
-    // Плановое количество рассчитываем от количества заказа
-    const plannedQuantity = order.quantity || 0;
-    
     // Прогресс выполнения
-    const progressPercent = plannedQuantity > 0 ? (totalProduced / plannedQuantity) * 100 : 0;
-    const remaining = Math.max(0, plannedQuantity - totalProduced);
+    const progressPercent = order.quantity > 0 ? (totalProduced / order.quantity) * 100 : 0;
+    const remaining = Math.max(0, order.quantity - totalProduced);
 
-    // ИСПРАВЛЕННЫЕ РАСЧЕТЫ OEE и KPI
-    const totalShiftTime = totalShifts * shiftDuration;
-    const totalActiveTime = totalSetupTime + totalProductionTime;
-    
-    // OEE станка = загруженность (наладка + производство) × производительность × качество
-    const machineAvailability = totalShiftTime > 0 ? (totalActiveTime / totalShiftTime) * 100 : 0;
-    const performance = plannedQuantity > 0 ? (totalProduced / plannedQuantity) * 100 : 0;
-    const qualityRate = totalProduced > 0 ? ((totalProduced - 0) / totalProduced) * 100 : 100; // Пока без учета брака
-    const machineOEE = (machineAvailability * performance * qualityRate) / 10000;
-    
     // Среднее время на деталь
-    const averageTimePerUnit = totalProduced > 0 ? totalProductionTime / totalProduced : 0;
+    const averageTimePerUnit = totalProduced > 0 ? totalWorkingTime / totalProduced : 0;
 
     // Прогноз завершения
     let estimatedCompletion = null;
@@ -276,29 +256,13 @@ export class OperationAnalyticsController {
         daysOverdue: !onSchedule && estimatedCompletion ? 
           Math.ceil((estimatedCompletion.getTime() - deadline.getTime()) / (1000 * 60 * 60 * 24)) : 0
       },
-      // ИСПРАВЛЕННАЯ АНАЛИТИКА ВРЕМЕНИ
       timeAnalytics: {
+        totalWorkingTime: Math.round(totalWorkingTime),
         totalSetupTime: Math.round(totalSetupTime),
-        totalProductionTime: Math.round(totalProductionTime),
-        totalDownTime: Math.round(totalDownTime),
-        totalActiveTime: Math.round(totalActiveTime),
-        machineAvailability: Math.round(machineAvailability * 10) / 10,
         averageTimePerUnit: Math.round(averageTimePerUnit * 10) / 10,
         estimatedCompletion: estimatedCompletion?.toISOString(),
         workingDaysLeft,
         totalDaysWorked: this.calculateWorkingDays(new Date(operation.createdAt), new Date())
-      },
-      // OEE СТАНКА
-      machineMetrics: {
-        oee: Math.round(machineOEE * 10) / 10,
-        availability: Math.round(machineAvailability * 10) / 10,
-        performance: Math.round(performance * 10) / 10,
-        quality: Math.round(qualityRate * 10) / 10,
-        utilizationBreakdown: {
-          setupPercent: totalShiftTime > 0 ? Math.round((totalSetupTime / totalShiftTime) * 1000) / 10 : 0,
-          productionPercent: totalShiftTime > 0 ? Math.round((totalProductionTime / totalShiftTime) * 1000) / 10 : 0,
-          downPercent: totalShiftTime > 0 ? Math.round((totalDownTime / totalShiftTime) * 1000) / 10 : 0
-        }
       },
       shiftsData: {
         totalShifts,
@@ -310,7 +274,7 @@ export class OperationAnalyticsController {
     };
   }
 
-  private updateOperatorStats(operatorMap: Map<string, any>, operatorName: string, quantity: number, timePerUnit: number, setupTime: number, productionTime: number, downTime: number) {
+  private updateOperatorStats(operatorMap: Map<string, any>, operatorName: string, quantity: number, timePerUnit: number) {
     if (!operatorName || operatorName === 'Не указан') return;
 
     if (!operatorMap.has(operatorName)) {
@@ -318,32 +282,21 @@ export class OperationAnalyticsController {
         operatorName,
         totalShifts: 0,
         totalQuantity: 0,
-        totalProductionTime: 0,
-        totalSetupTime: 0,
-        totalDownTime: 0,
+        totalTime: 0,
         averageTimePerUnit: 0,
-        productionEfficiency: 0,
-        operatorKPI: 0
+        efficiency: 0
       });
     }
 
     const operator = operatorMap.get(operatorName);
     operator.totalShifts++;
     operator.totalQuantity += quantity;
-    operator.totalProductionTime += productionTime;
-    operator.totalSetupTime += setupTime;
-    operator.totalDownTime += downTime;
-    
-    // KPI оператора (БЕЗ штрафа за наладку)
-    operator.averageTimePerUnit = operator.totalProductionTime / operator.totalQuantity;
+    operator.totalTime += quantity * timePerUnit;
+    operator.averageTimePerUnit = operator.totalTime / operator.totalQuantity;
     
     // Простой расчет эффективности (можно улучшить)
     const standardTime = 20; // 20 минут - условное нормативное время
-    operator.productionEfficiency = Math.round((standardTime / operator.averageTimePerUnit) * 100);
-    
-    // KPI оператора = эффективность в рамках производства
-    const utilizationFactor = operator.totalProductionTime / ((operator.totalProductionTime + operator.totalDownTime) || 1);
-    operator.operatorKPI = Math.round(operator.productionEfficiency * utilizationFactor);
+    operator.efficiency = Math.round((standardTime / operator.averageTimePerUnit) * 100);
   }
 
   private addWorkingDays(startDate: Date, daysToAdd: number): Date {

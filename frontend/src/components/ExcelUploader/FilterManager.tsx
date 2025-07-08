@@ -305,7 +305,7 @@ export const FilterManager: React.FC = () => {
                 <Input
                   id="name"
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, name: e.target.value })}
                   placeholder="Название фильтра"
                 />
               </div>
@@ -314,7 +314,7 @@ export const FilterManager: React.FC = () => {
                 <Label htmlFor="target_table">Целевая таблица</Label>
                 <Select
                   value={formData.target_table}
-                  onValueChange={(value) => setFormData({ ...formData, target_table: value })}
+                  onValueChange={(value: string) => setFormData({ ...formData, target_table: value })}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -332,7 +332,7 @@ export const FilterManager: React.FC = () => {
               <Input
                 id="description"
                 value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, description: e.target.value })}
                 placeholder="Описание фильтра"
               />
             </div>

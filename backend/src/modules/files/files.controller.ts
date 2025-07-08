@@ -18,10 +18,10 @@ import {
   StreamableFile,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { Response as ExpressResponse } from 'express';
 import { ApiTags, ApiOperation, ApiConsumes, ApiQuery } from '@nestjs/swagger';
+import { Response } from 'express';
 import { FilesService } from './files.service';
-
+import type { Express } from 'express';
 
 @ApiTags('files')
 @Controller('files')
@@ -126,7 +126,7 @@ export class FilesController {
   async getFile(
     @Param('filename') filename: string,
     @Query('folder') folder: string,
-    @Res({ passthrough: true }) res: ExpressResponse,
+    @Res({ passthrough: true }) res: Response,
   ): Promise<StreamableFile> {
     const buffer = await this.filesService.getFile(filename, folder);
     

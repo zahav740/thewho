@@ -1,8 +1,9 @@
 /**
  * @file: operators.controller.ts
- * @description: Контроллер для управления операторами
+ * @description: Контроллер для управления операторами (ИСПРАВЛЕН)
  * @dependencies: DataSource
  * @created: 2025-06-09
+ * @updated: 2025-07-01 - Исправлены типы и названия полей
  */
 import {
   Controller,
@@ -21,21 +22,33 @@ import { DataSource } from 'typeorm';
 export interface Operator {
   id: number;
   name: string;
-  isActive: boolean;
-  operatorType: 'SETUP' | 'PRODUCTION' | 'BOTH';
-  createdAt: string;
-  updatedAt: string;
+  active: boolean;
+  type: 'SETUP' | 'PRODUCTION' | 'BOTH';
+  experience?: number;
+  hourlyrate?: number;
+  email?: string;
+  phone?: string;
+  createdat: string;
+  updatedat: string;
 }
 
 export interface CreateOperatorDto {
   name: string;
-  operatorType?: 'SETUP' | 'PRODUCTION' | 'BOTH';
+  type?: 'SETUP' | 'PRODUCTION' | 'BOTH';
+  experience?: number;
+  hourlyrate?: number;
+  email?: string;
+  phone?: string;
 }
 
 export interface UpdateOperatorDto {
   name?: string;
-  isActive?: boolean;
-  operatorType?: 'SETUP' | 'PRODUCTION' | 'BOTH';
+  active?: boolean;
+  type?: 'SETUP' | 'PRODUCTION' | 'BOTH';
+  experience?: number;
+  hourlyrate?: number;
+  email?: string;
+  phone?: string;
 }
 
 @ApiTags('operators')
@@ -104,27 +117,31 @@ export class OperatorsController {
         SELECT 
           id,
           name,
-          "isActive",
-          "operatorType",
-          "createdAt",
-          "updatedAt"
+          active,
+          type,
+          experience,
+          hourlyrate,
+          email,
+          phone,
+          createdat,
+          updatedat
         FROM operators
         WHERE 1=1
       `;
 
-      const params = [];
+      const params: any[] = [];
       let paramIndex = 1;
 
       // Фильтр по активности
       if (active !== undefined) {
-        query += ` AND "isActive" = $${paramIndex}`;
+        query += ` AND active = $${paramIndex}`;
         params.push(active === 'true');
         paramIndex++;
       }
 
       // Фильтр по типу оператора
       if (type) {
-        query += ` AND ("operatorType" = $${paramIndex} OR "operatorType" = 'BOTH')`;
+        query += ` AND (type = $${paramIndex} OR type = 'BOTH')`;
         params.push(type.toUpperCase());
         paramIndex++;
       }
@@ -190,14 +207,40 @@ export class OperatorsController {
         throw new Error('Оператор с таким именем уже существует');
       }
 
+      const columns: string[] = ['name', 'type'];
+      const values: any[] = [createOperatorDto.name, createOperatorDto.type || 'BOTH'];
+      const placeholders: string[] = ['$1', '$2'];
+      let paramIndex = 3;
+
+      if (createOperatorDto.experience !== undefined) {
+        columns.push('experience');
+        values.push(createOperatorDto.experience);
+        placeholders.push(`$${paramIndex++}`);
+      }
+
+      if (createOperatorDto.hourlyrate !== undefined) {
+        columns.push('hourlyrate');
+        values.push(createOperatorDto.hourlyrate);
+        placeholders.push(`$${paramIndex++}`);
+      }
+
+      if (createOperatorDto.email) {
+        columns.push('email');
+        values.push(createOperatorDto.email);
+        placeholders.push(`$${paramIndex++}`);
+      }
+
+      if (createOperatorDto.phone) {
+        columns.push('phone');
+        values.push(createOperatorDto.phone);
+        placeholders.push(`$${paramIndex++}`);
+      }
+
       const result = await this.dataSource.query(
-        `INSERT INTO operators (name, "operatorType") 
-         VALUES ($1, $2) 
+        `INSERT INTO operators (${columns.join(', ')}) 
+         VALUES (${placeholders.join(', ')}) 
          RETURNING *`,
-        [
-          createOperatorDto.name,
-          createOperatorDto.operatorType || 'BOTH'
-        ]
+        values
       );
 
       console.log('OperatorsController.createOperator: Оператор создан:', result[0]);
@@ -217,8 +260,8 @@ export class OperatorsController {
     try {
       console.log('OperatorsController.updateOperator: Обновление оператора:', id, updateOperatorDto);
 
-      const setClauses = [];
-      const params = [];
+      const setClauses: string[] = [];
+      const params: any[] = [];
       let paramIndex = 1;
 
       if (updateOperatorDto.name !== undefined) {
@@ -227,19 +270,43 @@ export class OperatorsController {
         paramIndex++;
       }
 
-      if (updateOperatorDto.isActive !== undefined) {
-        setClauses.push(`"isActive" = $${paramIndex}`);
-        params.push(updateOperatorDto.isActive);
+      if (updateOperatorDto.active !== undefined) {
+        setClauses.push(`active = $${paramIndex}`);
+        params.push(updateOperatorDto.active);
         paramIndex++;
       }
 
-      if (updateOperatorDto.operatorType !== undefined) {
-        setClauses.push(`"operatorType" = $${paramIndex}`);
-        params.push(updateOperatorDto.operatorType);
+      if (updateOperatorDto.type !== undefined) {
+        setClauses.push(`type = $${paramIndex}`);
+        params.push(updateOperatorDto.type);
         paramIndex++;
       }
 
-      setClauses.push(`"updatedAt" = NOW()`);
+      if (updateOperatorDto.experience !== undefined) {
+        setClauses.push(`experience = $${paramIndex}`);
+        params.push(updateOperatorDto.experience);
+        paramIndex++;
+      }
+
+      if (updateOperatorDto.hourlyrate !== undefined) {
+        setClauses.push(`hourlyrate = $${paramIndex}`);
+        params.push(updateOperatorDto.hourlyrate);
+        paramIndex++;
+      }
+
+      if (updateOperatorDto.email !== undefined) {
+        setClauses.push(`email = $${paramIndex}`);
+        params.push(updateOperatorDto.email);
+        paramIndex++;
+      }
+
+      if (updateOperatorDto.phone !== undefined) {
+        setClauses.push(`phone = $${paramIndex}`);
+        params.push(updateOperatorDto.phone);
+        paramIndex++;
+      }
+
+      setClauses.push(`updatedat = NOW()`);
 
       if (setClauses.length === 1) {
         throw new Error('Нет данных для обновления');
@@ -277,7 +344,7 @@ export class OperatorsController {
       // Мягкое удаление - просто помечаем как неактивный
       const result = await this.dataSource.query(
         `UPDATE operators 
-         SET "isActive" = false, "updatedAt" = NOW()
+         SET active = false, updatedat = NOW()
          WHERE id = $1
          RETURNING name`,
         [parseInt(id)]

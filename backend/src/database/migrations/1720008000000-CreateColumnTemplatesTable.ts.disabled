@@ -1,0 +1,113 @@
+/**
+ * @file: CreateColumnTemplatesTable1720008000000.ts
+ * @description: Миграция для создания упрощенной таблицы column_templates
+ * @created: 2025-07-02
+ */
+import { MigrationInterface, QueryRunner, Table, Index } from 'typeorm';
+
+export class CreateColumnTemplatesTable1720008000000 implements MigrationInterface {
+  name = 'CreateColumnTemplatesTable1720008000000';
+
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.createTable(
+      new Table({
+        name: 'column_templates',
+        columns: [
+          {
+            name: 'id',
+            type: 'int',
+            isPrimary: true,
+            isGenerated: true,
+            generationStrategy: 'increment',
+          },
+          {
+            name: 'name',
+            type: 'varchar',
+            length: '255',
+          },
+          {
+            name: 'columnSelections',
+            type: 'json',
+          },
+          {
+            name: 'isDefault',
+            type: 'boolean',
+            default: false,
+          },
+          {
+            name: 'isActive',
+            type: 'boolean',
+            default: true,
+          },
+          {
+            name: 'createdBy',
+            type: 'varchar',
+            length: '255',
+            isNullable: true,
+          },
+          {
+            name: 'usageCount',
+            type: 'int',
+            default: 0,
+          },
+          {
+            name: 'createdAt',
+            type: 'timestamp',
+            default: 'CURRENT_TIMESTAMP',
+          },
+          {
+            name: 'updatedAt',
+            type: 'timestamp',
+            default: 'CURRENT_TIMESTAMP',
+            onUpdate: 'CURRENT_TIMESTAMP',
+          },
+        ],
+      }),
+      true,
+    );
+
+    // Создаем индексы
+    await queryRunner.createIndex(
+      'column_templates',
+      new Index('IDX_column_templates_name', ['name']),
+    );
+
+    await queryRunner.createIndex(
+      'column_templates',
+      new Index('IDX_column_templates_isDefault', ['isDefault']),
+    );
+
+    // Добавляем поле columnTemplateId в таблицу excel_files
+    await queryRunner.query(`
+      ALTER TABLE excel_files 
+      ADD COLUMN columnTemplateId INT NULL,
+      ADD COLUMN mappedData LONGTEXT NULL
+    `);
+
+    // Создаем внешний ключ
+    await queryRunner.query(`
+      ALTER TABLE excel_files 
+      ADD CONSTRAINT FK_excel_files_columnTemplate 
+      FOREIGN KEY (columnTemplateId) 
+      REFERENCES column_templates(id) 
+      ON DELETE SET NULL
+    `);
+  }
+
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    // Удаляем внешний ключ и колонки из excel_files
+    await queryRunner.query(`
+      ALTER TABLE excel_files 
+      DROP FOREIGN KEY FK_excel_files_columnTemplate
+    `);
+
+    await queryRunner.query(`
+      ALTER TABLE excel_files 
+      DROP COLUMN columnTemplateId,
+      DROP COLUMN mappedData
+    `);
+
+    // Удаляем таблицу шаблонов
+    await queryRunner.dropTable('column_templates');
+  }
+}
