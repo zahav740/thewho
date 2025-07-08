@@ -295,7 +295,7 @@ export class OrdersPdfFixedController {
     @Param('orderId') orderId: string,
     @UploadedFile() file: Express.Multer.File,
     @Query('action') action?: 'replace' | 'use_existing' | 'create_revision' | 'force',
-    @Res() res: Response,
+    @Res() res?: Response,
   ) {
     try {
       this.logger.log(`📁 Загрузка PDF для заказа ${orderId}: ${file.originalname}`);
@@ -314,7 +314,7 @@ export class OrdersPdfFixedController {
       this.logger.log(`📋 Номер чертежа: ${drawingNumber}`);
 
       // Если нет действия, проверяем дубликаты
-      if (!action || action === 'check') {
+      if (!action) {
         const fileHash = crypto.createHash('md5').update(file.buffer).digest('hex');
         const hashDuplicate = await this.pdfEnhancedService.checkDuplicateByHash(fileHash);
         const drawingDuplicate = await this.pdfEnhancedService.checkDuplicateByDrawingNumber(drawingNumber);
@@ -351,7 +351,7 @@ export class OrdersPdfFixedController {
             ]
           };
 
-          return res.status(409).json(duplicateResponse);
+          return res?.status(409).json(duplicateResponse);
         }
       }
 
@@ -388,7 +388,7 @@ export class OrdersPdfFixedController {
       };
 
       this.logger.log(`✅ PDF загружен успешно: ${JSON.stringify(response)}`);
-      return res.status(201).json(response);
+      return res?.status(201).json(response);
 
     } catch (error) {
       this.logger.error(`❌ Ошибка загрузки PDF: ${error.message}`, error.stack);

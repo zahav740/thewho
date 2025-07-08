@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎯 Тест основного Excel endpoint</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .upload-area {
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            margin: 20px 0;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .upload-area:hover {
+            border-color: #007bff;
+            background: #f8f9fa;
+        }
+        .upload-area.dragover {
+            border-color: #007bff;
+            background: #e3f2fd;
+        }
+        input[type="file"] {
+            display: none;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px 5px;
+            font-size: 14px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .result {
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 15px 0;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .success {
+            border-color: #28a745;
+            background: #d4edda;
+            color: #155724;
+        }
+        .error {
+            border-color: #dc3545;
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .info {
+            border-color: #17a2b8;
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+        .warning {
+            border-color: #ffc107;
+            background: #fff3cd;
+            color: #856404;
+        }
+        .status {
+            font-weight: bold;
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .progress {
+            width: 100%;
+            height: 20px;
+            background: #f0f0f0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(45deg, #007bff, #0056b3);
+            width: 0%;
+            transition: width 0.3s;
+        }
+        .endpoint-info {
+            background: #e9ecef;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+            font-family: monospace;
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 Тест основного Excel endpoint</h1>
+        <p>Этот тестер проверяет конкретно endpoint <code>/api/orders/upload-excel</code>, который используется фронтендом.</p>
+        
+        <div class="endpoint-info">
+            <strong>🔗 Тестируемый endpoint:</strong><br>
+            POST /api/orders/upload-excel<br>
+            <strong>📝 Поле файла:</strong> excel<br>
+            <strong>🎨 Цветовые фильтры:</strong> colorFilters (JSON string)
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>📂 Загрузка Excel файла</h2>
+        
+        <div class="upload-area" id="uploadArea">
+            <div style="font-size: 48px; margin-bottom: 15px;">📊</div>
+            <h3>Перетащите Excel файл сюда или кликните для выбора</h3>
+            <p>Поддерживаются форматы: .xlsx, .xls</p>
+            <p style="color: #666; font-size: 12px;">Максимальный размер: 100MB</p>
+        </div>
+        
+        <input type="file" id="fileInput" accept=".xlsx,.xls">
+        
+        <div style="text-align: center;">
+            <button onclick="selectFile()">📁 Выбрать файл</button>
+            <button id="uploadBtn" onclick="uploadFile()" disabled>🚀 Загрузить Excel</button>
+            <button onclick="clearAll()">🧹 Очистить</button>
+        </div>
+        
+        <div class="status" id="status">Выберите Excel файл для загрузки</div>
+        
+        <div class="progress" id="progress" style="display: none;">
+            <div class="progress-bar" id="progressBar"></div>
+        </div>
+        
+        <div class="result" id="result" style="display: none;"></div>
+    </div>
+
+    <div class="container">
+        <h2>📋 Инструкции</h2>
+        <ol>
+            <li><strong>Выберите Excel файл</strong> с данными заказов</li>
+            <li><strong>Нажмите "Загрузить Excel"</strong> для отправки на сервер</li>
+            <li><strong>Проверьте результат</strong> в области ниже</li>
+        </ol>
+        
+        <h3>📊 Ожидаемая структура Excel:</h3>
+        <table style="width: 100%; border-collapse: collapse; margin: 10px 0;">
+            <tr style="background: #f8f9fa;">
+                <th style="border: 1px solid #ddd; padding: 8px;">A</th>
+                <th style="border: 1px solid #ddd; padding: 8px;">B</th>
+                <th style="border: 1px solid #ddd; padding: 8px;">C</th>
+                <th style="border: 1px solid #ddd; padding: 8px;">D</th>
+                <th style="border: 1px solid #ddd; padding: 8px;">E</th>
+            </tr>
+            <tr>
+                <td style="border: 1px solid #ddd; padding: 8px;">Номер чертежа</td>
+                <td style="border: 1px solid #ddd; padding: 8px;">Количество</td>
+                <td style="border: 1px solid #ddd; padding: 8px;">Срок</td>
+                <td style="border: 1px solid #ddd; padding: 8px;">Приоритет</td>
+                <td style="border: 1px solid #ddd; padding: 8px;">Тип работы</td>
+            </tr>
+            <tr>
+                <td style="border: 1px solid #ddd; padding: 8px;">DRW-001</td>
+                <td style="border: 1px solid #ddd; padding: 8px;">10</td>
+                <td style="border: 1px solid #ddd; padding: 8px;">2025-08-01</td>
+                <td style="border: 1px solid #ddd; padding: 8px;">2</td>
+                <td style="border: 1px solid #ddd; padding: 8px;">Фрезерная</td>
+            </tr>
+        </table>
+    </div>
+
+    <script>
+        let selectedFile = null;
+
+        // Drag & Drop функциональность
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+
+        uploadArea.addEventListener('click', () => fileInput.click());
+
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFileSelect(files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFileSelect(e.target.files[0]);
+            }
+        });
+
+        function selectFile() {
+            fileInput.click();
+        }
+
+        function handleFileSelect(file) {
+            selectedFile = file;
+            updateStatus(`✅ Выбран файл: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`, 'info');
+            document.getElementById('uploadBtn').disabled = false;
+        }
+
+        async function uploadFile() {
+            if (!selectedFile) {
+                updateStatus('❌ Файл не выбран', 'error');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('excel', selectedFile); // Важно: используем 'excel' как ожидает backend
+
+            updateStatus('🚀 Загружаем файл на сервер...', 'info');
+            showProgress(30);
+
+            try {
+                const response = await fetch('/api/orders/upload-excel', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                showProgress(70);
+
+                const data = await response.json();
+                
+                showProgress(100);
+                
+                setTimeout(() => {
+                    hideProgress();
+                    
+                    if (response.ok && data.success) {
+                        updateStatus(
+                            `✅ Импорт завершен успешно!\\n` +
+                            `📊 Создано: ${data.data?.created || 0}\\n` +
+                            `🔄 Обновлено: ${data.data?.updated || 0}\\n` +
+                            `❌ Ошибок: ${data.data?.errors?.length || 0}`,
+                            'success'
+                        );
+                        showResult(data, 'success');
+                    } else {
+                        updateStatus(
+                            `❌ Ошибка импорта: ${data.message || 'Неизвестная ошибка'}`,
+                            'error'
+                        );
+                        showResult(data, 'error');
+                    }
+                }, 500);
+
+            } catch (error) {
+                hideProgress();
+                updateStatus(`❌ Ошибка соединения: ${error.message}`, 'error');
+                showResult({ error: error.message, timestamp: new Date().toISOString() }, 'error');
+            }
+        }
+
+        function updateStatus(message, type = 'info') {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.className = `status ${type}`;
+        }
+
+        function showProgress(percent) {
+            const progress = document.getElementById('progress');
+            const progressBar = document.getElementById('progressBar');
+            progress.style.display = 'block';
+            progressBar.style.width = percent + '%';
+        }
+
+        function hideProgress() {
+            const progress = document.getElementById('progress');
+            progress.style.display = 'none';
+        }
+
+        function showResult(data, type) {
+            const resultEl = document.getElementById('result');
+            resultEl.className = `result ${type}`;
+            resultEl.textContent = JSON.stringify(data, null, 2);
+            resultEl.style.display = 'block';
+        }
+
+        function clearAll() {
+            selectedFile = null;
+            document.getElementById('fileInput').value = '';
+            document.getElementById('uploadBtn').disabled = true;
+            document.getElementById('result').style.display = 'none';
+            hideProgress();
+            updateStatus('Выберите Excel файл для загрузки', 'info');
+        }
+
+        // Проверяем доступность сервера при загрузке
+        window.addEventListener('load', async () => {
+            try {
+                const response = await fetch('/api/orders');
+                if (response.ok) {
+                    console.log('✅ Сервер доступен');
+                } else {
+                    updateStatus('⚠️ Сервер недоступен - проверьте что backend запущен', 'warning');
+                }
+            } catch (error) {
+                updateStatus('❌ Не удается подключиться к серверу - запустите backend', 'error');
+            }
+        });
+    </script>
+</body>
+</html>

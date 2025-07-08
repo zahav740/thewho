@@ -6,7 +6,7 @@
 import React from 'react';
 import { Layout, Breadcrumb } from 'antd';
 import { HomeOutlined, FileExcelOutlined } from '@ant-design/icons';
-import ExcelImportManager from '../../components/ExcelImportManager';
+import { ExcelImportManager } from '../../components/ExcelImportManager';
 
 const { Content } = Layout;
 

@@ -22,7 +22,7 @@ import { ordersApi } from '../../services/ordersApi';
 import { OrdersV2Filter } from '../../types/order-v2.types';
 import { OrdersList } from './components/OrdersList';
 import { OrderForm } from './components/OrderForm';
-import { ExcelImportModal } from './components/ExcelImportModal';
+import { ImprovedExcelImportModal } from './components/ImprovedExcelImportModal';
 import { DeleteMenuButton } from './components/DeleteMenuButton';
 import { useTranslation } from '../../i18n';
 import { 
@@ -242,7 +242,7 @@ window.refreshOrdersListV2 = async () => {
             {t('database.new_order')}
           </Button>
           
-          <Tooltip title="Импорт Excel с автоматическим распределением приоритетов">
+          <Tooltip title="Импорт Excel с проверкой дубликатов">
             <Button
               type="primary"
               icon={<FileExcelOutlined />}
@@ -255,7 +255,7 @@ window.refreshOrdersListV2 = async () => {
                 height: screenInfo.isMobile ? 44 : 'auto'
               }}
             >
-              {screenInfo.isMobile ? 'Excel импорт' : 'Excel импорт'}
+              {screenInfo.isMobile ? 'Импорт с проверкой' : 'Импорт с проверкой дубликатов'}
               <CheckCircleOutlined style={{ marginLeft: 4 }} />
             </Button>
           </Tooltip>
@@ -305,8 +305,8 @@ window.refreshOrdersListV2 = async () => {
         onSuccess={handleFormSuccess}
       />
 
-      {/* Модальное окно Excel импорта */}
-      <ExcelImportModal
+      {/* Модальное окно Excel импорта с проверкой дубликатов */}
+      <ImprovedExcelImportModal
         visible={showExcelImport}
         onClose={() => setShowExcelImport(false)}
         onSuccess={handleExcelImportSuccess}

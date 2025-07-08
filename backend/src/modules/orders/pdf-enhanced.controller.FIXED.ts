@@ -174,7 +174,7 @@ export class PdfEnhancedController {
     @Param('drawingNumber') drawingNumber: string,
     @Param('fileName') fileName: string,
     @Query('download') download?: string,
-    @Res({ passthrough: true }) res: Response
+    @Res({ passthrough: true }) res?: Response
   ): Promise<StreamableFile> {
     try {
       this.logger.log(`📄 Запрос PDF файла: ${drawingNumber}/${fileName}`);

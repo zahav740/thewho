@@ -8,7 +8,7 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as ExcelJS from 'exceljs';
-import { Order, Priority } from '../../database/entities/order.entity';
+import { Order } from '../../database/entities/order.entity';
 import { Operation, OperationType } from '../../database/entities/operation.entity';
 import { OrdersService } from './orders.service';
 import type { Express } from 'express';
@@ -23,11 +23,11 @@ interface ParsedOrder {
   drawingNumber: string;
   quantity: number;
   deadline: Date;
-  priority: Priority;
+  priority: number; // Изменили на number
   workType?: string;
   operations: Array<{
     operationNumber: number;
-    operationType: OperationType;
+    operationType: string; // Исправили на string
     machineAxes: number;
     estimatedTime: number;
   }>;
@@ -163,7 +163,10 @@ export class ExcelImportService {
 
   private parseRowToOrder(row: ExcelJS.Row): ParsedOrder | null {
     const drawingNumber = row.getCell(1).value?.toString();
-    if (!drawingNumber) return null;
+    if (!drawingNumber) {
+      console.log('⚠️ Пропускаем строку: нет номера чертежа');
+      return null;
+    }
 
     const quantity = parseInt(row.getCell(2).value?.toString() || '0', 10);
     const deadlineValue = row.getCell(3).value;
@@ -173,7 +176,7 @@ export class ExcelImportService {
 
     const operations = this.parseOperations(row);
 
-    return {
+    const order = {
       drawingNumber,
       quantity,
       deadline,
@@ -181,6 +184,17 @@ export class ExcelImportService {
       workType,
       operations,
     };
+
+    console.log(`📝 Парсим заказ:`, {
+      drawingNumber,
+      quantity,
+      deadline: deadline.toISOString().split('T')[0],
+      priority,
+      workType,
+      operationsCount: operations.length
+    });
+
+    return order;
   }
 
   private parseDate(value: any): Date {
@@ -201,20 +215,23 @@ export class ExcelImportService {
     throw new Error('Дата не указана');
   }
 
-  private parsePriority(value?: string): Priority {
-    const priorityMap: Record<string, Priority> = {
-      '1': Priority.CRITICAL,
-      'критический': Priority.CRITICAL,
-      '2': Priority.HIGH,
-      'высокий': Priority.HIGH,
-      '3': Priority.MEDIUM,
-      'средний': Priority.MEDIUM,
-      '4': Priority.LOW,
-      'низкий': Priority.LOW,
+  private parsePriority(value?: string): number {
+    const priorityValue = parseInt(value || '3', 10);
+    // Возвращаем число от 1 до 4
+    if (priorityValue >= 1 && priorityValue <= 4) {
+      return priorityValue;
+    }
+    
+    // Если не число, пытаемся распознать по тексту
+    const priorityMap: Record<string, number> = {
+      'критический': 1,
+      'высокий': 2,
+      'средний': 3,
+      'низкий': 4,
     };
 
     const priority = priorityMap[value?.toLowerCase() || ''];
-    return priority || Priority.MEDIUM;
+    return priority || 3; // По умолчанию средний приоритет
   }
 
   private parseOperations(row: ExcelJS.Row): ParsedOrder['operations'] {
@@ -241,18 +258,24 @@ export class ExcelImportService {
     return operations;
   }
 
-  private parseOperationType(value?: string): OperationType {
-    const typeMap: Record<string, OperationType> = {
-      'фрезерная': OperationType.MILLING,
-      'milling': OperationType.MILLING,
-      'ф': OperationType.MILLING,
-      'токарная': OperationType.TURNING,
-      'turning': OperationType.TURNING,
-      'т': OperationType.TURNING,
+  private parseOperationType(value?: string): string {
+    const typeMap: Record<string, string> = {
+      'фрезерная': 'MILLING',
+      'milling': 'MILLING',
+      'ф': 'MILLING',
+      'токарная': 'TURNING',
+      'turning': 'TURNING',
+      'т': 'TURNING',
+      'сверление': 'DRILLING',
+      'drilling': 'DRILLING',
+      'с': 'DRILLING',
+      'шлифовка': 'GRINDING',
+      'grinding': 'GRINDING',
+      'ш': 'GRINDING',
     };
 
     const type = typeMap[value?.toLowerCase() || ''];
-    return type || OperationType.MILLING;
+    return type || 'MILLING';
   }
 
   private async processImportedOrders(
@@ -293,13 +316,13 @@ export class ExcelImportService {
     const order = this.orderRepository.create({
       drawingNumber: orderData.drawingNumber,
       quantity: orderData.quantity,
-      remainingQuantity: orderData.quantity,
       deadline: orderData.deadline,
       priority: orderData.priority,
-      status: 'planned',
+      workType: orderData.workType,
     });
 
     const savedOrder = await this.orderRepository.save(order);
+    console.log(`✅ Создан заказ: ${savedOrder.drawingNumber} (ID: ${savedOrder.id})`);
 
     // Создаем операции
     for (const opData of orderData.operations) {
@@ -307,9 +330,12 @@ export class ExcelImportService {
         operationNumber: opData.operationNumber,
         operationType: opData.operationType,
         estimatedTime: opData.estimatedTime,
+        machineAxes: opData.machineAxes,
+        status: 'PENDING',
         order: savedOrder,
       });
       await this.operationRepository.save(operation);
+      console.log(`  ✅ Создана операция: ${opData.operationNumber} (${opData.operationType})`);
     }
   }
 
@@ -319,11 +345,12 @@ export class ExcelImportService {
   ): Promise<void> {
     // Обновляем данные заказа
     existingOrder.quantity = orderData.quantity;
-    existingOrder.remainingQuantity = orderData.quantity;
     existingOrder.deadline = orderData.deadline;
     existingOrder.priority = orderData.priority;
+    existingOrder.workType = orderData.workType;
 
     await this.orderRepository.save(existingOrder);
+    console.log(`✅ Обновлен заказ: ${existingOrder.drawingNumber} (ID: ${existingOrder.id})`);
 
     // Удаляем старые операции и создаем новые
     await this.operationRepository.delete({ order: { id: existingOrder.id } });
@@ -333,9 +360,12 @@ export class ExcelImportService {
         operationNumber: opData.operationNumber,
         operationType: opData.operationType,
         estimatedTime: opData.estimatedTime,
+        machineAxes: opData.machineAxes,
+        status: 'PENDING',
         order: existingOrder,
       });
       await this.operationRepository.save(operation);
+      console.log(`  ✅ Обновлена операция: ${opData.operationNumber} (${opData.operationType})`);
     }
   }
 }

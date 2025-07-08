@@ -29,6 +29,10 @@ import { PdfEnhancedService } from './pdf-enhanced.service';
 import { PdfEnhancedController } from './pdf-enhanced.controller';
 import { PdfDebugController } from './pdf-debug.controller';
 import { OrdersSimpleController } from './orders-simple.controller';
+import { ExcelImportWithDuplicatesService } from './excel-import-with-duplicates.service';
+import { ExcelSimpleController } from './excel-simple.controller';
+import { ExcelTestController } from './excel-test.controller';
+import { ExcelUploadTestController } from './excel-upload-test.controller';
 
 @Module({
   imports: [
@@ -43,6 +47,9 @@ import { OrdersSimpleController } from './orders-simple.controller';
     EnhancedOrdersController,    // 🆕 Полный импорт Excel
     PdfEnhancedController,       // 🆕 Улучшенный PDF модуль
     PdfDebugController,          // 🆕 Диагностика PDF
+    ExcelSimpleController,       // 🆕 ТЕСТОВЫЙ контроллер Excel
+    ExcelTestController,         // 🆕 ПОЛНЫЙ тест Excel импорта
+    ExcelUploadTestController,   // 🆕 ТЕСТ основного endpoint /orders/upload-excel
   ],
   providers: [
     OrdersService, 
@@ -54,6 +61,7 @@ import { OrdersSimpleController } from './orders-simple.controller';
     ExcelProductionLoaderService, // 🆕 Загрузка производственного плана
     FlexibleExcelImportService,   // 🆕 Гибкий импорт с пользовательским маппингом
     PdfEnhancedService,          // 🆕 Улучшенная работа с PDF
+    ExcelImportWithDuplicatesService, // 🆕 Импорт Excel с проверкой дубликатов
   ],
   exports: [
     OrdersService, 
@@ -64,6 +72,7 @@ import { OrdersSimpleController } from './orders-simple.controller';
     ExcelProductionLoaderService, 
     FlexibleExcelImportService,
     PdfEnhancedService,          // 🆕 Экспортируем PDF сервис
+    ExcelImportWithDuplicatesService, // 🆕 Экспортируем сервис дубликатов
   ],
 })
 export class OrdersModule {}

@@ -70,4 +70,14 @@ export class Order {
 
   @UpdateDateColumn({ name: 'updatedAt', type: 'timestamp' })
   updatedAt: Date;
+
+  // Поля для soft delete (теперь существуют в БД)
+  @Column({ name: 'isDeleted', type: 'boolean', default: false, nullable: true })
+  isDeleted?: boolean;
+
+  @Column({ name: 'deletedAt', type: 'timestamp', nullable: true })
+  deletedAt?: Date;
+
+  @Column({ name: 'deletedBy', type: 'varchar', length: 100, nullable: true })
+  deletedBy?: string;
 }

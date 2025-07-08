@@ -37,6 +37,9 @@ export class FileHash {
   @JoinColumn({ name: 'order_id' })
   order: Order;
 
+  @Column({ name: 'order_id', type: 'integer' })
+  orderId: number;
+
   @Column({ name: 'drawing_number', type: 'varchar', length: 100 })
   drawingNumber: string;
 

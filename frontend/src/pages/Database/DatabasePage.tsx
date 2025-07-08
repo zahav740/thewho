@@ -22,7 +22,7 @@ import { OrdersList } from './components/OrdersList';
 import { OrderForm } from './components/OrderForm.SIMPLE';
 import { CSVImportModal } from './components/CSVImportModal';
 import AdvancedExcelUploader from '../../components/ExcelUploader/AdvancedExcelUploader';
-// import { EnhancedExcelImporter } from '../../components/ExcelUploader/EnhancedExcelImporter'; // Заменено на AdvancedExcelUploader
+import EnhancedExcelImportModal from '../../components/ExcelImportManager/EnhancedExcelImportModal';
 import { useTranslation } from '../../i18n';
 import { 
   ResponsiveContainer, 
@@ -38,7 +38,7 @@ export const DatabasePage: React.FC = () => {
   const [showOrderForm, setShowOrderForm] = useState(false);
   const [showCSVImport, setShowCSVImport] = useState(false);
   const [showAdvancedExcelImport, setShowAdvancedExcelImport] = useState(false);
-  // const [showEnhancedExcelImport, setShowEnhancedExcelImport] = useState(false); // Заменено
+  const [showEnhancedExcelImport, setShowEnhancedExcelImport] = useState(false);
   const [editingOrderId, setEditingOrderId] = useState<number | undefined>();
   const [filter, setFilter] = useState<OrdersFilter>({ page: 1, limit: 10 });
   const queryClient = useQueryClient();
@@ -140,7 +140,7 @@ export const DatabasePage: React.FC = () => {
   const handleEnhancedExcelImportSuccess = (result: any) => {
     queryClient.invalidateQueries({ queryKey: ['orders'] });
     message.success(
-      tWithParams('message.success.excel_imported', { created: result.created, updated: result.updated })
+      `Импорт завершен! Создано: ${result.created}, обновлено: ${result.updated}`
     );
   };
 
@@ -272,22 +272,22 @@ export const DatabasePage: React.FC = () => {
               </Button>
             </Tooltip>
             
-            {/* Новый Excel импорт с выбором колонок */}
-            <Tooltip title="Новый импорт Excel с возможностью выбора любых колонок">
+            {/* Новый Excel импорт с проверкой дубликатов */}
+            <Tooltip title="Новый импорт Excel с проверкой дубликатов и сохранением прогресса">
               <Button
                 type="primary"
                 icon={<FileExcelOutlined />}
-                onClick={() => setShowAdvancedExcelImport(true)}
+                onClick={() => setShowEnhancedExcelImport(true)}
                 size={componentSize}
                 style={{ 
-                  background: 'linear-gradient(45deg, #52c41a, #389e0d)',
+                  background: 'linear-gradient(45deg, #1890ff, #096dd9)',
                   border: 'none',
                   width: screenInfo.isMobile ? '100%' : 'auto',
                   height: screenInfo.isMobile ? 44 : 'auto',
                   marginBottom: screenInfo.isMobile ? 8 : 0
                 }}
               >
-                {screenInfo.isMobile ? '🆕 Excel (выбор колонок)' : '🆕 Excel (выбор колонок)'}
+                {screenInfo.isMobile ? '🔄 Excel (дубликаты)' : '🔄 Excel (проверка дубликатов)'}
                 <CheckCircleOutlined style={{ marginLeft: 4, color: 'white' }} />
               </Button>
             </Tooltip>
@@ -379,6 +379,13 @@ export const DatabasePage: React.FC = () => {
           description="Выберите любые колонки из вашего Excel файла и настройте соответствие полям заказа. Система автоматически проанализирует структуру файла."
         />
       </Modal>
+
+      {/* Новый Excel импорт с проверкой дубликатов */}
+      <EnhancedExcelImportModal
+        visible={showEnhancedExcelImport}
+        onClose={() => setShowEnhancedExcelImport(false)}
+        onSuccess={handleEnhancedExcelImportSuccess}
+      />
     </ResponsiveContainer>
   );
 };

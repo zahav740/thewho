@@ -36,6 +36,7 @@ import { SynchronizationModule } from './modules/synchronization/synchronization
 import { AuthModule } from './modules/auth/auth.module';
 import { ExcelImportModule } from './modules/excel-import/excel-import.module';
 import { ImprovedExcelImportModule } from './modules/excel-import/improved-excel-import.module';
+import { ExcelImportDuplicatesModule } from './modules/excel-import-duplicates/excel-import-duplicates.module';
 
 @Module({
   imports: [
@@ -74,6 +75,7 @@ import { ImprovedExcelImportModule } from './modules/excel-import/improved-excel
     AuthModule,
     ExcelImportModule,
     ImprovedExcelImportModule,
+    ExcelImportDuplicatesModule,
   ],
   providers: [
     // В данный момент глобальный JWT Guard закомментирован.

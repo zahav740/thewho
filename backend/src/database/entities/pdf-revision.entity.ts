@@ -24,6 +24,9 @@ export class PdfRevision {
   @JoinColumn({ name: 'order_id' })
   order: Order;
 
+  @Column({ name: 'order_id', type: 'integer' })
+  orderId: number;
+
   @Column({ name: 'revision_number', type: 'integer', default: 1 })
   revisionNumber: number;
 

@@ -249,15 +249,45 @@ export class OrdersController {
   }
 
   @Delete(':id')
-  @ApiOperation({ summary: 'Удалить заказ' })
-  @ApiResponse({ status: 204, description: 'Заказ удален' })
+  @ApiOperation({ summary: 'Мягкое удаление заказа' })
+  @ApiResponse({ status: 204, description: 'Заказ мягко удален' })
   async remove(@Param('id') id: string): Promise<void> {
     try {
-      this.logger.log(`Received request to delete order ${id}`);
+      this.logger.log(`Received request to soft delete order ${id}`);
       await this.ordersService.remove(id);
-      this.logger.log(`Order ${id} successfully deleted`);
+      this.logger.log(`Order ${id} successfully soft deleted`);
     } catch (error) {
-      this.logger.error(`Error deleting order ${id}: ${error.message}`, error.stack);
+      this.logger.error(`Error soft deleting order ${id}: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  @Post(':id/restore')
+  @ApiOperation({ summary: 'Восстановление удаленного заказа' })
+  @ApiResponse({ status: 200, description: 'Восстановленный заказ', type: Order })
+  async restore(@Param('id') id: string): Promise<Order> {
+    try {
+      this.logger.log(`Restoring order ${id}`);
+      const restoredOrder = await this.ordersService.restore(id);
+      this.logger.log(`Order ${id} successfully restored`);
+      return restoredOrder;
+    } catch (error) {
+      this.logger.error(`Error restoring order ${id}: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  @Get('deleted/list')
+  @ApiOperation({ summary: 'Получение списка удаленных заказов' })
+  @ApiResponse({ status: 200, description: 'Список удаленных заказов', type: [Order] })
+  async findDeleted(): Promise<Order[]> {
+    try {
+      this.logger.log('Fetching deleted orders');
+      const deletedOrders = await this.ordersService.findDeleted();
+      this.logger.log(`Found ${deletedOrders.length} deleted orders`);
+      return deletedOrders;
+    } catch (error) {
+      this.logger.error(`Error fetching deleted orders: ${error.message}`, error.stack);
       throw error;
     }
   }

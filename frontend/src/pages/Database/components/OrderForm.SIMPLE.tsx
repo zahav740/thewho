@@ -138,7 +138,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
           // Извлекаем номер чертежа из формы
           const formData = getValues();
           const drawingNumber = formData.drawingNumber || `order_${newOrder.id}`;
-          await pdfApi.uploadPdf(newOrder.id, drawingNumber, pdfFile);
+          const result = await pdfApi.uploadPdfSimple(newOrder.id, pdfFile);
           message.success('PDF файл также загружен');
         } catch (error) {
           console.error('❌ PDF upload error for new order:', error);
@@ -168,7 +168,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
           // Извлекаем номер чертежа из формы
           const formData = getValues();
           const drawingNumber = formData.drawingNumber || `order_${orderId}`;
-          await pdfApi.uploadPdf(orderId, drawingNumber, pdfFile);
+          const result = await pdfApi.uploadPdfSimple(orderId, pdfFile);
           message.success('PDF файл также обновлен');
         } catch (error) {
           console.error('❌ PDF upload error for updated order:', error);

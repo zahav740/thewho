@@ -674,4 +674,5 @@ const ExcelImportManager: React.FC = () => {
   );
 };
 
+export { ExcelImportManager };
 export default ExcelImportManager;

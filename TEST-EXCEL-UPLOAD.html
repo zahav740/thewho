@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест загрузки Excel файлов</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        h1, h2 {
+            color: #333;
+        }
+        .test-section {
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        .upload-area {
+            border: 2px dashed #ccc;
+            border-radius: 5px;
+            padding: 20px;
+            text-align: center;
+            margin: 10px 0;
+            cursor: pointer;
+            transition: border-color 0.3s;
+        }
+        .upload-area:hover {
+            border-color: #007bff;
+        }
+        .upload-area.dragover {
+            border-color: #007bff;
+            background: #f0f8ff;
+        }
+        input[type="file"] {
+            display: none;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .result {
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 10px;
+            margin: 10px 0;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .success {
+            border-color: #28a745;
+            background: #d4edda;
+            color: #155724;
+        }
+        .error {
+            border-color: #dc3545;
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .info {
+            border-color: #17a2b8;
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+        .status {
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        .progress {
+            width: 100%;
+            height: 20px;
+            background: #f0f0f0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .progress-bar {
+            height: 100%;
+            background: #007bff;
+            width: 0%;
+            transition: width 0.3s;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Тест загрузки Excel файлов</h1>
+        <p>Используйте эту страницу для тестирования загрузки и обработки Excel файлов в системе.</p>
+    </div>
+
+    <!-- Тест 1: Простая проверка файла -->
+    <div class="container">
+        <h2>📋 Тест 1: Проверка файла</h2>
+        <div class="test-section">
+            <p>Проверяет структуру Excel файла без импорта данных</p>
+            <div class="upload-area" onclick="document.getElementById('file1').click()">
+                <p>📁 Кликните или перетащите Excel файл сюда</p>
+                <p><small>Поддерживаются форматы: .xlsx, .xls</small></p>
+            </div>
+            <input type="file" id="file1" accept=".xlsx,.xls" onchange="handleFileCheck(this.files[0])">
+            <button onclick="document.getElementById('file1').click()">Выбрать файл</button>
+            <button id="checkBtn" onclick="checkFile()" disabled>Проверить файл</button>
+            
+            <div class="status" id="status1">Выберите файл для проверки</div>
+            <div class="result" id="result1" style="display: none;"></div>
+        </div>
+    </div>
+
+    <!-- Тест 2: Полный импорт -->
+    <div class="container">
+        <h2>🚀 Тест 2: Полный импорт</h2>
+        <div class="test-section">
+            <p>Полная загрузка и импорт данных из Excel в базу данных</p>
+            <div class="upload-area" onclick="document.getElementById('file2').click()">
+                <p>📁 Кликните или перетащите Excel файл сюда</p>
+                <p><small>Файл будет импортирован в базу данных</small></p>
+            </div>
+            <input type="file" id="file2" accept=".xlsx,.xls" onchange="handleFileImport(this.files[0])">
+            <button onclick="document.getElementById('file2').click()">Выбрать файл</button>
+            <button id="importBtn" onclick="importFile()" disabled>Импортировать</button>
+            
+            <div class="status" id="status2">Выберите файл для импорта</div>
+            <div class="progress" id="progress2" style="display: none;">
+                <div class="progress-bar" id="progressBar2"></div>
+            </div>
+            <div class="result" id="result2" style="display: none;"></div>
+        </div>
+    </div>
+
+    <!-- Тест 3: Тестовый контроллер -->
+    <div class="container">
+        <h2>🧪 Тест 3: Тестовый режим</h2>
+        <div class="test-section">
+            <p>Имитация импорта без реального сохранения в базу данных</p>
+            <div class="upload-area" onclick="document.getElementById('file3').click()">
+                <p>📁 Кликните или перетащите Excel файл сюда</p>
+                <p><small>Только тестирование, данные не сохраняются</small></p>
+            </div>
+            <input type="file" id="file3" accept=".xlsx,.xls" onchange="handleFileTest(this.files[0])">
+            <button onclick="document.getElementById('file3').click()">Выбрать файл</button>
+            <button id="testBtn" onclick="testFile()" disabled>Тестировать</button>
+            
+            <div class="status" id="status3">Выберите файл для тестирования</div>
+            <div class="result" id="result3" style="display: none;"></div>
+        </div>
+    </div>
+
+    <script>
+        let selectedFiles = {};
+
+        // Drag & Drop обработчики
+        document.querySelectorAll('.upload-area').forEach(area => {
+            area.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                area.classList.add('dragover');
+            });
+            
+            area.addEventListener('dragleave', () => {
+                area.classList.remove('dragover');
+            });
+            
+            area.addEventListener('drop', (e) => {
+                e.preventDefault();
+                area.classList.remove('dragover');
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    const testNum = area.parentElement.querySelector('input[type="file"]').id.replace('file', '');
+                    handleFile(files[0], testNum);
+                }
+            });
+        });
+
+        function handleFile(file, testNum) {
+            selectedFiles[testNum] = file;
+            document.getElementById(`status${testNum}`).textContent = `Выбран файл: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+            document.getElementById(`status${testNum}`).className = 'status';
+            
+            // Активируем соответствующую кнопку
+            if (testNum === '1') {
+                document.getElementById('checkBtn').disabled = false;
+            } else if (testNum === '2') {
+                document.getElementById('importBtn').disabled = false;
+            } else if (testNum === '3') {
+                document.getElementById('testBtn').disabled = false;
+            }
+        }
+
+        function handleFileCheck(file) {
+            if (file) handleFile(file, '1');
+        }
+
+        function handleFileImport(file) {
+            if (file) handleFile(file, '2');
+        }
+
+        function handleFileTest(file) {
+            if (file) handleFile(file, '3');
+        }
+
+        async function checkFile() {
+            const file = selectedFiles['1'];
+            if (!file) return;
+
+            const status = document.getElementById('status1');
+            const result = document.getElementById('result1');
+            
+            status.textContent = '🔍 Проверяем файл...';
+            status.className = 'status info';
+            result.style.display = 'none';
+
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+
+                const response = await fetch('/api/excel-test/check-file', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    status.textContent = '✅ Файл успешно проверен!';
+                    status.className = 'status success';
+                    result.className = 'result success';
+                } else {
+                    status.textContent = '❌ Ошибка проверки файла';
+                    status.className = 'status error';
+                    result.className = 'result error';
+                }
+                
+                result.textContent = JSON.stringify(data, null, 2);
+                result.style.display = 'block';
+                
+            } catch (error) {
+                status.textContent = '❌ Ошибка подключения к серверу';
+                status.className = 'status error';
+                result.className = 'result error';
+                result.textContent = `Ошибка: ${error.message}`;
+                result.style.display = 'block';
+            }
+        }
+
+        async function importFile() {
+            const file = selectedFiles['2'];
+            if (!file) return;
+
+            const status = document.getElementById('status2');
+            const result = document.getElementById('result2');
+            const progress = document.getElementById('progress2');
+            const progressBar = document.getElementById('progressBar2');
+            
+            status.textContent = '🚀 Импортируем файл...';
+            status.className = 'status info';
+            result.style.display = 'none';
+            progress.style.display = 'block';
+            progressBar.style.width = '50%';
+
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+
+                const response = await fetch('/api/excel-test/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+                progressBar.style.width = '100%';
+                
+                setTimeout(() => {
+                    progress.style.display = 'none';
+                    
+                    if (data.success) {
+                        status.textContent = `✅ Импорт завершен! Создано: ${data.data?.created || 0}, Обновлено: ${data.data?.updated || 0}`;
+                        status.className = 'status success';
+                        result.className = 'result success';
+                    } else {
+                        status.textContent = '❌ Ошибка импорта';
+                        status.className = 'status error';
+                        result.className = 'result error';
+                    }
+                    
+                    result.textContent = JSON.stringify(data, null, 2);
+                    result.style.display = 'block';
+                }, 500);
+                
+            } catch (error) {
+                progress.style.display = 'none';
+                status.textContent = '❌ Ошибка подключения к серверу';
+                status.className = 'status error';
+                result.className = 'result error';
+                result.textContent = `Ошибка: ${error.message}`;
+                result.style.display = 'block';
+            }
+        }
+
+        async function testFile() {
+            const file = selectedFiles['3'];
+            if (!file) return;
+
+            const status = document.getElementById('status3');
+            const result = document.getElementById('result3');
+            
+            status.textContent = '🧪 Тестируем файл...';
+            status.className = 'status info';
+            result.style.display = 'none';
+
+            try {
+                const formData = new FormData();
+                formData.append('excel', file);
+
+                const response = await fetch('/api/excel-simple/test-upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    status.textContent = '✅ Тест прошел успешно!';
+                    status.className = 'status success';
+                    result.className = 'result success';
+                } else {
+                    status.textContent = '❌ Тест не прошел';
+                    status.className = 'status error';
+                    result.className = 'result error';
+                }
+                
+                result.textContent = JSON.stringify(data, null, 2);
+                result.style.display = 'block';
+                
+            } catch (error) {
+                status.textContent = '❌ Ошибка подключения к серверу';
+                status.className = 'status error';
+                result.className = 'result error';
+                result.textContent = `Ошибка: ${error.message}`;
+                result.style.display = 'block';
+            }
+        }
+    </script>
+</body>
+</html>
